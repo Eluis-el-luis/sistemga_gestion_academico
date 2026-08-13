@@ -29,5 +29,7 @@ class DatabaseSeeder extends Seeder
             AulaAsignaturaDocenteSeeder::class,
             HorarioSeeder::class,
         ]);
+
+        $this->call(PermisoSeeder::class);
     }
 }

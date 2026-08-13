@@ -12,9 +12,45 @@
 
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                    <!-- Dashboard siempre visible -->
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
+
+                    <!-- Módulo de Alumnos -->
+                    @can('alumnos.ver')
+                        <x-nav-link :href="'#'" :active="false">
+                            Alumnos y Matrícula
+                        </x-nav-link>
+                    @endcan
+
+                    <!-- Módulo de Calificaciones -->
+                    @can('notas.ver')
+                        <x-nav-link :href="'#'" :active="false">
+                            Calificaciones
+                        </x-nav-link>
+                    @endcan
+
+                    <!-- Módulo de Asistencia -->
+                    @can('asistencia.ver')
+                        <x-nav-link :href="'#'" :active="false">
+                            Asistencia
+                        </x-nav-link>
+                    @endcan
+
+                    <!-- Módulo Académico (Estructura) -->
+                    @can('malla.ver')
+                        <x-nav-link :href="'#'" :active="false">
+                            Académico
+                        </x-nav-link>
+                    @endcan
+
+                    <!-- Reportes -->
+                    @can('reportes.ver')
+                        <x-nav-link :href="'#'" :active="false">
+                            Reportes
+                        </x-nav-link>
+                    @endcan
                 </div>
             </div>
 
