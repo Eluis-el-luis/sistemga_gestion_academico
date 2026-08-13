@@ -11,7 +11,9 @@ class UsuarioSeeder extends Seeder
     public function run(): void
     {
         $rolDirector = Rol::where('nombre', 'Director')->first()->id;
-        $rolDocente = Rol::where('nombre', 'Docente por Asignatura')->first()->id;
+        
+        // Ajustamos la búsqueda al nuevo nombre del rol
+        $rolDocente = Rol::where('nombre', 'Docente')->first()->id;
 
         // Usuario Director
         Usuario::create([
