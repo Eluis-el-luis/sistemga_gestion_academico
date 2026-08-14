@@ -19,7 +19,7 @@
 
                     <!-- Módulo de Alumnos -->
                     @can('alumnos.ver')
-                        <x-nav-link :href="'#'" :active="false">
+                        <x-nav-link :href="route('academico.alumnos.index')" :active="request()->routeIs('academico.alumnos.*')">
                             Alumnos y Matrícula
                         </x-nav-link>
                     @endcan
