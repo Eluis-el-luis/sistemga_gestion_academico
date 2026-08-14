@@ -14,6 +14,7 @@ class Usuario extends Authenticatable
     protected $fillable = ['nombre_completo', 'email', 'password', 'rol_id', 'activo'];
     protected $hidden = ['password'];
 
+    protected $guard_name = 'web';
     // Relación: Un usuario pertenece a un rol
     public function rol()
     {
