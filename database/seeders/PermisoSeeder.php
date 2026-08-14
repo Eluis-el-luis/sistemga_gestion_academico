@@ -10,6 +10,8 @@ class PermisoSeeder extends Seeder
 {
     public function run(): void
     {
+        // 0. Limpiar la caché de Spatie ANTES de crear o asignar permisos
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
         // 1. Definir la lista completa de permisos basados en los módulos de la matriz
         $permisos = [
             // Alumnos y Matrícula
@@ -42,7 +44,7 @@ class PermisoSeeder extends Seeder
 
         // 2. Crear los permisos en la base de datos
         foreach ($permisos as $permiso) {
-            Permission::findOrCreate($permiso);
+            Permission::firstOrCreate(['name' => $permiso]);
         }
 
         // 3. Obtener o crear los roles en el ecosistema de Spatie
