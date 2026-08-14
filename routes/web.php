@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AlumnoController;
 use App\Http\Controllers\MatriculaController;
+use App\Http\Controllers\AulaController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -26,10 +27,12 @@ Route::middleware('auth')->group(function () {
         
         Route::resource('alumnos', AlumnoController::class);
         Route::resource('matriculas', MatriculaController::class);
-        
+        Route::resource('aulas', AulaController::class);
     });
 
 });
+
+
 
 
 
