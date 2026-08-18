@@ -16,7 +16,7 @@
             
             <!-- Tarjeta 1: Datos Personales -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                <h3 class="text-lg font-bold text-gray-900 border-b pb-2 mb-4">Datos Personales</h3>
+                <h3 class="text-lg font-bold text-gray-900 border-b pb-2 mb-4">Datos del Alumno</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <p class="text-sm text-gray-500 uppercase tracking-wide">Código Único</p>
@@ -31,8 +31,107 @@
                         <p class="font-semibold text-gray-900">{{ \Carbon\Carbon::parse($alumno->fecha_nacimiento)->format('d/m/Y') }}</p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-500 uppercase tracking-wide">Edad Aproximada</p>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Edad</p>
                         <p class="font-semibold text-gray-900">{{ \Carbon\Carbon::parse($alumno->fecha_nacimiento)->age }} años</p>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Dirección</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->direccion_domiciliar ?? 'No especificada' }}</p>
+                    </div>
+
+                </div>
+
+                <h3 class="text-lg font-bold text-gray-900 border-b pb-2 mb-4"></h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Nombre Completo de la Madre</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->madre_nombre_completo ?? 'No especificado' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Cedula de la Madre</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->madre_cedula ?? 'No especificada' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Teléfono de la Madre</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->madre_telefono ?? 'No especificado' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Ocupación de la Madre</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->madre_ocupacion ?? 'No especificada' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Asiste Iglesia</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->madre_nombre_iglesia ?? 'No especificado' }}</p>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-bold text-gray-900 border-b pb-2 mb-4"></h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Nombre Completo del Padre</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->padre_nombre_completo ?? 'No especificado' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Cedula del Padre</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->padre_cedula ?? 'No especificada' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Teléfono del Padre</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->padre_telefono ?? 'No especificado' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Ocupación del Padre</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->padre_ocupacion ?? 'No especificada' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Asiste Iglesia</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->padre_nombre_iglesia ?? 'No especificado' }}</p>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-bold text-gray-900 border-b pb-2 mb-4"></h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Nombre Completo del Tutor</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->tutor_nombre_completo ?? 'No especificado' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Cedula del Tutor</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->tutor_cedula ?? 'No especificada' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Teléfono del Tutor</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->tutor_telefono ?? 'No especificado' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Ocupación del Tutor</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->tutor_ocupacion ?? 'No especificada' }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
+                <h3 class="text-lg font-bold text-gray-900 border-b pb-2 mb-4">Información Médica y Retiro</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Enfermedades</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->enfermedades_cronicas ?? 'No especificadas' }}</p>
+                    </div>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 border-b pb-2 mb-4"></h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Autorizado Para Retirar</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->autorizado_retirar_nombre ?? 'No especificado' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Cedula </p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->autorizado_retirar_cedula ?? 'No especificada' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Teléfono</p>
+                        <p class="font-semibold text-gray-900">{{ $alumno->autorizado_retirar_telefono ?? 'No especificado' }}</p>
                     </div>
                 </div>
             </div>
@@ -41,13 +140,7 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                 <div class="flex justify-between items-center border-b pb-2 mb-4">
                     <h3 class="text-lg font-bold text-gray-900">Historial Académico</h3>
-                    
-                    <!-- Botón para Matricular -->
-                    @can('create', App\Models\Matricula::class)
-                        <a href="{{ route('academico.matriculas.create', ['alumno_id' => $alumno->id]) }}" class="text-sm bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-150">
-                            + Nueva Matrícula
-                        </a>
-                    @endcan
+
                 </div>
                 
                 <div class="overflow-x-auto">

@@ -17,11 +17,6 @@
                             <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
                         </svg>
                     </div>
-                    <div class="ml-3">
-                        <p class="text-sm text-indigo-700 font-bold">
-                            Estás matriculando a: <span class="text-indigo-900">{{ $alumno->nombre_completo }}</span> ({{ $alumno->codigo_unico_persona }})
-                        </p>
-                    </div>
                 </div>
             </div>
 
@@ -31,9 +26,20 @@
                     
                     <form action="{{ route('academico.matriculas.store') }}" method="POST">
                         @csrf
-                        
-                        <!-- Campo oculto con el ID del alumno -->
-                        <input type="hidden" name="alumno_id" value="{{ $alumno->id }}">
+
+                        <!-- Fila 0: Seleccionar Alumno -->
+                        <div class="mb-6">
+                            <label for="alumno_id" class="block text-gray-700 font-bold mb-2">Seleccione el Estudiante *</label>
+                            <select name="alumno_id" id="alumno_id" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('alumno_id') border-red-500 @enderror" required>
+                                <option value="">Buscar estudiante (Código - Nombre)...</option>
+                                @foreach($alumnos as $alumno)
+                                    <option value="{{ $alumno->id }}" {{ (old('alumno_id') == $alumno->id || $alumnoSeleccionado == $alumno->id) ? 'selected' : '' }}>
+                                        {{ $alumno->codigo_unico_persona }} - {{ $alumno->nombre_completo }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('alumno_id') <p class="text-red-500 text-xs italic mt-1">{{ $message }}</p> @enderror
+                        </div>
 
                         <!-- Fila 1: Año Escolar y Fecha -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -86,7 +92,7 @@
                         </div>
 
                         <div class="flex items-center justify-between mt-8 border-t pt-4">
-                            <a href="{{ route('academico.alumnos.show', $alumno->id) }}" class="text-gray-500 hover:text-gray-700 font-bold py-2 px-4">
+                            <a href="{{ route('academico.matriculas.index') }}" class="text-gray-500 hover:text-gray-700 font-bold py-2 px-4">
                                 Cancelar
                             </a>
                             <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:shadow-outline transition duration-150">

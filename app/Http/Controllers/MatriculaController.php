@@ -21,14 +21,14 @@ class MatriculaController extends Controller
     {
         $this->authorize('create', Matricula::class);
 
-        // Obtenemos al alumno mediante el ID enviado por la URL
-        $alumno = Alumno::findOrFail($request->alumno_id);
-        
-        // Cargamos los catálogos necesarios para los "select" del formulario
+        $alumnos = Alumno::orderBy('nombre_completo')->get();
         $aulas = Aula::with('grado')->get();
-        $anios = AnioEscolar::where('activo', true)->get(); // Traemos solo los años activos
+        $anios = AnioEscolar::where('activo', true)->get();
+        
+        // Capturamos el ID si venimos del flujo de "Nuevo Ingreso"
+        $alumnoSeleccionado = $request->query('alumno_id');
 
-        return view('academico.matriculas.create', compact('alumno', 'aulas', 'anios'));
+        return view('academico.matriculas.create', compact('alumnos', 'aulas', 'anios', 'alumnoSeleccionado'));
     }
 
     /**
@@ -40,8 +40,23 @@ class MatriculaController extends Controller
 
         Matricula::create($request->validated());
 
-        // Redirigimos de vuelta a la ficha del alumno
-        return redirect()->route('academico.alumnos.show', $request->alumno_id)
-                         ->with('success', 'Alumno matriculado exitosamente para este periodo.');
+        // Redirigimos al índice general de matrículas
+        return redirect()->route('academico.matriculas.index')
+                         ->with('success', 'Matrícula procesada exitosamente.');
+    }
+
+    /**
+     * Muestra el listado general de matrículas.
+     */
+    public function index()
+    {
+        $this->authorize('viewAny', Matricula::class);
+
+        // Traemos las matrículas con sus relaciones para no saturar la base de datos (Eager Loading)
+        $matriculas = Matricula::with(['alumno', 'aula.grado', 'anioEscolar'])
+                        ->latest('fecha_matricula')
+                        ->paginate(15);
+
+        return view('academico.matriculas.index', compact('matriculas'));
     }
 }

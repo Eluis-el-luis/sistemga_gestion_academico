@@ -50,13 +50,14 @@ class PermisoSeeder extends Seeder
         // 3. Obtener o crear los roles en el ecosistema de Spatie
         $director = Role::firstOrCreate(['name' => 'Director']);
         $subdirector = Role::firstOrCreate(['name' => 'Subdirector']);
-        $docente = Role::firstOrCreate(['name' => 'Docente']);
+        $docente_guia = Role::firstOrCreate(['name' => 'Docente Guía', 'guard_name' => 'web']);
+        $docente_asignatura = Role::firstOrCreate(['name' => 'Docente por Asignatura', 'guard_name' => 'web']);
         
         $alumno = Role::firstOrCreate(['name' => 'Alumno']);
 
         // 4. Asignar permisos al Director (Según matriz: Gestiona casi todo, ve el resto)
         $director->syncPermissions([
-            'alumnos.gestionar', 'notas.ver', 'asistencia.ver', 'indicadores.ver', 
+            'alumnos.gestionar','alumnos.ver', 'notas.ver', 'asistencia.ver', 'indicadores.ver', 
             'boletines.ver', 'malla.gestionar', 'asignaturas_aula.gestionar', 
             'horarios.ver', 'avance.ver', 'apoyo_padres.ver', 'reparacion.ver', 
             'reportes.gestionar', 'configuracion.gestionar'
@@ -64,22 +65,32 @@ class PermisoSeeder extends Seeder
 
         // 5. Asignar permisos al Subdirector (Según matriz: Similar al director, pero supervisa más)
         $subdirector->syncPermissions([
-            'alumnos.supervisar', 'notas.ver', 'asistencia.ver', 'indicadores.ver', 
+            'alumnos.supervisar','alumnos.ver', 'notas.ver', 'asistencia.ver', 'indicadores.ver', 
             'boletines.ver', 'malla.gestionar', 'asignaturas_aula.gestionar', 
             'horarios.ver', 'avance.ver', 'apoyo_padres.ver', 'reparacion.ver', 
             'reportes.supervisar', 'configuracion.ver'
         ]);
 
-        // 6. Asignar permisos al Docente (Según matriz: Gestiona sus áreas, ve el resto)
-        // Nota: El alcance de *qué* alumnos gestiona se controlará en las Policies, 
-        // aquí solo le damos el permiso general para acceder al módulo.
-        $docente->syncPermissions([
-            'alumnos.gestionar', 'alumnos.ver', 'notas.gestionar', 'notas.ver', 
+        // EL DOCENTE GUÍA: Tiene permiso de "alumnos.gestionar" (Puede Matricular)
+        $docente_guia->syncPermissions([
+            'alumnos.gestionar', 'alumnos.ver', // <- MAGIA: Esto le da acceso a Matricular
+            'notas.gestionar', 'notas.ver', 
             'asistencia.gestionar', 'asistencia.ver', 'indicadores.gestionar', 
             'indicadores.ver', 'boletines.gestionar', 'asignaturas_aula.gestionar', 
             'asignaturas_aula.ver', 'horarios.gestionar', 'horarios.ver', 
             'avance.gestionar', 'avance.ver', 'apoyo_padres.gestionar', 
             'reparacion.gestionar', 'reparacion.ver', 'reportes.ver'
         ]);
+
+        // EL DOCENTE POR ASIGNATURA: NO tiene "alumnos.gestionar", solo "alumnos.ver"
+        $docente_asignatura->syncPermissions([
+            'alumnos.ver', 
+            'notas.gestionar', 'notas.ver', 
+            'asistencia.gestionar', 'asistencia.ver', 'indicadores.gestionar', 
+            'indicadores.ver', 'asignaturas_aula.ver', 'horarios.ver', 
+            'avance.gestionar', 'avance.ver', 'reparacion.gestionar', 'reparacion.ver'
+        ]);
+
+
     }
 }

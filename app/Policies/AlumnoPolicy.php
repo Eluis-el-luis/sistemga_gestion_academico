@@ -30,13 +30,10 @@ class AlumnoPolicy
         return $usuario->hasPermissionTo('alumnos.ver') || $usuario->hasPermissionTo('alumnos.gestionar');
     }
 
-    /**
-     * ¿Puede crear un nuevo alumno?
-     */
     public function create(Usuario $usuario): bool
     {
-        // Solo quien tenga el permiso explícito de gestionar puede crear (Director, Coordinador)
-        return $usuario->hasPermissionTo('alumnos.gestionar');
+        // Solo Dirección y Subdirección pueden registrar nuevos ingresos en el sistema
+        return $usuario->hasRole(['Director', 'Subdirector']);
     }
 
     /**
@@ -44,7 +41,7 @@ class AlumnoPolicy
      */
     public function update(Usuario $usuario, Alumno $alumno): bool
     {
-        if (!$usuario->hasPermissionTo('alumnos.gestionar')) {
+        if (!$usuario->hasRole(['Director', 'Subdirector'])) {
             return false;
         }
 
@@ -67,5 +64,10 @@ class AlumnoPolicy
         }
 
         return false;
+    }
+
+    public function delete(Usuario $usuario, Alumno $alumno): bool
+    {
+        return $usuario->hasRole(['Director', 'Subdirector']);
     }
 }

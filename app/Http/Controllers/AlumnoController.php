@@ -6,6 +6,8 @@ use App\Models\Alumno;
 use App\Http\Requests\StoreAlumnoRequest;
 use App\Http\Requests\UpdateAlumnoRequest;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Request;
+
 
 class AlumnoController extends Controller
 {
@@ -15,16 +17,54 @@ class AlumnoController extends Controller
     /**
      * Muestra el listado de alumnos.
      */
-    public function index()
+    public function index(Request $request)
     {
-        // 1. Autorización: Llama al método viewAny de AlumnoPolicy
         $this->authorize('viewAny', Alumno::class);
 
-        // 2. Consulta: Traemos a los alumnos ordenados alfabéticamente y paginados
-        $alumnos = Alumno::orderBy('nombre_completo', 'asc')->paginate(15);
+        // Preparamos la consulta trayendo también la última matrícula del alumno
+        $query = Alumno::with(['matriculas' => function($q) {
+            $q->latest('fecha_matricula');
+        }, 'matriculas.aula.grado', 'matriculas.aula.modalidad']);
 
-        // 3. Respuesta
-        return view('academico.alumnos.index', compact('alumnos'));
+        // --- 1. ALCANCE POR ROL (Scope) ---
+        $usuario = auth()->user();
+        if ($usuario->hasRole('Docente Guía')) {
+            // Buscamos si el usuario está asociado a un docente, y sacamos sus aulas
+            $docente = \App\Models\Docente::where('usuario_id', $usuario->id)->first();
+            if ($docente) {
+                $aulas_id = \App\Models\Aula::where('docente_guia_id', $docente->id)->pluck('id');
+                // Filtramos para que solo vea a los alumnos matriculados en SUS aulas
+                $query->whereHas('matriculas', function($q) use ($aulas_id) {
+                    $q->whereIn('aula_id', $aulas_id)->where('estado', 'activo');
+                });
+            }
+        }
+
+        // --- 2. FILTROS EN PANTALLA ---
+        if ($request->filled('modalidad_id')) {
+            $query->whereHas('matriculas.aula', function($q) use ($request) {
+                $q->where('modalidad_id', $request->modalidad_id);
+            });
+        }
+        if ($request->filled('grado_id')) {
+            $query->whereHas('matriculas.aula', function($q) use ($request) {
+                $q->where('grado_id', $request->grado_id);
+            });
+        }
+        if ($request->filled('aula_id')) {
+            $query->whereHas('matriculas', function($q) use ($request) {
+                $q->where('aula_id', $request->aula_id);
+            });
+        }
+
+        $alumnos = $query->paginate(15);
+
+        // Traemos los catálogos para llenar los <select> de los filtros
+        $modalidades = \App\Models\Modalidad::all();
+        $grados = \App\Models\Grado::all();
+        $aulas = \App\Models\Aula::all();
+
+        return view('academico.alumnos.index', compact('alumnos', 'modalidades', 'grados', 'aulas'));
     }
 
     /**
@@ -37,18 +77,15 @@ class AlumnoController extends Controller
         return view('academico.alumnos.create');
     }
 
-    /**
-     * Guarda el nuevo alumno en la base de datos.
-     */
     public function store(StoreAlumnoRequest $request)
     {
         $this->authorize('create', Alumno::class);
 
-        // El request ya viene validado gracias a StoreAlumnoRequest
         Alumno::create($request->validated());
 
+        // Redirigimos al directorio de alumnos en vez de la matrícula
         return redirect()->route('academico.alumnos.index')
-                         ->with('success', 'Alumno registrado exitosamente.');
+                         ->with('success', 'Expediente del alumno registrado con éxito. El Docente Guía ya puede proceder con su matrícula en el aula correspondiente.');
     }
 
     /**

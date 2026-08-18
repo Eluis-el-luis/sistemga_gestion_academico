@@ -2,24 +2,22 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Editar Datos del Alumno: ') }} <span class="text-indigo-600">{{ $alumno->nombre_completo }}</span>
+            {{ __('Editar Expediente: ') }} {{ $alumno->nombre_completo }}
         </h2>
     </x-slot>
 
     <div class="py-12">
-        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
-                    
                     <form action="{{ route('academico.alumnos.update', $alumno) }}" method="POST">
                         @csrf
-                        @method('PUT') <!-- Convierte el POST en PUT para la actualización -->
+                        @method('PUT')
                         
-                        <!-- Incluimos el mismo parcial -->
-                        @include('academico.alumnos.partials._form', ['btnText' => 'Actualizar Datos'])
+                        <!-- Aquí llamamos a la vista parcial que armamos con las tarjetas -->
+                        @include('academico.alumnos.partials._form', ['btnText' => 'Actualizar Expediente'])
                         
                     </form>
-
                 </div>
             </div>
         </div>
