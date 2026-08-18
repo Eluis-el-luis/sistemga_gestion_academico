@@ -9,15 +9,18 @@ class RolSeeder extends Seeder
 {
     public function run(): void
     {
+        // Catálogo de roles jerárquicos del colegio[cite: 1]
         $roles = [
             ['nombre' => 'Director'],
             ['nombre' => 'Subdirector'],
-            ['nombre' => 'Docente'],
+            ['nombre' => 'Coordinador'],
+            ['nombre' => 'Docente Guia'],
+            ['nombre' => 'Docente por Asignatura'],
             ['nombre' => 'Alumno'],
         ];
 
         foreach ($roles as $rol) {
-            Rol::create($rol);
+            Rol::firstOrCreate(['nombre' => $rol['nombre']]);
         }
     }
 }

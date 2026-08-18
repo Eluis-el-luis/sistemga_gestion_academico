@@ -16,7 +16,8 @@ class DatabaseSeeder extends Seeder
             RolSeeder::class,
             ModalidadSeeder::class,
             AnioEscolarSeeder::class,
-            GradoSeeder::class,           
+            GradoSeeder::class,
+            PermisoSeeder::class,           
             CorteEvaluativoSeeder::class, 
             AsignaturaSeeder::class,
             MallaCurricularSeeder::class,
@@ -29,7 +30,5 @@ class DatabaseSeeder extends Seeder
             AulaAsignaturaDocenteSeeder::class,
             HorarioSeeder::class,
         ]);
-
-        $this->call(PermisoSeeder::class);
     }
 }

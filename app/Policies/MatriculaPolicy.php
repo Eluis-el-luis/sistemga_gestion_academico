@@ -25,7 +25,7 @@ class MatriculaPolicy
      */
     public function viewAny(Usuario $usuario): bool
     {
-        return $usuario->hasPermissionTo('matriculas.ver') || $usuario->hasPermissionTo('matriculas.gestionar');
+        return $usuario->hasPermissionTo('alumnos.ver') || $usuario->hasPermissionTo('alumnos.gestionar');
     }
 
     /**
@@ -33,7 +33,7 @@ class MatriculaPolicy
      */
     public function create(Usuario $usuario): bool
     {
-        return $usuario->hasPermissionTo('matriculas.gestionar');
+        return $usuario->hasPermissionTo('alumnos.gestionar');
     }
 
     /**

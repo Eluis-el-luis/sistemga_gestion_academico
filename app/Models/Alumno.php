@@ -7,7 +7,21 @@ class Alumno extends Model
 {
     use HasFactory;
     protected $table = 'alumno';
-    protected $fillable = ['usuario_id', 'codigo_unico_persona', 'nombre_completo', 'sexo', 'fecha_nacimiento'];
+    protected $fillable = [
+        'usuario_id',
+        'codigo_unico_persona',
+        'nombre_completo',
+        'sexo',
+        'fecha_nacimiento',
+        'direccion_domiciliar',
+        'enfermedades_cronicas',
+        'hermanos_en_colegio',
+        'madre_nombre_completo', 'madre_cedula', 'madre_telefono', 'madre_ocupacion', 'madre_asiste_iglesia', 'madre_nombre_iglesia',
+        'padre_nombre_completo', 'padre_cedula', 'padre_telefono', 'padre_ocupacion', 'padre_asiste_iglesia', 'padre_nombre_iglesia',
+        'tutor_nombre_completo', 'tutor_cedula', 'tutor_telefono', 'tutor_ocupacion',
+        'autorizado_retirar_nombre', 'autorizado_retirar_cedula', 'autorizado_retirar_telefono',
+        'acepta_compromiso_cristiano'
+    ];
 
     public function usuario()
     {
