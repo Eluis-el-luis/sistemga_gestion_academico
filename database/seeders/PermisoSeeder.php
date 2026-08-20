@@ -56,6 +56,8 @@ class PermisoSeeder extends Seeder
         $docente_guia = Role::firstOrCreate(['name' => 'Docente Guía', 'guard_name' => 'web']);
         $docente_asignatura = Role::firstOrCreate(['name' => 'Docente por Asignatura', 'guard_name' => 'web']);
         $alumno = Role::firstOrCreate(['name' => 'Alumno', 'guard_name' => 'web']);
+        $coordinador = Role::firstOrCreate(['name' => 'Coordinador', 'guard_name' => 'web']);
+        $gestor = Role::firstOrCreate(['name' => 'Gestor de Usuarios', 'guard_name' => 'web']);
 
         // 4. Asignar permisos al Director 
         $director->syncPermissions([
@@ -93,6 +95,23 @@ class PermisoSeeder extends Seeder
             'asistencia.gestionar', 'asistencia.ver', 'indicadores.gestionar', 
             'indicadores.ver', 'asignaturas_aula.ver', 'horarios.ver', 
             'avance.gestionar', 'avance.ver', 'reparacion.gestionar', 'reparacion.ver'
+        ]);
+
+        // 8. EL GESTOR DE USUARIOS (Nuevo)
+        // Solo puede gestionar usuarios, alumnos (matrícula inicial) y estructurar aulas/mallas.
+        $gestor->syncPermissions([
+            'configuracion.gestionar', 'configuracion.ver', 
+            'alumnos.gestionar', 'alumnos.ver',
+            'aulas.gestionar', 'aulas.ver',
+            'malla.gestionar', 'malla.ver',
+            'asignaturas_aula.gestionar', 'asignaturas_aula.ver'
+        ]);
+
+        // 9. EL COORDINADOR (Nuevo)
+        // Solo permisos de "ver" y reportes para poder supervisar a sus docentes.
+        $coordinador->syncPermissions([
+            'alumnos.ver', 'aulas.ver', 'notas.ver', 'asistencia.ver', 
+            'indicadores.ver', 'horarios.ver', 'reportes.ver'
         ]);
     }
 }
