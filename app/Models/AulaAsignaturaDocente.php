@@ -24,4 +24,8 @@ class AulaAsignaturaDocente extends Model
         return $this->belongsTo(Docente::class, 'docente_id');
     }
 
+    public function horarios()
+    {
+        return $this->hasMany(Horario::class, 'aula_asignatura_docente_id');
+    }
 }

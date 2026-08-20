@@ -8,4 +8,9 @@ class Grado extends Model
     use HasFactory;
     protected $table = 'grado';
     protected $fillable = ['nombre', 'modalidad_id'];
+
+    public function mallaCurricular()
+    {
+        return $this->hasMany(MallaCurricular::class, 'grado_id');
+    }
 }

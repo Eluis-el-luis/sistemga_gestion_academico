@@ -14,10 +14,9 @@ class HorarioSeeder extends Seeder
 
         // Bloque de 45 minutos como indica el documento
         Horario::create([
-            'aula_asignatura_docente_id' => $asignacion,
+            'aula_asignatura_docente_id' => 1,
             'dia_semana' => 'Lunes',
-            'hora_inicio' => '08:00:00',
-            'hora_fin' => '08:45:00'
+            'bloque_horario_id' => 1, // Le pasamos el ID del bloque oficial (ej. la 1ra Hora)
         ]);
     }
 }

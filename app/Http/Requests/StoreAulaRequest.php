@@ -9,17 +9,14 @@ class StoreAulaRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true; // Protegido por AulaPolicy
+        return true;
     }
 
     public function rules(): array
     {
         return [
-            // Validamos que el nombre (ej. "5to A") no se repita en el mismo año y grado
             'nombre' => [
-                'required',
-                'string',
-                'max:20',
+                'required', 'string', 'max:20',
                 Rule::unique('aula')->where(function ($query) {
                     return $query->where('anio_escolar_id', $this->anio_escolar_id)
                                  ->where('grado_id', $this->grado_id);
@@ -28,7 +25,16 @@ class StoreAulaRequest extends FormRequest
             'grado_id' => 'required|exists:grado,id',
             'modalidad_id' => 'required|exists:modalidad,id',
             'turno' => 'required|string|max:20',
-            'docente_guia_id' => 'required|exists:docente,id',
+            
+            // MAGIA AQUÍ: Validamos que el docente no se repita en el mismo año escolar
+            'docente_guia_id' => [
+                'required',
+                'exists:docente,id',
+                Rule::unique('aula')->where(function ($query) {
+                    return $query->where('anio_escolar_id', $this->anio_escolar_id);
+                }),
+            ],
+            
             'anio_escolar_id' => 'required|exists:anio_escolar,id',
             'cupo' => 'required|integer|min:1|max:50',
         ];
@@ -38,6 +44,7 @@ class StoreAulaRequest extends FormRequest
     {
         return [
             'nombre.unique' => 'Ya existe un aula con este nombre para el grado y año escolar seleccionados.',
+            'docente_guia_id.unique' => 'Error: El docente seleccionado ya es guía de otra aula en este año escolar.',
         ];
     }
 }

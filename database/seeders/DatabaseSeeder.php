@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
             AulaSeeder::class,
             MatriculaSeeder::class,
             AulaAsignaturaDocenteSeeder::class,
+            BloqueHorarioSeeder::class,
             HorarioSeeder::class,
         ]);
     }
