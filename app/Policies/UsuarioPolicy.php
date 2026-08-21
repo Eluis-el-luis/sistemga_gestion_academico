@@ -9,26 +9,31 @@ class UsuarioPolicy
 {
     use HandlesAuthorization;
 
-    public function before(Usuario $usuario, $ability)
+
+    public function viewAny(Usuario $authUser): bool
     {
-        // Director y Subdirector tienen poder absoluto
-        if ($usuario->hasRole(['Director', 'Subdirector'])) {
-            return true;
+        return $authUser->hasPermissionTo('configuracion.ver');
+    }
+
+    public function create(Usuario $authUser): bool
+    {
+        return $authUser->hasPermissionTo('configuracion.gestionar');
+    }
+
+    public function update(Usuario $authUser, Usuario $targetUser): bool
+    {
+        // Regla: La cuenta de dirección sólo puede ser editada por ella misma.
+        if ($targetUser->hasRole('Director')) {
+            return $authUser->id === $targetUser->id;
         }
+
+        // Para el resto de usuarios, el Gestor o Subdirector pueden editar si tienen el permiso.
+        return $authUser->hasPermissionTo('configuracion.gestionar');
     }
 
-    public function viewAny(Usuario $usuario): bool
+    public function delete(Usuario $authUser, Usuario $targetUser): bool
     {
-        return $usuario->hasPermissionTo('configuracion.ver');
-    }
-
-    public function create(Usuario $usuario): bool
-    {
-        return $usuario->hasPermissionTo('configuracion.gestionar');
-    }
-
-    public function update(Usuario $usuario, Usuario $modelo): bool
-    {
-        return $usuario->hasPermissionTo('configuracion.gestionar');
+        // Regla: Solo la Directora puede borrar. Además, no puede borrarse a sí misma.
+        return $authUser->hasRole('Director') && $authUser->id !== $targetUser->id;
     }
 }

@@ -42,7 +42,11 @@ Route::middleware('auth')->group(function () {
         // Plantilla Oficial: Bloques de Horario General
         Route::resource('bloques', \App\Http\Controllers\BloqueHorarioController::class)
             ->only(['index', 'store', 'destroy']);
+
+        Route::put('usuarios/{usuario}/reset-password', [\App\Http\Controllers\UsuarioController::class, 'resetPassword'])
+             ->name('usuarios.reset-password');
         Route::resource('usuarios', \App\Http\Controllers\UsuarioController::class);
+
     });
 
 });

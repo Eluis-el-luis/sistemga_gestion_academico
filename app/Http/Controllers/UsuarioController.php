@@ -49,15 +49,28 @@ class UsuarioController extends Controller
             'roles' => 'required|array|min:1' // Validamos que elijan al menos un rol
         ]);
 
-        // 1. Buscamos el ID nativo del PRIMER rol seleccionado para llenar tu columna 'rol_id' y que la BD no dé error
-        $rolPrincipal = Rol::where('nombre', $request->roles[0])->orWhere('name', $request->roles[0])->first();
+        $rolesSeleccionados = $request->roles ?? [];
+        $esDirector = in_array('Director', $rolesSeleccionados);
+        $esSubdirector = in_array('Subdirector', $rolesSeleccionados);
+
+        // Regla: No pueden existir dos roles de Dirección/Subdirección
+        if ($esDirector && \App\Models\Usuario::role('Director')->exists()) {
+            return back()->withErrors(['roles' => 'Ya existe una cuenta de Dirección. No pueden existir dos.'])->withInput();
+        }
+
+        if ($esSubdirector && \App\Models\Usuario::role('Subdirector')->exists()) {
+            return back()->withErrors(['roles' => 'Ya existe una cuenta de Subdirección. No pueden existir dos.'])->withInput();
+        }
+
+        // Buscamos el rol primario por si cambió
+        $rolPrincipal = Rol::where('nombre', $request->roles[0])->first();
 
         // 2. Crear el usuario en la BD
         $usuario = Usuario::create([
             'nombre_completo' => $request->nombre_completo,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'rol_id' => $rolPrincipal ? $rolPrincipal->id : 1, 
+            'rol_id' => $rolPrincipal ? $rolPrincipal->id : 1,
             'activo' => true
         ]);
 
@@ -104,8 +117,20 @@ class UsuarioController extends Controller
             'roles' => 'required|array|min:1'
         ]);
 
+        $rolesSeleccionados = $request->roles ?? [];
+        $esDirector = in_array('Director', $rolesSeleccionados);
+        $esSubdirector = in_array('Subdirector', $rolesSeleccionados);
+
+        if ($esDirector && \App\Models\Usuario::role('Director')->where('id', '!=', $usuario->id)->exists()) {
+            return back()->withErrors(['roles' => 'Ya existe otra cuenta de Dirección asignada en el sistema.']);
+        }
+
+        if ($esSubdirector && \App\Models\Usuario::role('Subdirector')->where('id', '!=', $usuario->id)->exists()) {
+            return back()->withErrors(['roles' => 'Ya existe otra cuenta de Subdirección asignada en el sistema.']);
+        }
+
         // Buscamos el rol primario por si cambió
-        $rolPrincipal = Rol::where('nombre', $request->roles[0])->orWhere('name', $request->roles[0])->first();
+        $rolPrincipal = Rol::where('nombre', $request->roles[0])->first();
 
         $usuario->update([
             'nombre_completo' => $request->nombre_completo,
@@ -143,5 +168,28 @@ class UsuarioController extends Controller
         $mensaje = $usuario->activo ? 'Usuario reactivado en el sistema.' : 'Usuario desactivado por seguridad.';
 
         return redirect()->route('academico.usuarios.index')->with('success', $mensaje);
+    }
+
+    /**
+     * Restablece la contraseña desde el Modal (Autogenerada o Manual)
+     */
+    public function resetPassword(\Illuminate\Http\Request $request, Usuario $usuario)
+    {
+        // Reutilizamos la política de edición: 
+        // Si no puede editar al usuario (ej. Subdirector intentando afectar al Director), bloquea la acción.
+        $this->authorize('update', $usuario);
+
+        // Validamos que venga una contraseña y cumpla el mínimo de seguridad
+        $request->validate([
+            'password' => 'required|string|min:8',
+        ]);
+
+        // Actualizamos encriptando la nueva clave
+        $usuario->update([
+            'password' => bcrypt($request->password)
+        ]);
+
+        return redirect()->route('academico.usuarios.index')
+                         ->with('success', 'Contraseña de ' . ($usuario->nombre_completo ?? $usuario->name) . ' restablecida exitosamente.');
     }
 }

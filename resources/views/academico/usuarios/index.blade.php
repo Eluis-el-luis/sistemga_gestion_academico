@@ -93,12 +93,15 @@
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right space-x-2">
+                                        @can('update', $usuario)
                                         <a href="{{ route('academico.usuarios.edit', $usuario) }}" class="inline-flex p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 border border-amber-100 shadow-sm" title="Editar">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                                         </a>
+                                        @endcan
                                         <button type="button" @click="abrirModal({{ $usuario->id }}, '{{ addslashes($usuario->nombre_completo ?? $usuario->name) }}')" class="inline-flex p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 border border-blue-100 shadow-sm" title="Restablecer Contraseña">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
                                         </button>
+                                        @can('delete', $usuario)
                                         <form action="{{ route('academico.usuarios.destroy', $usuario) }}" method="POST" class="inline-block alerta-desactivar">
                                             @csrf
                                             @method('DELETE')
@@ -112,6 +115,7 @@
                                                 </svg>
                                             </button>
                                         </form>
+                                        @endcan
                                     </td>
                                 </tr>
                             @empty
