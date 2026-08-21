@@ -28,6 +28,8 @@ Route::middleware('auth')->group(function () {
         
         Route::resource('alumnos', AlumnoController::class);
         Route::resource('matriculas', MatriculaController::class);
+        Route::patch('matriculas/{matricula}/retirar', [MatriculaController::class, 'retirar'])->name('matriculas.retirar');
+        Route::patch('matriculas/{matricula}/reactivar', [MatriculaController::class, 'reactivar'])->name('matriculas.reactivar');
         Route::resource('aulas', AulaController::class);
         Route::post('aulas/{aula}/asignaturas', [\App\Http\Controllers\AulaAsignaturaController::class, 'store'])->name('aulas.asignaturas.store');
         Route::put('aulas/{aula}/asignaturas/{asignatura}', [\App\Http\Controllers\AulaAsignaturaController::class, 'update'])->name('aulas.asignaturas.update');
