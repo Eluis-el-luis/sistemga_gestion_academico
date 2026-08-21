@@ -14,49 +14,74 @@ class MatriculaController extends Controller
 {
     use AuthorizesRequests;
 
-    /**
-     * Muestra el formulario para matricular a un alumno específico.
-     */
+    public function index(Request $request)
+    {
+        $this->authorize('viewAny', Matricula::class);
+
+        $anioActivo = AnioEscolar::where('activo', true)->first();
+
+        // 🌟 CORRECCIÓN 1: Separamos 'aula.grado' y 'aula.modalidad'
+        $query = Matricula::with(['alumno', 'aula.grado', 'aula.modalidad', 'anioEscolar']);
+
+        // --- FILTROS ---
+        if ($request->filled('anio_escolar_id')) {
+            $query->where('anio_escolar_id', $request->anio_escolar_id);
+        } elseif (!$request->has('anio_escolar_id') && $anioActivo) {
+            $query->where('anio_escolar_id', $anioActivo->id);
+        }
+
+        if ($request->filled('aula_id')) {
+            $query->where('aula_id', $request->aula_id);
+        }
+
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->estado);
+        }
+
+        $matriculas = $query->latest('fecha_matricula')->paginate(15);
+
+        // 🌟 CORRECCIÓN 2: Separamos en un arreglo ['grado', 'modalidad']
+        $aniosEscolares = AnioEscolar::all();
+        $aulas = Aula::with(['grado', 'modalidad'])->get();
+
+        return view('academico.matriculas.index', compact('matriculas', 'aniosEscolares', 'aulas', 'anioActivo'));
+    }
+
     public function create(Request $request)
     {
         $this->authorize('create', Matricula::class);
 
         $alumnos = Alumno::orderBy('nombre_completo')->get();
-        $aulas = Aula::with('grado')->get();
+        // 🌟 CORRECCIÓN 3: Aseguramos cargar ambas relaciones aquí también
+        $aulas = Aula::with(['grado', 'modalidad'])->get();
         $anios = AnioEscolar::where('activo', true)->get();
         
-        // Capturamos el ID si venimos del flujo de "Nuevo Ingreso"
         $alumnoSeleccionado = $request->query('alumno_id');
 
         return view('academico.matriculas.create', compact('alumnos', 'aulas', 'anios', 'alumnoSeleccionado'));
     }
 
-    /**
-     * Guarda la matrícula en la base de datos.
-     */
     public function store(StoreMatriculaRequest $request)
     {
         $this->authorize('create', Matricula::class);
-
         Matricula::create($request->validated());
 
-        // Redirigimos al índice general de matrículas
         return redirect()->route('academico.matriculas.index')
                          ->with('success', 'Matrícula procesada exitosamente.');
     }
-
-    /**
-     * Muestra el listado general de matrículas.
-     */
-    public function index()
+    
+    // Tus métodos retirar, reactivar y destroy van aquí abajo...
+    public function retirar(Request $request, Matricula $matricula)
     {
-        $this->authorize('viewAny', Matricula::class);
+        $this->authorize('update', $matricula);
+        $matricula->update(['estado' => 'retirado']);
+        return redirect()->route('academico.matriculas.index')->with('success', 'Estudiante retirado correctamente.');
+    }
 
-        // Traemos las matrículas con sus relaciones para no saturar la base de datos (Eager Loading)
-        $matriculas = Matricula::with(['alumno', 'aula.grado', 'anioEscolar'])
-                        ->latest('fecha_matricula')
-                        ->paginate(15);
-
-        return view('academico.matriculas.index', compact('matriculas'));
+    public function reactivar(Request $request, Matricula $matricula)
+    {
+        $this->authorize('update', $matricula);
+        $matricula->update(['estado' => 'activo']);
+        return redirect()->route('academico.matriculas.index')->with('success', 'Matrícula reactivada correctamente.');
     }
 }
