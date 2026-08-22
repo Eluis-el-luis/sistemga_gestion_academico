@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Usuario;
-use App\Models\Rol;
+use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Hash;
@@ -33,7 +33,8 @@ class UsuarioController extends Controller
     {
         $this->authorize('create', Usuario::class);
         
-        $roles = Rol::all();
+        $roles = Role::all();
+        $modalidades = \App\Models\Modalidad::all();
         
         return view('academico.usuarios.create', compact('roles'));
     }
@@ -46,7 +47,11 @@ class UsuarioController extends Controller
             'nombre_completo' => 'required|string|max:120',
             'email' => 'required|email|unique:usuario,email',
             'password' => 'required|string|min:8',
-            'roles' => 'required|array|min:1' // Validamos que elijan al menos un rol
+            'roles' => 'required|array|min:1',
+            // Añadimos las validaciones del perfil docente
+            'codigo_unico_persona' => 'nullable|string|max:20|unique:docente,codigo_unico_persona',
+            'sexo' => 'nullable|in:M,F',
+            'modalidad_coordina_id' => 'nullable|exists:modalidad,id'
         ]);
 
         $rolesSeleccionados = $request->roles ?? [];
@@ -62,48 +67,51 @@ class UsuarioController extends Controller
             return back()->withErrors(['roles' => 'Ya existe una cuenta de Subdirección. No pueden existir dos.'])->withInput();
         }
 
-        // Buscamos el rol primario por si cambió
-        $rolPrincipal = Rol::where('nombre', $request->roles[0])->first();
+        // 1. Buscamos el rol primario
+        //$rolPrincipal = Rol::where('nombre', $request->roles[0])->first();
 
         // 2. Crear el usuario en la BD
         $usuario = Usuario::create([
             'nombre_completo' => $request->nombre_completo,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'rol_id' => $rolPrincipal ? $rolPrincipal->id : 1,
+            // 'rol_id' => $rolPrincipal ? $rolPrincipal->id : 1, <-- ELIMINA ESTA LÍNEA
             'activo' => true
         ]);
 
-        // 3. Sincronizar Spatie (Aquí ocurre la magia multi-rol)
+        // 3. Sincronizar Spatie
         $usuario->syncRoles($request->roles);
 
-        // 4. ¿Es un docente? Verificamos si en sus roles elegidos está la palabra "Docente"
+        // 4. Verificamos si es docente o coordinador
         $esDocente = collect($request->roles)->contains(function ($rol) {
-            return str_contains($rol, 'Docente');
+            return str_contains($rol, 'Docente') || $rol === 'Coordinador';
         });
 
         if ($esDocente) {
-            // Generamos su expediente si no existe
-            \App\Models\Docente::firstOrCreate(
-                ['usuario_id' => $usuario->id],
-                [
-                    'codigo_unico_persona' => 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
-                    'es_coordinador' => collect($request->roles)->contains('Coordinador'),
-                ]
-            );
+            $esCoordinador = collect($request->roles)->contains('Coordinador');
+            
+            // Creamos su expediente capturando los datos del formulario
+            \App\Models\Docente::create([
+                'usuario_id' => $usuario->id,
+                'codigo_unico_persona' => $request->codigo_unico_persona ?? 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
+                'sexo' => $request->sexo ?? 'M',
+                'es_coordinador' => $esCoordinador,
+                'modalidad_coordina_id' => $esCoordinador ? $request->modalidad_coordina_id : null,
+            ]);
         }
 
         return redirect()->route('academico.usuarios.index')
-                         ->with('success', 'Usuario creado exitosamente con sus accesos.');
+                         ->with('success', 'Usuario creado exitosamente con sus accesos y perfil.');
     }
 
     public function edit(Usuario $usuario)
     {
         $this->authorize('update', $usuario);
         
-        $roles = Rol::all();
+        $roles = Role::all();
+        $modalidades = \App\Models\Modalidad::all(); // <-- AGREGAMOS ESTO
         
-        return view('academico.usuarios.edit', compact('usuario', 'roles'));
+        return view('academico.usuarios.edit', compact('usuario', 'roles', 'modalidades'));
     }
 
     public function update(Request $request, Usuario $usuario)
@@ -114,43 +122,36 @@ class UsuarioController extends Controller
             'nombre_completo' => 'required|string|max:120',
             'email' => 'required|email|unique:usuario,email,' . $usuario->id,
             'activo' => 'required|boolean',
-            'roles' => 'required|array|min:1'
+            'roles' => 'required|array|min:1',
+            // Validaciones nuevas para los docentes
+            'codigo_unico_persona' => 'nullable|string|max:20',
+            'sexo' => 'nullable|in:M,F',
+            'modalidad_coordina_id' => 'nullable|exists:modalidad,id'
         ]);
 
-        $rolesSeleccionados = $request->roles ?? [];
-        $esDirector = in_array('Director', $rolesSeleccionados);
-        $esSubdirector = in_array('Subdirector', $rolesSeleccionados);
-
-        if ($esDirector && \App\Models\Usuario::role('Director')->where('id', '!=', $usuario->id)->exists()) {
-            return back()->withErrors(['roles' => 'Ya existe otra cuenta de Dirección asignada en el sistema.']);
-        }
-
-        if ($esSubdirector && \App\Models\Usuario::role('Subdirector')->where('id', '!=', $usuario->id)->exists()) {
-            return back()->withErrors(['roles' => 'Ya existe otra cuenta de Subdirección asignada en el sistema.']);
-        }
-
-        // Buscamos el rol primario por si cambió
-        $rolPrincipal = Rol::where('nombre', $request->roles[0])->first();
-
+        // 1. Actualizamos el Usuario Básico (Usamos ->update() y quitamos el password)
         $usuario->update([
             'nombre_completo' => $request->nombre_completo,
             'email' => $request->email,
-            'rol_id' => $rolPrincipal ? $rolPrincipal->id : $usuario->rol_id,
             'activo' => $request->activo
         ]);
 
-        // Magia Spatie: Actualiza automáticamente todos los roles (quita los viejos y pone los nuevos)
+        // 2. Sincronizamos Roles en Spatie
         $usuario->syncRoles($request->roles);
 
-        // Actualizamos si es coordinador
-        $esDocente = collect($request->roles)->contains(function ($rol) { return str_contains($rol, 'Docente'); });
+        // 3. Verificamos si tiene roles académicos y actualizamos su perfil de Docente
+        $esDocente = collect($request->roles)->contains(function ($rol) { 
+            return str_contains($rol, 'Docente') || $rol === 'Coordinador'; 
+        });
         
         if ($esDocente) {
             \App\Models\Docente::updateOrCreate(
                 ['usuario_id' => $usuario->id],
                 [
-                    'codigo_unico_persona' => 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
+                    'codigo_unico_persona' => $request->codigo_unico_persona ?? $usuario->docente->codigo_unico_persona ?? 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
+                    'sexo' => $request->sexo ?? $usuario->docente->sexo ?? 'M',
                     'es_coordinador' => collect($request->roles)->contains('Coordinador'),
+                    'modalidad_coordina_id' => collect($request->roles)->contains('Coordinador') ? $request->modalidad_coordina_id : null,
                 ]
             );
         }

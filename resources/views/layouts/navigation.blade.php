@@ -23,7 +23,7 @@
                     <!-- Solo Director y Gestor -->
                     @hasanyrole('Director|Gestor de Usuarios')
                         <x-nav-link :href="route('academico.usuarios.index')" :active="request()->routeIs('academico.usuarios.*')" class="hover:text-amber-800">
-                            {{ __('Usuarios') }}
+                            {{ __('Personal y Docentes') }}
                         </x-nav-link>
                     @endhasanyrole
 
@@ -142,7 +142,7 @@
             </x-responsive-nav-link>
 
             @hasanyrole('Director|Gestor de Usuarios')
-                <x-responsive-nav-link :href="route('academico.usuarios.index')">Usuarios</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('academico.usuarios.index')">Personal y Docentes</x-responsive-nav-link>
             @endhasanyrole
 
             @hasanyrole('Director|Subdirector|Gestor de Usuarios|Coordinador|Docente Guía')
