@@ -14,7 +14,13 @@
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-xl p-8 border border-gray-100">
                 
-                <form action="{{ route('academico.usuarios.store') }}" method="POST" class="space-y-6">
+                <form action="{{ route('academico.usuarios.store') }}" method="POST" 
+                    x-data="{ 
+                        selectedRoles: {{ json_encode(old('roles', [])) }},
+                        get isDocente() { return this.selectedRoles.some(r => r.includes('Docente') || r === 'Coordinador'); },
+                        get isCoordinador() { return this.selectedRoles.includes('Coordinador'); }
+                    }" 
+                    class="space-y-6">
                     @csrf
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -67,9 +73,10 @@
                         <label class="block text-sm font-bold text-gray-700 mb-3">Roles y Accesos del Usuario <span class="text-red-500">*</span></label>
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bg-blue-50/50 p-5 rounded-lg border border-blue-100">
                             @foreach($roles as $rol)
-                                <label class="inline-flex items-center cursor-pointer group bg-white p-2.5 rounded shadow-sm border border-gray-200 hover:border-blue-400 transition-colors">
-                                    <input type="checkbox" name="roles[]" value="{{ $rol->nombre ?? $rol->name }}" {{ in_array(($rol->nombre ?? $rol->name), old('roles', [])) ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 w-4 h-4">
-                                    <span class="ml-2 text-sm font-medium text-gray-700 group-hover:text-blue-700">{{ $rol->nombre ?? $rol->name }}</span>
+                                <label class="inline-flex items-center cursor-pointer group transition-colors p-2.5 rounded shadow-sm border border-gray-200 hover:border-blue-400"
+                                    :class="selectedRoles.includes('{{ $rol->nombre ?? $rol->name }}') ? 'bg-blue-50 border-blue-200' : 'bg-white'">
+                                    <input type="checkbox" name="roles[]" value="{{ $rol->nombre ?? $rol->name }}" x-model="selectedRoles" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 w-4 h-4">
+                                    <span class="ml-2 text-sm font-medium transition-colors" :class="selectedRoles.includes('{{ $rol->nombre ?? $rol->name }}') ? 'text-blue-800 font-bold' : 'text-gray-700 group-hover:text-blue-700'">{{ $rol->nombre ?? $rol->name }}</span>
                                 </label>
                             @endforeach
                         </div>
@@ -77,10 +84,45 @@
                         @error('roles') <span class="text-red-500 text-xs font-medium mt-1">{{ $message }}</span> @enderror
                     </div>
 
+                    <!-- TARJETA 3: DATOS DOCENTES (Oculta por defecto, aparece con Alpine) -->
+                    <div x-show="isDocente" x-transition.duration.300ms class="bg-amber-50 rounded-2xl p-6 shadow-sm border border-amber-100 mt-6" style="display: none;">
+                        <h3 class="text-md font-bold text-amber-900 border-b border-amber-200/50 pb-2 mb-4 flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0v6"></path></svg>
+                            Perfil Académico del Personal
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-bold text-amber-800 mb-1">CUP (Código Único Persona)</label>
+                                <input type="text" name="codigo_unico_persona" value="{{ old('codigo_unico_persona') }}" class="w-full rounded-lg border-amber-200 shadow-sm focus:ring-amber-500 focus:border-amber-500 sm:text-sm bg-white" placeholder="Ej: DOC-2026-001">
+                                @error('codigo_unico_persona') <span class="text-red-500 text-xs font-medium mt-1">{{ $message }}</span> @enderror
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-amber-800 mb-1">Sexo</label>
+                                <select name="sexo" class="w-full rounded-lg border-amber-200 shadow-sm focus:ring-amber-500 focus:border-amber-500 sm:text-sm bg-white">
+                                    <option value="M" {{ old('sexo') == 'M' ? 'selected' : '' }}>Masculino</option>
+                                    <option value="F" {{ old('sexo') == 'F' ? 'selected' : '' }}>Femenino</option>
+                                </select>
+                            </div>
+                            
+                            <div x-show="isCoordinador" x-transition class="md:col-span-2 mt-2" style="display: none;">
+                                <label class="block text-sm font-bold text-amber-900 mb-1">Modalidad que Coordina <span class="text-red-500">*</span></label>
+                                <select name="modalidad_coordina_id" :required="isCoordinador" class="w-full md:w-1/2 rounded-lg border-amber-300 shadow-sm focus:ring-amber-500 focus:border-amber-500 sm:text-sm bg-white">
+                                    <option value="">Seleccione el Nivel Académico...</option>
+                                    @foreach($modalidades ?? [] as $mod)
+                                        <option value="{{ $mod->id }}" {{ old('modalidad_coordina_id') == $mod->id ? 'selected' : '' }}>
+                                            {{ $mod->nombre }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="pt-6 flex items-center justify-end space-x-4 border-t border-gray-100 mt-8">
                         <a href="{{ route('academico.usuarios.index') }}" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Cancelar</a>
                         <button type="submit" class="inline-flex justify-center rounded-lg border border-transparent bg-blue-600 py-2 px-6 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all">
-                            Guardar Perfil
+                            Registrar Personal
                         </button>
                     </div>
                 </form>

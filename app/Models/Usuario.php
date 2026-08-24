@@ -16,10 +16,10 @@ class Usuario extends Authenticatable
 
     protected $guard_name = 'web';
     // Relación: Un usuario pertenece a un rol
-    public function rol()
-    {
-        return $this->belongsTo(Rol::class, 'rol_id');
-    }
+    //public function rol()
+    //{
+    //    return $this->belongsTo(Rol::class, 'rol_id');
+    //}
 
     // Relación: Un usuario puede ser un docente
     public function docente()
