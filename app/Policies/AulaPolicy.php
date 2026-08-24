@@ -39,16 +39,21 @@ class AulaPolicy
     /**
      * Alcance de los datos (G)estionar.
      */
+    /**
+     * Alcance de los datos (G)estionar.
+     */
     public function update(Usuario $usuario, Aula $aula): bool
     {
-        // Nota: En el seeder le pusimos 'alumnos.gestionar' a este bloque
-        if (!$usuario->hasPermissionTo('aulas.gestionar')) return false;
-
-        $docente = $usuario->docente;
+        // 1. Verificamos si el usuario está ligado a un registro de Docente
+        $docente = \App\Models\Docente::where('usuario_id', $usuario->id)->first();
+        
+        // 2. Si es docente y tiene la bandera de coordinador activa...
         if ($docente && $docente->es_coordinador) {
-            // Solo puede editar si la matrícula pertenece a un aula de SU modalidad
+            // Solo puede editar (agregar/quitar materias) si el aula pertenece a la modalidad que coordina
             return $docente->modalidad_coordina_id === $aula->modalidad_id;
         }
-        return false;
+
+        // 3. Si no es coordinador, debe tener explícitamente el permiso de gestión (Dirección)
+        return $usuario->hasPermissionTo('aulas.gestionar');
     }
 }

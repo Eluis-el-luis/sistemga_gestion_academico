@@ -14,6 +14,9 @@ class MallaCurricular extends Model
         return $this->belongsTo(Grado::class, 'grado_id');
     }
 
+    /**
+     * La asignatura que se está asignando.
+     */
     public function asignatura()
     {
         return $this->belongsTo(Asignatura::class, 'asignatura_id');
