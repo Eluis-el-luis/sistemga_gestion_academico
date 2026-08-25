@@ -32,7 +32,7 @@
         <div class="flex flex-col min-h-screen transition-all duration-300" :class="sidebarOpen ? 'lg:pl-64' : 'lg:pl-20'">
             
             <!-- TOPBAR (h-16 para alinear con el logo) -->
-            <header class="sticky top-0 z-30 bg-white border-b border-slate-200/60 shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 relative transition-all">
+            <header class="sticky top-0 z-30 bg-white border-b border-slate-200/60 shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 transition-all">
                 
                 <div class="flex items-center gap-4">
                     <button @click="sidebarOpen = !sidebarOpen" class="text-slate-500 hover:text-[#e6ac27] bg-slate-50 hover:bg-amber-50 p-2 rounded-lg transition-colors focus:outline-none">
