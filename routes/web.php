@@ -11,10 +11,12 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// --- RUTAS DEL PANEL PRINCIPAL Y TABLERO DE AVISOS ---
 Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
+// Gestión de Avisos (El controlador se encargará de validar que solo Dirección tenga acceso)
 Route::post('/dashboard/avisos', [\App\Http\Controllers\DashboardController::class, 'storeAviso'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard.avisos.store');
@@ -26,6 +28,7 @@ Route::put('/dashboard/avisos/{id}', [\App\Http\Controllers\DashboardController:
 Route::delete('/dashboard/avisos/{id}', [\App\Http\Controllers\DashboardController::class, 'destroyAviso'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard.avisos.destroy');
+// -----------------------------------------------------
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

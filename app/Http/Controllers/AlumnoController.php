@@ -16,11 +16,12 @@ class AlumnoController extends Controller
     {
         $this->authorize('viewAny', Alumno::class);
 
+        // Preparamos la consulta trayendo las matrículas para mostrar el grado en la tabla
         $query = Alumno::with(['matriculas' => function($q) {
             $q->latest('fecha_matricula');
         }, 'matriculas.aula.grado', 'matriculas.aula.modalidad']);
 
-        // --- 1. ALCANCE POR ROL (Scope) ---
+        // --- 1. ALCANCE POR ROL (Scope para Docentes Guías) ---
         $usuario = auth()->user();
         if ($usuario->hasRole('Docente Guía')) {
             $docente = \App\Models\Docente::where('usuario_id', $usuario->id)->first();
@@ -32,20 +33,25 @@ class AlumnoController extends Controller
             }
         }
 
-        // --- 2. FILTROS EN PANTALLA (Corregidos) ---
+        // --- 2. MOTOR DE BÚSQUEDA (Nombre o CUP) ---
+        if ($request->filled('buscar')) {
+            $busqueda = $request->buscar;
+            $query->where(function($q) use ($busqueda) {
+                $q->where('nombre_completo', 'like', "%{$busqueda}%")
+                  ->orWhere('codigo_unico_persona', 'like', "%{$busqueda}%");
+            });
+        }
+
+        // --- 3. FILTROS EN PANTALLA (Cascada) ---
         if ($request->filled('modalidad_id')) {
-            $query->whereHas('matriculas', function($q) use ($request) {
-                $q->whereHas('aula', function($q2) use ($request) {
-                    $q2->where('modalidad_id', $request->modalidad_id);
-                });
+            $query->whereHas('matriculas.aula', function($q) use ($request) {
+                $q->where('modalidad_id', $request->modalidad_id);
             });
         }
 
         if ($request->filled('grado_id')) {
-            $query->whereHas('matriculas', function($q) use ($request) {
-                $q->whereHas('aula', function($q2) use ($request) {
-                    $q2->where('grado_id', $request->grado_id);
-                });
+            $query->whereHas('matriculas.aula', function($q) use ($request) {
+                $q->where('grado_id', $request->grado_id);
             });
         }
 
@@ -61,8 +67,12 @@ class AlumnoController extends Controller
             });
         }
 
-        $alumnos = $query->paginate(15);
+        // --- 4. ORDEN ALFABÉTICO Y PAGINACIÓN ---
+        $alumnos = $query->orderBy('nombre_completo', 'asc')
+                         ->paginate(15)
+                         ->withQueryString(); // <- Mantiene los filtros activos al cambiar de página
 
+        // Traemos los catálogos para llenar los <select> de los filtros
         $modalidades = \App\Models\Modalidad::all();
         $grados = \App\Models\Grado::all();
         $aulas = \App\Models\Aula::all();
@@ -79,16 +89,20 @@ class AlumnoController extends Controller
     public function store(StoreAlumnoRequest $request)
     {
         $this->authorize('create', Alumno::class);
+        
         Alumno::create($request->validated());
 
         return redirect()->route('academico.alumnos.index')
-                         ->with('success', 'Expediente del alumno registrado con éxito. El Docente Guía ya puede proceder con su matrícula.');
+                         ->with('success', 'Expediente del alumno registrado con éxito. El Docente Guía ya puede proceder con su matrícula en el aula correspondiente.');
     }
 
     public function show(Alumno $alumno)
     {
         $this->authorize('viewAny', Alumno::class);
+        
+        // Eager Loading: Cargamos las matrículas, el aula, el grado y el año escolar
         $alumno->load(['matriculas.aula.grado', 'matriculas.anioEscolar']);
+        
         return view('academico.alumnos.show', compact('alumno'));
     }
 
@@ -101,6 +115,7 @@ class AlumnoController extends Controller
     public function update(UpdateAlumnoRequest $request, Alumno $alumno)
     {
         $this->authorize('update', $alumno);
+        
         $alumno->update($request->validated());
 
         return redirect()->route('academico.alumnos.index')
@@ -109,7 +124,8 @@ class AlumnoController extends Controller
 
     public function destroy(Alumno $alumno)
     {
-        $this->authorize('update', $alumno);
+        $this->authorize('delete', $alumno);
+        
         $alumno->delete();
 
         return redirect()->route('academico.alumnos.index')

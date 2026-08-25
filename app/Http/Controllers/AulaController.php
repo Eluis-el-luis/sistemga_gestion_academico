@@ -74,11 +74,76 @@ class AulaController extends Controller
     }
 
     /**
+     * Muestra el formulario para editar un aula existente.
+     */
+    public function edit(Aula $aula)
+    {
+        $this->authorize('update', $aula);
+
+        $modalidades = \App\Models\Modalidad::all();
+        $grados = \App\Models\Grado::all();
+        $anios = \App\Models\AnioEscolar::all();
+        
+        // Obtenemos los docentes ocupados en el año del aula, EXCLUYENDO al docente actual de esta aula
+        $docentesOcupados = Aula::where('anio_escolar_id', $aula->anio_escolar_id)
+                                ->where('id', '!=', $aula->id)
+                                ->pluck('docente_guia_id')
+                                ->toArray();
+
+        $docentes = \App\Models\Docente::with('usuario')
+                                ->whereNotIn('id', $docentesOcupados)
+                                ->get();
+
+        return view('academico.aulas.edit', compact('aula', 'modalidades', 'grados', 'anios', 'docentes'));
+    }
+
+    /**
+     * Actualiza los datos del aula en la base de datos.
+     */
+    public function update(Request $request, Aula $aula)
+    {
+        $this->authorize('update', $aula);
+
+        $validated = $request->validate([
+            'anio_escolar_id' => 'required|exists:anios_escolares,id',
+            'modalidad_id'    => 'required|exists:modalidades,id',
+            'grado_id'        => 'required|exists:grados,id',
+            'nombre'          => 'required|string|max:50',
+            'turno'           => 'required|string|max:50',
+            'cupo'            => 'required|integer|min:1|max:100',
+            'docente_guia_id' => 'nullable|exists:docentes,id',
+        ]);
+
+        $aula->update($validated);
+
+        return redirect()->route('academico.aulas.index')
+                         ->with('success', 'Información del aula actualizada exitosamente.');
+    }
+
+    /**
+     * Elimina un aula del sistema.
+     */
+    public function destroy(Aula $aula)
+    {
+        $this->authorize('delete', $aula);
+
+        // Opcional: Validar si tiene matrículas activas antes de borrar
+        if ($aula->matriculas()->count() > 0) {
+            return back()->with('error', 'No se puede eliminar el aula porque tiene estudiantes matriculados.');
+        }
+
+        $aula->delete();
+
+        return redirect()->route('academico.aulas.index')
+                         ->with('success', 'El aula ha sido eliminada del sistema correctamente.');
+    }
+
+    /**
      * Muestra la estructura interna de un aula específica (Sus materias y docentes).
      */
     public function show(Aula $aula)
     {
-        $this->authorize('viewAny', Aula::class);
+        $this->authorize('update', $aula);
         $aula->load(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario']);
 
         $asignaciones = \App\Models\AulaAsignaturaDocente::with(['asignatura', 'docente.usuario'])

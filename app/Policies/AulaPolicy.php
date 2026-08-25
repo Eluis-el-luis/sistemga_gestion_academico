@@ -56,4 +56,22 @@ class AulaPolicy
         // 3. Si no es coordinador, debe tener explícitamente el permiso de gestión (Dirección)
         return $usuario->hasPermissionTo('aulas.gestionar');
     }
+
+    /**
+     * Equivalente a (E)liminar en la Matriz.
+     */
+    public function delete(Usuario $usuario, Aula $aula): bool
+    {
+        // 1. Verificamos si es coordinador de la modalidad del aula
+        $docente = \App\Models\Docente::where('usuario_id', $usuario->id)->first();
+        
+        if ($docente && $docente->es_coordinador) {
+            return $docente->modalidad_coordina_id === $aula->modalidad_id;
+        }
+
+        // 2. Si no, requiere el permiso general de gestión
+        return $usuario->hasPermissionTo('aulas.gestionar');
+    }
+
+
 }
