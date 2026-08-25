@@ -2,10 +2,11 @@
 namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Docente extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
     protected $table = 'docente';
     protected $fillable = ['usuario_id', 'codigo_unico_persona', 'sexo', 'es_coordinador', 'modalidad_coordina_id'];
 

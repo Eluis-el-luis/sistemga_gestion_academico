@@ -197,6 +197,11 @@
                                 </div>
                             </a>
                         </div>
+
+                       
+                        <div class="mt-6">
+                            @include('components.dashboard.asignatura-stats')
+                        </div>
                     </div>
                     @endhasanyrole
 
