@@ -25,7 +25,7 @@ class AulaAsignaturaDocentePolicy
      */
     public function viewAny(Usuario $usuario): bool
     {
-        return $usuario->hasPermissionTo('aulas_asignaturas.docentes.ver') || $usuario->hasPermissionTo('aulas_asignaturas.docentes.gestionar');
+        return $usuario->hasPermissionTo('asignaturas_aula.ver') || $usuario->hasPermissionTo('asignaturas_aula.gestionar');
     }
 
     /**
@@ -33,7 +33,7 @@ class AulaAsignaturaDocentePolicy
      */
     public function create(Usuario $usuario): bool
     {
-        return $usuario->hasPermissionTo('aulas_asignaturas.docentes.gestionar');
+        return $usuario->hasPermissionTo('asignaturas_aula.gestionar');
     }
 
     /**
@@ -41,7 +41,7 @@ class AulaAsignaturaDocentePolicy
      */
     public function update(Usuario $usuario, AulaAsignaturaDocente $aulaAsignaturaDocente): bool
     {
-        if (!$usuario->hasPermissionTo('aulas_asignaturas.docentes.gestionar')) {
+        if (!$usuario->hasPermissionTo('asignaturas_aula.gestionar')) {
             return false;
         }
 
@@ -49,6 +49,33 @@ class AulaAsignaturaDocentePolicy
         $docente = $usuario->docente;
         if ($docente) {
             return $aulaAsignaturaDocente->docente_id === $docente->id;
+        }
+
+        return false;
+    }
+
+    /**
+     * Determina si el usuario puede ingresar calificaciones para esta asignatura.
+     */
+    public function calificar(Usuario $usuario, AulaAsignaturaDocente $asignatura): bool
+    {
+        // 1. Debe tener el permiso base de Spatie para gestionar notas
+        if (!$usuario->hasPermissionTo('notas.gestionar')) {
+            return false;
+        }
+
+        // 2. Verificamos la relación del docente con esta materia específica
+        $docente = $usuario->docente;
+        if ($docente) {
+            // Regla A: ¿Es el maestro que imparte esta asignatura exacta?
+            if ($asignatura->docente_id === $docente->id) {
+                return true;
+            }
+
+            // Regla B: ¿Es el docente guía dueño de toda el aula?
+            if ($asignatura->aula->docente_guia_id === $docente->id) {
+                return true;
+            }
         }
 
         return false;

@@ -89,7 +89,7 @@
                     @endhasanyrole
 
                     @can('notas.ver')
-                        <x-nav-link :href="'#'" :active="false" class="hover:text-amber-800">Calificaciones</x-nav-link>
+                        <x-nav-link :href="route('academico.notas.index')" :active="request()->routeIs('academico.notas.*')" class="hover:text-amber-800">Calificaciones</x-nav-link>
                     @endcan
                     @can('asistencia.ver')
                         <x-nav-link :href="'#'" :active="false" class="hover:text-amber-800">Asistencia</x-nav-link>

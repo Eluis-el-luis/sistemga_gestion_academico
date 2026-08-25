@@ -1,54 +1,72 @@
 @php
-    // Buscamos las materias que da este profesor en distintas aulas
+    // Buscamos las materias que da este profesor
     $docente = \App\Models\Docente::where('usuario_id', Auth::id())->first();
     $asignaciones = $docente ? \App\Models\AulaAsignaturaDocente::where('docente_id', $docente->id)->get() : collect();
     $totalAulas = $asignaciones->pluck('aula_id')->unique()->count();
     $totalMaterias = $asignaciones->count();
 @endphp
 
-<div class="space-y-6">
-    <div class="flex items-center justify-between mt-8">
-        <h3 class="text-lg font-bold text-gray-800 border-b-2 border-blue-400 pb-1 inline-block">
-            Panel de Docente por Asignatura
-        </h3>
+@if($totalMaterias > 0)
+    <!-- Tarjetas de Estadísticas -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-stone-200 p-5 flex items-center gap-4 hover:border-[#e6ac27] transition-colors">
+            <div class="w-12 h-12 rounded-xl bg-[#FFFDF5] text-[#e6ac27] flex items-center justify-center border border-[#e6ac27]/20">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1H4z"></path></svg>
+            </div>
+            <div>
+                <span class="block text-xs font-bold text-stone-500 uppercase tracking-widest">Aulas que atiendo</span>
+                <h4 class="text-2xl font-black text-[#3d2c1d]">{{ $totalAulas }} <span class="text-sm font-bold text-stone-400">secciones</span></h4>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-stone-200 p-5 flex items-center gap-4 hover:border-[#e6ac27] transition-colors">
+            <div class="w-12 h-12 rounded-xl bg-[#FFFDF5] text-[#e6ac27] flex items-center justify-center border border-[#e6ac27]/20">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div>
+                <span class="block text-xs font-bold text-stone-500 uppercase tracking-widest">Carga Horaria</span>
+                <h4 class="text-2xl font-black text-[#3d2c1d]">{{ $totalMaterias }} <span class="text-sm font-bold text-stone-400">bloques</span></h4>
+            </div>
+        </div>
     </div>
 
-    @if($totalMaterias > 0)
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-white rounded-xl shadow-sm border border-blue-100 p-6 flex items-center gap-4 hover:shadow-md transition-shadow">
-                <div class="p-4 bg-blue-100 text-blue-600 rounded-full">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-500 font-medium uppercase tracking-wide">Aulas que atiendo</p>
-                    <h4 class="text-3xl font-extrabold text-gray-900">{{ $totalAulas }}</h4>
-                    <p class="text-xs text-blue-600 font-semibold mt-1">Secciones distintas</p>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-blue-100 p-6 flex items-center gap-4 hover:shadow-md transition-shadow">
-                <div class="p-4 bg-blue-100 text-blue-600 rounded-full">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-500 font-medium uppercase tracking-wide">Carga Horaria</p>
-                    <h4 class="text-3xl font-extrabold text-gray-900">{{ $totalMaterias }}</h4>
-                    <p class="text-xs text-blue-600 font-semibold mt-1">Bloques de clases asignados</p>
-                </div>
-            </div>
+    <!-- Tabla Dinámica de Materias Asignadas -->
+    <div id="mis-aulas" class="bg-white overflow-hidden shadow-sm rounded-2xl border border-stone-200">
+        <div class="p-4 border-b border-stone-200 bg-[#FFFDF5]">
+            <h4 class="font-black text-[#3d2c1d] text-sm uppercase tracking-widest">Mis Aulas Asignadas</h4>
         </div>
-
-        <div class="grid grid-cols-2 gap-4">
-            <button class="bg-white border border-gray-200 rounded-lg p-3 text-sm font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors shadow-sm">
-                📝 Subir Calificaciones
-            </button>
-            <button class="bg-white border border-gray-200 rounded-lg p-3 text-sm font-bold text-gray-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors shadow-sm">
-                📅 Mi Horario
-            </button>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-stone-200 text-sm">
+                <thead class="bg-white text-stone-500 uppercase text-xs font-bold">
+                    <tr>
+                        <th class="px-6 py-3 text-left">Grado y Aula</th>
+                        <th class="px-6 py-3 text-left">Asignatura</th>
+                        <th class="px-6 py-3 text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-stone-100">
+                    @foreach($asignaciones as $asignacion)
+                        <tr class="hover:bg-stone-50 transition-colors">
+                            <td class="px-6 py-4 font-bold text-[#3d2c1d]">
+                                {{ $asignacion->aula->grado->nombre ?? '' }} - {{ $asignacion->aula->nombre ?? '' }}
+                            </td>
+                            <td class="px-6 py-4 text-[#e6ac27] font-black">
+                                {{ $asignacion->asignatura->nombre ?? '' }}
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                
+                                <a href="{{ route('academico.notas.create', $asignacion->id) }}" class="inline-flex items-center gap-1 bg-[#e6ac27] hover:bg-[#d69f22] text-[#3d2c1d] font-black py-1.5 px-4 rounded-lg shadow-sm text-xs transition-transform transform hover:scale-105">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                    Calificar
+                                </a>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
         </div>
-    @else
-        <div class="bg-gray-50 border-l-4 border-gray-400 p-4 rounded-md">
-            <p class="text-gray-700 font-medium">No tienes asignaturas asignadas en este momento.</p>
-        </div>
-    @endif
-</div>
+    </div>
+@else
+    <div class="bg-stone-50 border border-stone-200 p-6 rounded-2xl text-center mt-6">
+        <p class="text-stone-500 font-bold">No tienes asignaturas asignadas en este momento.</p>
+    </div>
+@endif

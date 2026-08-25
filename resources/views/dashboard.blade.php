@@ -145,8 +145,10 @@
                     @hasanyrole('Docente por Asignatura|Docente Guía')
                     <div x-show="['Docente por Asignatura', 'Docente Guía'].includes(rolActivo)" x-transition.opacity style="display: none;">
                         <h4 class="text-sm font-black text-[#3d2c1d] uppercase tracking-widest mb-4 border-b border-stone-200 pb-2">Gestión Académica</h4>
+                        
+                        <!-- 1. TUS BOTONES PREMIUM ORIGINALES INTACTOS -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <a href="#" class="group bg-white p-5 rounded-2xl border border-stone-200 shadow-sm hover:shadow-md hover:border-[#e6ac27] transition-all flex items-center gap-4">
+                            <a href="{{ route('academico.notas.index') }}" class="group bg-white p-5 rounded-2xl border border-stone-200 shadow-sm hover:shadow-md hover:border-[#e6ac27] transition-all flex items-center gap-4">
                                 <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                                 </div>
@@ -164,6 +166,11 @@
                                     <span class="block text-xs font-medium text-stone-500 mt-0.5">Horas clase asignadas</span>
                                 </div>
                             </a>
+                        </div>
+
+                       
+                        <div class="mt-6">
+                            @include('components.dashboard.asignatura-stats')
                         </div>
                     </div>
                     @endhasanyrole

@@ -59,6 +59,12 @@ Route::middleware('auth')->group(function () {
              ->name('usuarios.reset-password');
         Route::resource('usuarios', \App\Http\Controllers\UsuarioController::class);
 
+        // Fase 5: Calificaciones
+        Route::get('notas', [\App\Http\Controllers\NotaController::class, 'index'])->name('notas.index');
+        Route::get('notas/planilla/{asignacion}', [\App\Http\Controllers\NotaController::class, 'create'])->name('notas.create');
+        Route::post('notas', [\App\Http\Controllers\NotaController::class, 'store'])->name('notas.store');
+        
+
     });
 
 });
