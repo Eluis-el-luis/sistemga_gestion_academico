@@ -75,17 +75,24 @@ class NotaController extends Controller
     public function index()
     {
         // Buscamos al docente asociado al usuario logueado
-        $docente = \App\Models\Docente::where('usuario_id', auth()->id())->first();
+        $usuario = auth()->user();
         
-        $asignaciones = collect();
-        if ($docente) {
-            // Traemos todas las materias que imparte, cargando los datos del aula y grado
-            $asignaciones = \App\Models\AulaAsignaturaDocente::with(['aula.grado', 'asignatura'])
-                ->where('docente_id', $docente->id)
+        if ($usuario->hasRole(['Subdirector', 'Director', 'Coordinador'])) {
+            // Traemos todas las aulas con sus asignaturas para supervisar
+            $asignaciones = \App\Models\AulaAsignaturaDocente::with(['aula.grado', 'asignatura', 'docente'])
                 ->get();
+            $modoSupervision = true;
+        } 
+        // MODO OPERATIVO: Docente
+        else {
+            $docente = \App\Models\Docente::where('usuario_id', $usuario->id)->first();
+            $asignaciones = $docente 
+                ? \App\Models\AulaAsignaturaDocente::with(['aula.grado', 'asignatura'])->where('docente_id', $docente->id)->get() 
+                : collect();
+            $modoSupervision = false;
         }
 
-        return view('academico.notas.index', compact('asignaciones'));
+        return view('academico.notas.index', compact('asignaciones', 'modoSupervision'));
     }
 
     /**

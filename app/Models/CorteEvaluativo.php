@@ -10,7 +10,7 @@ class CorteEvaluativo extends Model
     use HasFactory;
     
     protected $table = 'corte_evaluativo';
-    protected $fillable = ['anio_escolar_id', 'numero', 'semestre', 'fecha_inicio', 'fecha_fin'];
+    protected $fillable = ['anio_escolar_id', 'numero', 'semestre', 'fecha_inicio', 'fecha_fin', 'peso_acumulado', 'peso_examen'];
 
    
     public function anioEscolar()

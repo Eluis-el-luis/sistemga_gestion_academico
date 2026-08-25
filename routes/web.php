@@ -63,6 +63,12 @@ Route::middleware('auth')->group(function () {
         Route::get('notas', [\App\Http\Controllers\NotaController::class, 'index'])->name('notas.index');
         Route::get('notas/planilla/{asignacion}', [\App\Http\Controllers\NotaController::class, 'create'])->name('notas.create');
         Route::post('notas', [\App\Http\Controllers\NotaController::class, 'store'])->name('notas.store');
+        Route::get('cortes-evaluativos', [\App\Http\Controllers\CorteEvaluativoController::class, 'index'])->name('cortes.index');
+        Route::put('cortes-evaluativos/{corte}', [\App\Http\Controllers\CorteEvaluativoController::class, 'update'])->name('cortes.update');
+    
+        Route::get('notas/actividades/{asignacion}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'index'])->name('notas.actividades.index');
+        Route::post('notas/actividades/{asignacion}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'store'])->name('notas.actividades.store');
+        Route::delete('notas/actividades/{asignacion}/{actividad}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'destroy'])->name('notas.actividades.destroy');
         
 
     });
