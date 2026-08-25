@@ -123,19 +123,23 @@ class AulaController extends Controller
     /**
      * Elimina un aula del sistema.
      */
-    public function destroy(Aula $aula)
+    public function destroy(\App\Models\Aula $aula)
     {
-        $this->authorize('delete', $aula);
+        // Autorización (usamos la política que ya creaste)
+        $this->authorize('create', \App\Models\Aula::class);
 
-        // Opcional: Validar si tiene matrículas activas antes de borrar
-        if ($aula->matriculas()->count() > 0) {
-            return back()->with('error', 'No se puede eliminar el aula porque tiene estudiantes matriculados.');
+        try {
+            $aula->delete();
+            return back()->with('success', 'Aula eliminada correctamente.');
+            
+        } catch (\Illuminate\Database\QueryException $e) {
+            // El código 23000, 23503 indica violación de llave foránea (Integridad Referencial)
+            if ($e->getCode() == 23000 || $e->getCode() == 23503) {
+                return back()->with('error', 'No se puede eliminar esta aula porque tiene estudiantes matriculados o clases asignadas. Traslade a los alumnos primero.');
+            }
+            
+            return back()->with('error', 'Ocurrió un error en la base de datos al intentar eliminar el aula.');
         }
-
-        $aula->delete();
-
-        return redirect()->route('academico.aulas.index')
-                         ->with('success', 'El aula ha sido eliminada del sistema correctamente.');
     }
 
     /**

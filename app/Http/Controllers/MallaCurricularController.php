@@ -33,7 +33,7 @@ class MallaCurricularController extends Controller
         $request->validate([
             'grado_id' => 'required|exists:grado,id',
             'asignatura_id' => 'required|exists:asignatura,id',
-            'horas_semanales_sugeridas' => 'required|integer|min:1|max:40',
+            
         ]);
 
         // Evitar duplicados: no meter la misma materia dos veces al mismo grado
@@ -48,7 +48,7 @@ class MallaCurricularController extends Controller
         MallaCurricular::create([
             'grado_id' => $request->grado_id,
             'asignatura_id' => $request->asignatura_id,
-            'horas_semanales_sugeridas' => $request->horas_semanales_sugeridas,
+           
             'activo' => true
         ]);
 

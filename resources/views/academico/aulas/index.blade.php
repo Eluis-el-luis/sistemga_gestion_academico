@@ -25,6 +25,13 @@
                 </div>
             @endif
 
+            @if(session('error'))
+                <div class="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl shadow-sm flex items-center gap-3 font-medium">
+                    <svg class="w-5 h-5 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    {{ session('error') }}
+                </div>
+            @endif
+
             <!-- TABLA PRINCIPAL -->
             <div class="bg-white overflow-hidden shadow-sm rounded-3xl border border-slate-200">
                 <div class="overflow-x-auto">
