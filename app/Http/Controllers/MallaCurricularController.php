@@ -14,13 +14,10 @@ class MallaCurricularController extends Controller
 
     public function index(Request $request)
     {
-        // Solo Dirección y Subdirección tienen este permiso
         $this->authorize('malla.gestionar');
 
-        // Traemos todos los grados junto con las asignaturas que ya tienen en su malla
-        $grados = Grado::with(['mallaCurricular.asignatura'])->get();
-        
-        // Traemos el catálogo completo de asignaturas para el formulario de agregar
+        // Traemos los grados con sus materias
+        $grados = Grado::with(['mallaCurricular.asignatura', 'modalidad'])->get();
         $asignaturas = Asignatura::all();
 
         return view('academico.malla.index', compact('grados', 'asignaturas'));
@@ -33,26 +30,41 @@ class MallaCurricularController extends Controller
         $request->validate([
             'grado_id' => 'required|exists:grado,id',
             'asignatura_id' => 'required|exists:asignatura,id',
-            
+            'horas_semanales_sugeridas' => 'required|numeric|min:1|max:40'
         ]);
 
-        // Evitar duplicados: no meter la misma materia dos veces al mismo grado
+        $grado = Grado::with('mallaCurricular')->findOrFail($request->grado_id);
+
+        // 1. Verificación de duplicados
         $existe = MallaCurricular::where('grado_id', $request->grado_id)
                                  ->where('asignatura_id', $request->asignatura_id)
                                  ->first();
 
         if ($existe) {
-            return back()->with('error', 'Error: Esta asignatura ya forma parte de la malla curricular de ese grado.');
+            return back()->with('error', 'Error: Esta asignatura ya forma parte de la malla oficial de este grado.');
         }
 
+        // 2. Verificación de TOPE DE HORAS
+        // NOTA: Si aún no creas la columna 'horas_maximas_semanales' en la BD, usará 35 por defecto para no fallar.
+        $limiteHoras = $grado->horas_maximas_semanales ?? 35; 
+        
+        $horasActuales = $grado->mallaCurricular->sum('horas_semanales_sugeridas');
+        $horasNuevas = $request->horas_semanales_sugeridas;
+
+        if (($horasActuales + $horasNuevas) > $limiteHoras) {
+            $disponibles = $limiteHoras - $horasActuales;
+            return back()->with('error', "No se puede añadir. El límite de este grado es {$limiteHoras}h semanales y solo quedan {$disponibles}h disponibles.");
+        }
+
+        // 3. Si todo está bien, guardamos
         MallaCurricular::create([
             'grado_id' => $request->grado_id,
             'asignatura_id' => $request->asignatura_id,
-           
+            'horas_semanales_sugeridas' => $request->horas_semanales_sugeridas,
             'activo' => true
         ]);
 
-        return back()->with('success', 'Asignatura agregada a la plantilla oficial del grado con éxito.');
+        return back()->with('success', 'Asignatura agregada a la plantilla oficial con éxito.');
     }
 
     public function destroy($id)
@@ -63,5 +75,23 @@ class MallaCurricularController extends Controller
         $malla->delete();
 
         return back()->with('success', 'Asignatura removida de la plantilla oficial exitosamente.');
+    }
+
+    /**
+     * Actualiza el límite de horas máximas semanales de un grado
+     */
+    public function actualizarHorasGrado(Request $request, Grado $grado)
+    {
+        $this->authorize('malla.gestionar');
+
+        $request->validate([
+            'horas_maximas_semanales' => 'required|integer|min:1|max:60'
+        ]);
+
+        $grado->update([
+            'horas_maximas_semanales' => $request->horas_maximas_semanales
+        ]);
+
+        return back()->with('success', "Límite de horas para {$grado->nombre} actualizado a {$request->horas_maximas_semanales}h.");
     }
 }

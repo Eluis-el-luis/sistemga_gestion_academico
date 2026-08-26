@@ -2,18 +2,25 @@
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div class="flex items-center gap-3">
-                <a href="{{ route('academico.aulas.index') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors" title="Volver al Directorio de Aulas">
+                <!-- Flecha de regreso dinámica -->
+                <a href="{{ $contexto === 'asignacion' ? route('academico.asignaciones.index') : route('academico.aulas.index') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors">
                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 </a>
-                <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight tracking-tight">
-                    Estructura: <span class="text-[#e6ac27]">{{ $aula->grado->nombre }} - {{ $aula->nombre }}</span>
+                <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">
+                    {{ $contexto === 'asignacion' ? 'Asignación de Maestros:' : 'Estructura:' }} 
+                    <span class="text-[#e6ac27]">{{ $aula->grado->nombre }} - {{ $aula->nombre }}</span>
                 </h2>
             </div>
             
-            <a href="{{ route('academico.aulas.horarios.index', $aula->id) }}" class="inline-flex items-center px-5 py-2.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-xl font-black text-sm shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5 focus:ring-2 focus:ring-offset-2 focus:ring-[#e6ac27]">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                Armar Horario Semanal
-            </a>
+            <!-- Botón de Horario (SOLO visible si estamos en Gestión) -->
+            @if($contexto === 'gestion')
+                @can('horarios.ver')
+                <a href="{{ route('academico.aulas.horarios.index', $aula->id) }}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-xl font-black text-sm shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5 focus:ring-2 focus:ring-offset-2 focus:ring-[#e6ac27]">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    Armar Horario Semanal
+                </a>
+                @endcan
+            @endif
         </div>
     </x-slot>
 
