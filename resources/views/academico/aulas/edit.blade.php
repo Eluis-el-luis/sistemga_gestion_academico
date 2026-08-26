@@ -10,7 +10,7 @@
         </div>
     </x-slot>
 
-    <div class="py-10 bg-slate-50 min-h-screen">
+    <div class="pb-12 pt-6">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
             
             <div class="bg-white overflow-hidden shadow-sm rounded-3xl border border-slate-200">
@@ -149,7 +149,6 @@
             });
 
             modSelect.addEventListener('change', actualizarGrados);
-            // Ejecutar al cargar para limpiar los que no coinciden con la BD
             actualizarGrados();
         });
     </script>

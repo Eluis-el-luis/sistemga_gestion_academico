@@ -21,19 +21,51 @@ class AulaController extends Controller
     }
 
     /**
-     * Muestra el listado de aulas.
+     * Helper privado para no repetir la consulta a la BD
+     */
+    private function getAulasPaginadas()
+    {
+        return Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
+                     ->orderBy('anio_escolar_id', 'desc')
+                     ->orderBy('grado_id')
+                     ->paginate(15);
+    }
+
+    /**
+     * 1. ACCESO: Gestión de Aulas
      */
     public function index()
     {
         $this->authorize('viewAny', Aula::class);
+        $aulas = $this->getAulasPaginadas();
+        $contexto = 'gestion'; // Le decimos a la vista de dónde venimos
 
-        // Traemos las aulas con sus relaciones principales
-        $aulas = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
-                     ->orderBy('anio_escolar_id', 'desc')
-                     ->orderBy('grado_id')
-                     ->paginate(15);
+        return view('academico.aulas.index', compact('aulas', 'contexto'));
+    }
 
-        return view('academico.aulas.index', compact('aulas'));
+    /**
+     * 2. ACCESO: Asignación de Maestros
+     */
+    public function indexAsignaciones()
+    {
+        $this->authorize('viewAny', Aula::class);
+        $aulas = $this->getAulasPaginadas();
+        $contexto = 'asignacion'; 
+
+        return view('academico.aulas.index', compact('aulas', 'contexto'));
+    }
+
+    /**
+     * 3. ACCESO: Gestor de Horarios
+     */
+    public function indexHorarios()
+    {
+        // Nota: Asumo que si pueden ver aulas, pueden ver esta vista.
+        $this->authorize('viewAny', Aula::class); 
+        $aulas = $this->getAulasPaginadas();
+        $contexto = 'horarios'; 
+
+        return view('academico.aulas.index', compact('aulas', 'contexto'));
     }
 
     /**
@@ -47,13 +79,11 @@ class AulaController extends Controller
         $grados = \App\Models\Grado::all();
         $anios = \App\Models\AnioEscolar::where('activo', true)->get();
         
-        // 1. Obtenemos los IDs de los docentes que YA SON guías en los años activos
         $aniosActivosIds = $anios->pluck('id');
         $docentesOcupados = Aula::whereIn('anio_escolar_id', $aniosActivosIds)
                                 ->pluck('docente_guia_id')
                                 ->toArray();
 
-        // 2. Traemos SOLO a los docentes que NO están en la lista de ocupados
         $docentes = \App\Models\Docente::with('usuario')
                         ->whereNotIn('id', $docentesOcupados)
                         ->get();
@@ -65,17 +95,12 @@ class AulaController extends Controller
     {
         $this->authorize('create', Aula::class);
 
-        // Llamamos al servicio en lugar de usar Aula::create()
-        // El servicio guarda el aula Y le inyecta las materias automáticamente
         $this->aulaService->crearAulaConMalla($request->validated());
 
         return redirect()->route('academico.aulas.index')
                          ->with('success', 'Aula creada exitosamente. Las asignaturas de la malla curricular han sido asignadas automáticamente.');
     }
 
-    /**
-     * Muestra el formulario para editar un aula existente.
-     */
     public function edit(Aula $aula)
     {
         $this->authorize('update', $aula);
@@ -84,7 +109,6 @@ class AulaController extends Controller
         $grados = \App\Models\Grado::all();
         $anios = \App\Models\AnioEscolar::all();
         
-        // Obtenemos los docentes ocupados en el año del aula, EXCLUYENDO al docente actual de esta aula
         $docentesOcupados = Aula::where('anio_escolar_id', $aula->anio_escolar_id)
                                 ->where('id', '!=', $aula->id)
                                 ->pluck('docente_guia_id')
@@ -97,9 +121,6 @@ class AulaController extends Controller
         return view('academico.aulas.edit', compact('aula', 'modalidades', 'grados', 'anios', 'docentes'));
     }
 
-    /**
-     * Actualiza los datos del aula en la base de datos.
-     */
     public function update(Request $request, Aula $aula)
     {
         $this->authorize('update', $aula);
@@ -120,14 +141,10 @@ class AulaController extends Controller
                          ->with('success', 'Información del aula actualizada exitosamente.');
     }
 
-    /**
-     * Elimina un aula del sistema.
-     */
     public function destroy(Aula $aula)
     {
         $this->authorize('delete', $aula);
 
-        // Opcional: Validar si tiene matrículas activas antes de borrar
         if ($aula->matriculas()->count() > 0) {
             return back()->with('error', 'No se puede eliminar el aula porque tiene estudiantes matriculados.');
         }
@@ -138,9 +155,6 @@ class AulaController extends Controller
                          ->with('success', 'El aula ha sido eliminada del sistema correctamente.');
     }
 
-    /**
-     * Muestra la estructura interna de un aula específica (Sus materias y docentes).
-     */
     public function show(Aula $aula)
     {
         $this->authorize('update', $aula);
@@ -150,10 +164,7 @@ class AulaController extends Controller
                             ->where('aula_id', $aula->id)
                             ->get();
 
-        // 1. Traemos TODAS las asignaturas para el botón "Agregar Materia Extra"
         $todasAsignaturas = \App\Models\Asignatura::all();
-        
-        // 2. Traemos a TODOS los docentes para el botón "Asignar Profesor"
         $todosDocentes = \App\Models\Docente::with('usuario')->get();
 
         return view('academico.aulas.show', compact('aula', 'asignaciones', 'todasAsignaturas', 'todosDocentes'));

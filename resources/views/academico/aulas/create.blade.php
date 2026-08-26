@@ -10,13 +10,13 @@
         </div>
     </x-slot>
 
-    <div class="py-10 bg-slate-50 min-h-screen">
+    <div class="pb-12 pt-6">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
             
             <div class="bg-white overflow-hidden shadow-sm rounded-3xl border border-slate-200">
                 <div class="bg-[#FFFDF5] border-b border-[#e6ac27]/20 px-8 py-5">
                     <h3 class="text-lg font-black text-[#3d2c1d] flex items-center gap-2">
-                        <svg class="w-6 h-6 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                        <svg class="w-6 h-6 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 01-1-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                         Datos del Grupo a Crear
                     </h3>
                 </div>
@@ -123,7 +123,7 @@
         </div>
     </div>
 
-    <!-- Script Original de Cascada -->
+    <!-- Script de Cascada -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const modSelect = document.getElementById('filtro_modalidad');

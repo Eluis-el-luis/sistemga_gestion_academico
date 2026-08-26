@@ -36,7 +36,7 @@
         </div>
         @endhasanyrole
 
-        <!-- MÓDULO ACADÉMICO (Alumnos, Matrículas y Fase 5: Calificaciones) -->
+        <!-- MÓDULO ACADÉMICO -->
         @hasanyrole('Director|Subdirector|Gestor de Usuarios|Coordinador|Docente Guía')
         <div class="pt-4 pb-1">
             <p x-show="sidebarOpen" class="px-4 text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 whitespace-nowrap">Académico</p>
@@ -54,7 +54,6 @@
             </a>
             @endhasanyrole
 
-            <!-- FASE 5: Calificaciones -->
             <a href="{{ route('academico.notas.index') }}" title="Calificaciones" class="flex items-center gap-3 px-4 mx-3 py-3 rounded-xl transition-all {{ request()->routeIs('academico.notas.*') ? 'bg-[#e6ac27]/15 text-[#e6ac27] font-black border border-[#e6ac27]/30 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-[#3d2c1d] font-bold' }}" :class="sidebarOpen ? 'justify-start' : 'justify-center lg:mx-2 lg:px-0'">
                 <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012-2m-6 9l2 2 4-4"></path></svg>
                 <span x-show="sidebarOpen" class="whitespace-nowrap">Calificaciones</span>
@@ -62,17 +61,31 @@
         </div>
         @endhasanyrole
 
-        <!-- MÓDULO ESTRUCTURA (Aulas, Malla y Horarios) -->
+        <!-- MÓDULO ESTRUCTURA Y HORARIOS -->
         @hasanyrole('Director|Subdirector|Gestor de Usuarios|Coordinador')
         <div class="pt-4 pb-1">
-            <p x-show="sidebarOpen" class="px-4 text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 whitespace-nowrap">Aulas y Horarios</p>
+            <p x-show="sidebarOpen" class="px-4 text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 whitespace-nowrap">Planificación Escolar</p>
             <div x-show="!sidebarOpen" class="w-6 h-px bg-[#e6ac27]/30 mx-auto my-3"></div>
             
+            <!-- 1. Gestión de Aulas -->
             <a href="{{ route('academico.aulas.index') }}" title="Gestión de Aulas" class="flex items-center gap-3 px-4 mx-3 py-3 rounded-xl transition-all {{ request()->routeIs('academico.aulas.*') ? 'bg-[#e6ac27]/15 text-[#e6ac27] font-black border border-[#e6ac27]/30 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-[#3d2c1d] font-bold' }}" :class="sidebarOpen ? 'justify-start' : 'justify-center lg:mx-2 lg:px-0'">
                 <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                 <span x-show="sidebarOpen" class="whitespace-nowrap">Gestión de Aulas</span>
             </a>
 
+            <!-- 2. Asignación de Maestros -->
+            <a href="{{ route('academico.asignaciones.index') }}" title="Asignación de Maestros" class="flex items-center gap-3 px-4 mx-3 py-3 rounded-xl transition-all {{ request()->routeIs('academico.asignaciones.*') ? 'bg-[#e6ac27]/15 text-[#e6ac27] font-black border border-[#e6ac27]/30 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-[#3d2c1d] font-bold' }}" :class="sidebarOpen ? 'justify-start' : 'justify-center lg:mx-2 lg:px-0'">
+                <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                <span x-show="sidebarOpen" class="whitespace-nowrap">Asignación de Maestros</span>
+            </a>
+
+            <!-- 3. Gestor de Horarios -->
+            <a href="{{ route('academico.gestor-horarios.index') }}" title="Gestor de Horarios" class="flex items-center gap-3 px-4 mx-3 py-3 rounded-xl transition-all {{ request()->routeIs('academico.gestor-horarios.*') ? 'bg-[#e6ac27]/15 text-[#e6ac27] font-black border border-[#e6ac27]/30 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-[#3d2c1d] font-bold' }}" :class="sidebarOpen ? 'justify-start' : 'justify-center lg:mx-2 lg:px-0'">
+                <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <span x-show="sidebarOpen" class="whitespace-nowrap">Gestor de Horarios</span>
+            </a>
+
+            <!-- 4. Malla Curricular -->
             @hasanyrole('Director|Subdirector|Gestor de Usuarios')
             <a href="{{ route('academico.malla.index') }}" title="Malla Curricular" class="flex items-center gap-3 px-4 mx-3 py-3 rounded-xl transition-all {{ request()->routeIs('academico.malla.*') ? 'bg-[#e6ac27]/15 text-[#e6ac27] font-black border border-[#e6ac27]/30 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-[#3d2c1d] font-bold' }}" :class="sidebarOpen ? 'justify-start' : 'justify-center lg:mx-2 lg:px-0'">
                 <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
@@ -80,9 +93,10 @@
             </a>
             @endhasanyrole
 
-            <a href="{{ route('academico.bloques.index') }}" title="Horario General" class="flex items-center gap-3 px-4 mx-3 py-3 rounded-xl transition-all {{ request()->routeIs('academico.bloques.*') ? 'bg-[#e6ac27]/15 text-[#e6ac27] font-black border border-[#e6ac27]/30 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-[#3d2c1d] font-bold' }}" :class="sidebarOpen ? 'justify-start' : 'justify-center lg:mx-2 lg:px-0'">
+            <!-- 5. Bloques de Modalidades -->
+            <a href="{{ route('academico.bloques.index') }}" title="Bloques de Modalidades" class="flex items-center gap-3 px-4 mx-3 py-3 rounded-xl transition-all {{ request()->routeIs('academico.bloques.*') ? 'bg-[#e6ac27]/15 text-[#e6ac27] font-black border border-[#e6ac27]/30 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-[#3d2c1d] font-bold' }}" :class="sidebarOpen ? 'justify-start' : 'justify-center lg:mx-2 lg:px-0'">
                 <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <span x-show="sidebarOpen" class="whitespace-nowrap">Horario General</span>
+                <span x-show="sidebarOpen" class="whitespace-nowrap">Bloques de Modalidades</span>
             </a>
         </div>
         @endhasanyrole

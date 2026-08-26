@@ -31,8 +31,8 @@
         <!-- CONTENEDOR DINÁMICO: lg:pl-64 (abierto) o lg:pl-20 (mini sidebar cerrado) -->
         <div class="flex flex-col min-h-screen transition-all duration-300" :class="sidebarOpen ? 'lg:pl-64' : 'lg:pl-20'">
             
-            <!-- TOPBAR (h-16 para alinear con el logo) -->
-            <header class="sticky top-0 z-30 bg-white border-b border-slate-200/60 shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 transition-all">
+            <!-- TOPBAR (Solo Menú Hamburguesa y Perfil del Usuario) -->
+            <nav class="sticky top-0 z-30 bg-white border-b border-slate-200/60 shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 transition-all">
                 
                 <div class="flex items-center gap-4">
                     <button @click="sidebarOpen = !sidebarOpen" class="text-slate-500 hover:text-[#e6ac27] bg-slate-50 hover:bg-amber-50 p-2 rounded-lg transition-colors focus:outline-none">
@@ -40,12 +40,7 @@
                     </button>
                 </div>
 
-                @isset($header)
-                    <div class="absolute left-1/2 transform -translate-x-1/2 hidden sm:block">
-                        {{ $header }}
-                    </div>
-                @endisset
-
+                <!-- Menú de Usuario a la derecha -->
                 <div class="flex items-center">
                     <x-dropdown align="right" width="48">
                         <x-slot name="trigger">
@@ -80,8 +75,16 @@
                         </x-slot>
                     </x-dropdown>
                 </div>
-            </header>
+            </nav>
 
+            <!-- ENCABEZADO DE PÁGINA (Título y Botones, ahora libre y con su propio espacio) -->
+            @isset($header)
+                <header class="bg-transparent pt-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+                    {{ $header }}
+                </header>
+            @endisset
+
+            <!-- CONTENIDO PRINCIPAL -->
             <main class="flex-1 w-full">
                 {{ $slot }}
             </main>

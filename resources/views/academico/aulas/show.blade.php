@@ -17,7 +17,7 @@
         </div>
     </x-slot>
 
-    <div class="py-10 bg-slate-50 min-h-screen">
+    <div class="pb-12 pt-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
             
             <!-- TARJETA DE RESUMEN DEL AULA -->
@@ -177,7 +177,7 @@
                 </div>
             </div>
 
-            <div class="bg-slate-50 px-8 py-5 flex justify-end gap-4 border-t border-slate-100">
+            <div class="bg-slate-50 px-8 py-5 flex justify-end gap-4 border-t border-slate-100 rounded-b-3xl">
                 <button type="button" x-on:click="$dispatch('close')" class="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">
                     Cancelar
                 </button>
@@ -220,7 +220,7 @@
                     </div>
                 </div>
 
-                <div class="bg-slate-50 px-8 py-5 flex justify-end gap-4 border-t border-slate-100">
+                <div class="bg-slate-50 px-8 py-5 flex justify-end gap-4 border-t border-slate-100 rounded-b-3xl">
                     <button type="button" x-on:click="$dispatch('close')" class="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">
                         Cancelar
                     </button>
