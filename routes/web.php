@@ -44,10 +44,15 @@ Route::middleware('auth')->group(function () {
         Route::resource('matriculas', MatriculaController::class);
         Route::patch('matriculas/{matricula}/retirar', [MatriculaController::class, 'retirar'])->name('matriculas.retirar');
         Route::patch('matriculas/{matricula}/reactivar', [MatriculaController::class, 'reactivar'])->name('matriculas.reactivar');
-        
+        // Ruta para actualizar el límite de horas del grado desde la malla
+        Route::put('malla/grado/{grado}/horas', [\App\Http\Controllers\MallaCurricularController::class, 'actualizarHorasGrado'])->name('malla.grado.horas');
+
         // --- GESTIÓN DE AULAS Y SUS NUEVOS ACCESOS DIRECTOS ---
         Route::resource('aulas', AulaController::class);
         Route::get('asignaciones', [AulaController::class, 'indexAsignaciones'])->name('asignaciones.index');
+        // NUEVA RUTA PARA LOS DETALLES DE ASIGNACIÓN:
+        Route::get('asignaciones/{aula}', [AulaController::class, 'showAsignaciones'])->name('asignaciones.show');
+        Route::get('gestor-horarios', [AulaController::class, 'indexHorarios'])->name('gestor-horarios.index');
         Route::get('gestor-horarios', [AulaController::class, 'indexHorarios'])->name('gestor-horarios.index');
         
         Route::post('aulas/{aula}/asignaturas', [\App\Http\Controllers\AulaAsignaturaController::class, 'store'])->name('aulas.asignaturas.store');

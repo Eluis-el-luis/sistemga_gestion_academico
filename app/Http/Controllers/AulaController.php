@@ -125,20 +125,18 @@ class AulaController extends Controller
     {
         $this->authorize('update', $aula);
 
+        // Validamos ÚNICAMENTE los campos permitidos para edición
         $validated = $request->validate([
-            'anio_escolar_id' => 'required|exists:anios_escolares,id',
-            'modalidad_id'    => 'required|exists:modalidades,id',
-            'grado_id'        => 'required|exists:grados,id',
-            'nombre'          => 'required|string|max:50',
-            'turno'           => 'required|string|max:50',
-            'cupo'            => 'required|integer|min:1|max:100',
-            'docente_guia_id' => 'nullable|exists:docentes,id',
+            'anio_escolar_id' => 'required|exists:anio_escolar,id',
+            'docente_guia_id' => 'nullable|exists:docente,id',
         ]);
 
+        // Los campos como grado_id, modalidad_id, nombre, turno y cupo 
+        // quedan completamente protegidos contra modificaciones.
         $aula->update($validated);
 
         return redirect()->route('academico.aulas.index')
-                         ->with('success', 'Información del aula actualizada exitosamente.');
+                         ->with('success', 'Asignación del aula actualizada exitosamente.');
     }
 
     /**
@@ -146,8 +144,8 @@ class AulaController extends Controller
      */
     public function destroy(\App\Models\Aula $aula)
     {
-        // Autorización (usamos la política que ya creaste)
-        $this->authorize('create', \App\Models\Aula::class);
+        // CORRECCIÓN: El permiso debe ser 'delete', no 'create'
+        $this->authorize('delete', $aula);
 
         try {
             $aula->delete();
@@ -156,7 +154,7 @@ class AulaController extends Controller
         } catch (\Illuminate\Database\QueryException $e) {
             // El código 23000, 23503 indica violación de llave foránea (Integridad Referencial)
             if ($e->getCode() == 23000 || $e->getCode() == 23503) {
-                return back()->with('error', 'No se puede eliminar esta aula porque tiene estudiantes matriculados o clases asignadas. Traslade a los alumnos primero.');
+                return back()->with('error', 'No se puede eliminar esta aula porque tiene clases asignadas o alumnos. Elimine sus clases o traslade a los alumnos primero.');
             }
             
             return back()->with('error', 'Ocurrió un error en la base de datos al intentar eliminar el aula.');
@@ -172,9 +170,35 @@ class AulaController extends Controller
                             ->where('aula_id', $aula->id)
                             ->get();
 
-        $todasAsignaturas = \App\Models\Asignatura::all();
-        $todosDocentes = \App\Models\Docente::with('usuario')->get();
+        // --- FILTRO ANTI-DUPLICADOS ---
+        $asignaturasYaAsignadas = $asignaciones->pluck('asignatura_id')->toArray();
+        $todasAsignaturas = \App\Models\Asignatura::whereNotIn('id', $asignaturasYaAsignadas)->get();
+        // ------------------------------
 
-        return view('academico.aulas.show', compact('aula', 'asignaciones', 'todasAsignaturas', 'todosDocentes'));
+        $todosDocentes = \App\Models\Docente::with('usuario')->get();
+        $contexto = 'gestion'; // Añadimos el contexto
+
+        return view('academico.aulas.show', compact('aula', 'asignaciones', 'todasAsignaturas', 'todosDocentes', 'contexto'));
+    }
+
+    // NUEVO MÉTODO PARA ASIGNACIONES
+    public function showAsignaciones(Aula $aula)
+    {
+        $this->authorize('viewAny', Aula::class);
+        $aula->load(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario']);
+
+        $asignaciones = \App\Models\AulaAsignaturaDocente::with(['asignatura', 'docente.usuario'])
+                            ->where('aula_id', $aula->id)
+                            ->get();
+
+        // --- FILTRO ANTI-DUPLICADOS ---
+        $asignaturasYaAsignadas = $asignaciones->pluck('asignatura_id')->toArray();
+        $todasAsignaturas = \App\Models\Asignatura::whereNotIn('id', $asignaturasYaAsignadas)->get();
+        // ------------------------------
+
+        $todosDocentes = \App\Models\Docente::with('usuario')->get();
+        $contexto = 'asignacion'; // Contexto diferente
+
+        return view('academico.aulas.show', compact('aula', 'asignaciones', 'todasAsignaturas', 'todosDocentes', 'contexto'));
     }
 }

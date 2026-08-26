@@ -84,14 +84,46 @@
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     @foreach($grados as $grado)
-                        <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+                        @php
+                            // Cálculo del progreso para la barra
+                            $limiteHoras = $grado->horas_maximas_semanales ?? 35; // Fallback a 35 si no existe en BD
+                            $horasUsadas = $grado->mallaCurricular->sum('horas_semanales_sugeridas');
+                            $porcentaje = $limiteHoras > 0 ? ($horasUsadas / $limiteHoras) * 100 : 0;
+                            
+                            // Color dinámico según qué tan lleno esté
+                            $colorBarra = $porcentaje > 90 ? 'bg-rose-500' : 'bg-[#e6ac27]';
+                            $estaLleno = $porcentaje >= 100;
+                        @endphp
+
+                        <div class="bg-white rounded-3xl shadow-sm border {{ $estaLleno ? 'border-rose-200' : 'border-slate-200' }} overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+                            
                             <!-- Cabecera de la Tarjeta -->
-                            <div class="bg-[#FFFDF5] px-6 py-5 border-b border-[#e6ac27]/20 flex justify-between items-center">
-                                <div>
-                                    <h4 class="font-black text-[#3d2c1d] text-lg">{{ $grado->nombre }}</h4>
-                                    <p class="text-xs text-slate-500 font-bold mt-0.5">{{ $grado->mallaCurricular->count() }} materias configuradas</p>
+                            <div class="bg-[#FFFDF5] px-6 py-5 border-b border-[#e6ac27]/20">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h4 class="font-black text-[#3d2c1d] text-lg">{{ $grado->nombre }}</h4>
+                                        <span class="bg-slate-100 border border-slate-200 text-slate-600 px-2 py-0.5 rounded-lg text-[10px] uppercase tracking-widest font-black inline-block mt-1">{{ $grado->modalidad->nombre ?? 'N/A' }}</span>
+                                    </div>
+                                    <div class="text-right flex items-center justify-end gap-1">
+                                        <span class="text-xl font-black {{ $estaLleno ? 'text-rose-600' : 'text-[#e6ac27]' }}">{{ $horasUsadas }}</span>
+                                        
+                                        <!-- BOTÓN PARA EDITAR HORAS (MAGIA AQUÍ) -->
+                                        <form action="{{ route('academico.malla.grado.horas', $grado->id) }}" method="POST" class="inline-block form-editar-horas">
+                                            @csrf
+                                            @method('PUT')
+                                            <input type="hidden" name="horas_maximas_semanales" class="input-horas-oculto">
+                                            <button type="button" class="text-xs font-bold text-slate-400 hover:text-[#e6ac27] transition-colors cursor-pointer flex items-center gap-0.5 mt-1.5 btn-editar-horas" data-grado="{{ $grado->nombre }}" data-horas="{{ $limiteHoras }}" title="Editar límite de horas">
+                                                / {{ $limiteHoras }}h
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                            </button>
+                                        </form>
+                                    </div>
                                 </div>
-                                <span class="bg-slate-100 border border-slate-200 text-slate-600 px-2 py-1 rounded-lg text-[10px] uppercase tracking-widest font-black">{{ $grado->modalidad->nombre ?? 'N/A' }}</span>
+                                
+                                <!-- BARRA DE PROGRESO -->
+                                <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                                    <div class="h-1.5 rounded-full transition-all duration-500 {{ $colorBarra }}" style="width: {{ min(100, $porcentaje) }}%"></div>
+                                </div>
                             </div>
                             
                             <!-- Lista de Materias -->
@@ -102,10 +134,10 @@
                                             <li class="flex justify-between items-center text-sm border-b border-slate-100 pb-4 last:border-0 last:pb-0 group">
                                                 <div class="flex flex-col">
                                                     <span class="font-bold text-slate-700 group-hover:text-[#e6ac27] transition-colors">{{ $item->asignatura->nombre }}</span>
-                                                    <span class="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">{{ $item->horas_semanales_sugeridas }} horas / sem</span>
+                                                    <span class="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">{{ number_format($item->horas_semanales_sugeridas ?? 0, 0) }} horas / sem</span>
                                                 </div>
                                                 
-                                                <form action="{{ route('academico.malla.destroy', $item->id) }}" method="POST" class="alerta-eliminar" onsubmit="return confirm('¿Seguro que deseas quitar esta materia de la plantilla oficial?');">
+                                                <form action="{{ route('academico.malla.destroy', $item->id) }}" method="POST" class="alerta-eliminar">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-2 rounded-xl transition-colors" title="Quitar de la malla">
@@ -130,10 +162,11 @@
         </div>
     </div>
 
-
-    <!-- SCRIPT DE FILTRADO DINÁMICO -->
+    <!-- SCRIPT DE ALERTAS DINÁMICAS -->
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            
+            // SCRIPT PARA ELIMINAR MATERIA
             document.querySelectorAll('.alerta-eliminar').forEach(formulario => {
                 formulario.addEventListener('submit', function (e) {
                     e.preventDefault();
@@ -151,10 +184,35 @@
                 });
             });
 
-            function restaurarOpciones(opciones) {
-                asignaturaSelect.innerHTML = '';
-                opciones.forEach(op => asignaturaSelect.appendChild(op.cloneNode(true)));
-            }
+            // SCRIPT PARA EDITAR LÍMITE DE HORAS
+            document.querySelectorAll('.btn-editar-horas').forEach(boton => {
+                boton.addEventListener('click', function () {
+                    const gradoNombre = this.getAttribute('data-grado');
+                    const horasActuales = this.getAttribute('data-horas');
+                    const formulario = this.closest('form');
+                    const inputOculto = formulario.querySelector('.input-horas-oculto');
+
+                    Swal.fire({
+                        title: 'Límite de Horas',
+                        text: `Establece el máximo de horas semanales para ${gradoNombre}`,
+                        input: 'number',
+                        inputValue: horasActuales,
+                        inputAttributes: { min: 1, max: 60, step: 1 },
+                        showCancelButton: true,
+                        confirmButtonColor: '#e6ac27',
+                        cancelButtonColor: '#94a3b8',
+                        confirmButtonText: 'Guardar Cambios',
+                        cancelButtonText: 'Cancelar',
+                        customClass: { popup: 'rounded-3xl border border-slate-200' }
+                    }).then((result) => {
+                        if (result.isConfirmed && result.value) {
+                            inputOculto.value = result.value;
+                            formulario.submit();
+                        }
+                    });
+                });
+            });
+
         });
     </script>
 </x-app-layout>
