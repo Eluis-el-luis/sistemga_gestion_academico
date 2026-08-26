@@ -11,7 +11,7 @@
     <div class="pb-12 pt-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
 
-            <!-- Mensajes de Sesión -->
+            <!-- Mensajes de Éxito o Error -->
             @if(session('success'))
                 <div class="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl shadow-sm flex items-center gap-3 font-medium">
                     <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
@@ -41,7 +41,9 @@
                             <select name="grado_id" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm transition-colors font-medium text-slate-700" required>
                                 <option value="">Seleccione...</option>
                                 @foreach($grados as $grado)
-                                    <option value="{{ $grado->id }}">{{ $grado->nombre }}</option>
+                                    <option value="{{ $grado->id }}" data-modalidad="{{ strtolower($grado->modalidad->nombre ?? '') }}">
+                                        {{ $grado->nombre }}
+                                    </option>
                                 @endforeach
                             </select>
                         </div>
@@ -51,7 +53,9 @@
                             <select name="asignatura_id" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm transition-colors font-medium text-slate-700" required>
                                 <option value="">Seleccione la Materia...</option>
                                 @foreach($asignaturas as $asignatura)
-                                    <option value="{{ $asignatura->id }}">{{ $asignatura->nombre }}</option>
+                                    <option value="{{ $asignatura->id }}" data-is-preescolar="{{ $asignatura->nombre === 'Tema motivador' ? 'true' : 'false' }}">
+                                        {{ $asignatura->nombre }}
+                                    </option>
                                 @endforeach
                             </select>
                         </div>
@@ -67,6 +71,7 @@
                             </button>
                         </div>
                     </form>
+                    <p class="text-xs text-indigo-600 font-semibold mt-4">ℹ Las materias que agregues aquí se clonarán automáticamente cada vez que se aperture una nueva Aula para ese grado.</p>
                 </div>
             </div>
 
@@ -100,8 +105,7 @@
                                                     <span class="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">{{ $item->horas_semanales_sugeridas }} horas / sem</span>
                                                 </div>
                                                 
-                                                <!-- Botón Eliminar con SweetAlert -->
-                                                <form action="{{ route('academico.malla.destroy', $item->id) }}" method="POST" class="alerta-eliminar">
+                                                <form action="{{ route('academico.malla.destroy', $item->id) }}" method="POST" class="alerta-eliminar" onsubmit="return confirm('¿Seguro que deseas quitar esta materia de la plantilla oficial?');">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-2 rounded-xl transition-colors" title="Quitar de la malla">
@@ -126,7 +130,8 @@
         </div>
     </div>
 
-    <!-- Script para SweetAlert2 -->
+
+    <!-- SCRIPT DE FILTRADO DINÁMICO -->
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.alerta-eliminar').forEach(formulario => {
@@ -145,6 +150,11 @@
                     }).then((result) => { if (result.isConfirmed) this.submit(); });
                 });
             });
+
+            function restaurarOpciones(opciones) {
+                asignaturaSelect.innerHTML = '';
+                opciones.forEach(op => asignaturaSelect.appendChild(op.cloneNode(true)));
+            }
         });
     </script>
 </x-app-layout>
