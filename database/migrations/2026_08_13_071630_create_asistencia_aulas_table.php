@@ -12,8 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('matricula_id')->constrained('matricula')->onDelete('cascade');
             $table->date('fecha');
-            $table->boolean('presente');
-            $table->boolean('justificada')->default(false);
+            $table->string('estado_asistencia', 50); 
             $table->timestamps();
         });
     }
