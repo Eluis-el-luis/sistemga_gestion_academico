@@ -19,24 +19,36 @@ class HorarioController extends Controller
 
         $aula->load(['grado', 'modalidad']);
         
-        $asignaciones = AulaAsignaturaDocente::with('asignatura')
+        $asignaciones = AulaAsignaturaDocente::with(['asignatura', 'docente.usuario'])
                             ->where('aula_id', $aula->id)
                             ->get();
 
-        // 1. Buscamos los bloques oficiales para ESTA modalidad y ESTE turno
+        // 1. Buscamos los bloques oficiales
         $bloquesOficiales = BloqueHorario::where('modalidad_id', $aula->modalidad_id)
                                 ->where('turno', $aula->turno)
                                 ->orderBy('hora_inicio')
                                 ->get();
 
-        // 2. Traemos los horarios y los cargamos junto con su bloque oficial
+        // 2. Traemos los horarios
         $horarios = Horario::with(['aulaAsignaturaDocente.asignatura', 'bloque'])
                     ->whereIn('aula_asignatura_docente_id', $asignaciones->pluck('id'))
-                    ->get()
-                    // Ordenamos usando la hora de inicio del bloque relacionado
-                    ->sortBy(function($horario) {
-                        return $horario->bloque->hora_inicio ?? '00:00:00';
-                    });
+                    ->get();
+
+        // 3. --- NUEVA MAGIA: Cálculo de la Bolsa de Horas ---
+        // Contamos cuántas veces aparece cada asignación en el horario actual
+        $conteoHoras = $horarios->countBy('aula_asignatura_docente_id');
+
+        // A cada asignación le inyectamos las horas que ha consumido y las restantes
+        foreach ($asignaciones as $asignacion) {
+            $asignacion->horas_programadas = $conteoHoras->get($asignacion->id, 0);
+            $asignacion->horas_restantes = $asignacion->horas_semanales - $asignacion->horas_programadas;
+        }
+        // ----------------------------------------------------
+
+        // Ordenamos los horarios por hora de inicio
+        $horarios = $horarios->sortBy(function($horario) {
+            return $horario->bloque->hora_inicio ?? '00:00:00';
+        });
 
         $calendario = [
             'Lunes' => $horarios->where('dia_semana', 'Lunes'),
@@ -46,7 +58,7 @@ class HorarioController extends Controller
             'Viernes' => $horarios->where('dia_semana', 'Viernes'),
         ];
 
-        return view('academico.horarios.index', compact('aula', 'asignaciones', 'calendario', 'bloquesOficiales'));
+        return view('academico.aulas.horarios.index', compact('aula', 'asignaciones', 'calendario', 'bloquesOficiales'));
     }
 
     public function store(Request $request, Aula $aula)
@@ -59,21 +71,46 @@ class HorarioController extends Controller
             'bloque_horario_id' => 'required|exists:bloque_horario,id',
         ]);
 
-        // Validación extra: Evitar que se guarden dos materias en la misma aula, mismo día y misma hora
-        $existe = Horario::whereHas('aulaAsignaturaDocente', function($query) use ($aula) {
+        // 1. Obtener la asignación solicitada para saber quién es el maestro
+        $asignacion = AulaAsignaturaDocente::with('aula.grado')->findOrFail($request->aula_asignatura_docente_id);
+
+        // 2. Escudo de Integridad: ¿Tiene profesor asignado?
+        if (!$asignacion->docente_id) {
+            return back()->with('error', 'No puedes asignar un horario a una materia que aún no tiene profesor titular.');
+        }
+
+        // 3. Escudo Choque de Aula: ¿El aula ya tiene clase a esta hora?
+        $choqueAula = Horario::whereHas('aulaAsignaturaDocente', function($query) use ($aula) {
             $query->where('aula_id', $aula->id);
         })
         ->where('dia_semana', $request->dia_semana)
         ->where('bloque_horario_id', $request->bloque_horario_id)
         ->first();
 
-        if ($existe) {
-            return back()->with('error', '¡Choque de horario! Ya hay una materia asignada en ese bloque y día.');
+        if ($choqueAula) {
+            return back()->with('error', '¡Choque de Aula! Ya hay una materia asignada a esta sección en ese día y hora.');
         }
 
+        // 4. Escudo Choque de Docente: ¿El profesor está en otra aula a esta hora?
+        $choqueDocente = Horario::with('aulaAsignaturaDocente.aula.grado') // Cargamos la relación para el mensaje de error
+        ->whereHas('aulaAsignaturaDocente', function($query) use ($asignacion) {
+            $query->where('docente_id', $asignacion->docente_id);
+        })
+        ->where('dia_semana', $request->dia_semana)
+        ->where('bloque_horario_id', $request->bloque_horario_id)
+        ->first();
+
+        if ($choqueDocente) {
+            $aulaOcupada = $choqueDocente->aulaAsignaturaDocente->aula->nombre ?? 'otra aula';
+            $gradoOcupado = $choqueDocente->aulaAsignaturaDocente->aula->grado->nombre ?? '';
+            
+            return back()->with('error', "¡Choque de Maestro! El docente ya imparte clases en {$gradoOcupado} - {$aulaOcupada} durante ese bloque.");
+        }
+
+        // 5. Vía Libre: Guardar
         Horario::create($request->all());
 
-        return back()->with('success', 'Bloque de horario agregado correctamente.');
+        return back()->with('success', 'Clase asignada al horario correctamente.');
     }
 
     public function destroy(Aula $aula, Horario $horario)

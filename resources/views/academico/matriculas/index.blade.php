@@ -101,11 +101,16 @@
                         <tbody class="divide-y divide-slate-100 text-slate-700 bg-white">
                             @forelse ($matriculas as $matricula)
                                 <tr class="hover:bg-slate-50/80 transition-colors group">
-                                    <td class="px-8 py-5 font-black text-slate-500">{{ $matricula->alumno->codigo_unico_persona }}</td>
-                                    <td class="px-6 py-5 font-black text-[#3d2c1d] text-base">{{ $matricula->alumno->nombre_completo }}</td>
+                                    <!-- APLICACIÓN DE LA RED DE SEGURIDAD AQUÍ -->
+                                    <td class="px-8 py-5 font-black {{ $matricula->alumno ? 'text-slate-500' : 'text-rose-400' }}">
+                                        {{ $matricula->alumno?->codigo_unico_persona ?? 'SIN-CUP' }}
+                                    </td>
+                                    <td class="px-6 py-5 font-black text-base {{ $matricula->alumno ? 'text-[#3d2c1d]' : 'text-rose-600' }}">
+                                        {{ $matricula->alumno?->nombre_completo ?? '⚠️ Alumno no encontrado (Registro Huérfano)' }}
+                                    </td>
                                     <td class="px-6 py-5">
-                                        <span class="block font-bold text-slate-800">{{ $matricula->aula->nombre }}</span>
-                                        <span class="text-[11px] font-black uppercase tracking-widest text-slate-400 mt-1">{{ $matricula->anioEscolar->nombre }}</span>
+                                        <span class="block font-bold text-slate-800">{{ $matricula->aula->nombre ?? 'N/A' }}</span>
+                                        <span class="text-[11px] font-black uppercase tracking-widest text-slate-400 mt-1">{{ $matricula->anioEscolar->nombre ?? 'N/A' }}</span>
                                     </td>
                                     <td class="px-6 py-5 text-center">
                                         <span class="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm border
@@ -118,10 +123,12 @@
                                     </td>
                                     <td class="px-8 py-5 text-right space-x-3">
                                         
-                                        <!-- Ver Expediente del Alumno -->
-                                        <a href="{{ route('academico.alumnos.show', $matricula->alumno_id) }}" class="inline-flex p-2 bg-slate-50 text-blue-600 rounded-xl hover:bg-blue-100 border border-slate-200 hover:border-blue-300 shadow-sm transition-all" title="Ver Expediente">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                                        </a>
+                                        <!-- Ver Expediente del Alumno (Deshabilitado si es huérfano) -->
+                                        @if($matricula->alumno)
+                                            <a href="{{ route('academico.alumnos.show', $matricula->alumno_id) }}" class="inline-flex p-2 bg-slate-50 text-blue-600 rounded-xl hover:bg-blue-100 border border-slate-200 hover:border-blue-300 shadow-sm transition-all" title="Ver Expediente">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                            </a>
+                                        @endif
 
                                         @can('update', $matricula)
                                             <span class="text-slate-300">|</span>

@@ -16,7 +16,7 @@ Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'ind
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
-// Gestión de Avisos (El controlador se encargará de validar que solo Dirección tenga acceso)
+// Gestión de Avisos
 Route::post('/dashboard/avisos', [\App\Http\Controllers\DashboardController::class, 'storeAviso'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard.avisos.store');
@@ -36,7 +36,6 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-
 Route::middleware('auth')->group(function () {
     
     Route::prefix('academico')->name('academico.')->group(function () {
@@ -45,18 +44,36 @@ Route::middleware('auth')->group(function () {
         Route::resource('matriculas', MatriculaController::class);
         Route::patch('matriculas/{matricula}/retirar', [MatriculaController::class, 'retirar'])->name('matriculas.retirar');
         Route::patch('matriculas/{matricula}/reactivar', [MatriculaController::class, 'reactivar'])->name('matriculas.reactivar');
+        
+        // --- GESTIÓN DE AULAS Y SUS NUEVOS ACCESOS DIRECTOS ---
         Route::resource('aulas', AulaController::class);
+        Route::get('asignaciones', [AulaController::class, 'indexAsignaciones'])->name('asignaciones.index');
+        Route::get('gestor-horarios', [AulaController::class, 'indexHorarios'])->name('gestor-horarios.index');
+        
         Route::post('aulas/{aula}/asignaturas', [\App\Http\Controllers\AulaAsignaturaController::class, 'store'])->name('aulas.asignaturas.store');
         Route::put('aulas/{aula}/asignaturas/{asignatura}', [\App\Http\Controllers\AulaAsignaturaController::class, 'update'])->name('aulas.asignaturas.update');
+        
         // HORARIOS DEL AULA
         Route::get('aulas/{aula}/horarios', [\App\Http\Controllers\HorarioController::class, 'index'])->name('aulas.horarios.index');
         Route::post('aulas/{aula}/horarios', [\App\Http\Controllers\HorarioController::class, 'store'])->name('aulas.horarios.store');
         Route::delete('aulas/{aula}/horarios/{horario}', [\App\Http\Controllers\HorarioController::class, 'destroy'])->name('aulas.horarios.destroy');
+        
         Route::resource('malla', \App\Http\Controllers\MallaCurricularController::class)
         ->only(['index', 'store', 'destroy']);
-        // Plantilla Oficial: Bloques de Horario General
+        
+        // Bloques de Modalidades (Antes Horario General)
         Route::resource('bloques', \App\Http\Controllers\BloqueHorarioController::class)
             ->only(['index', 'store', 'destroy']);
+
+        // --- VISOR DE HORARIOS (Solo Lectura) ---
+        Route::prefix('visor-horarios')->name('visor.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\VisorHorarioController::class, 'index'])->name('index');
+            Route::get('/docentes', [\App\Http\Controllers\VisorHorarioController::class, 'docentes'])->name('docentes');
+            Route::get('/docentes/{docente}', [\App\Http\Controllers\VisorHorarioController::class, 'horarioDocente'])->name('docente.show');
+            Route::get('/aulas', [\App\Http\Controllers\VisorHorarioController::class, 'aulas'])->name('aulas');
+            Route::get('/aulas/{aula}', [\App\Http\Controllers\VisorHorarioController::class, 'horarioAula'])->name('aula.show');
+        });
+        // ----------------------------------------
 
         Route::put('usuarios/{usuario}/reset-password', [\App\Http\Controllers\UsuarioController::class, 'resetPassword'])
              ->name('usuarios.reset-password');
@@ -72,11 +89,7 @@ Route::middleware('auth')->group(function () {
         Route::get('notas/actividades/{asignacion}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'index'])->name('notas.actividades.index');
         Route::post('notas/actividades/{asignacion}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'store'])->name('notas.actividades.store');
         Route::delete('notas/actividades/{asignacion}/{actividad}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'destroy'])->name('notas.actividades.destroy');
-        
-
     });
-
 });
-
 
 require __DIR__.'/auth.php';

@@ -123,23 +123,35 @@
 
                         <!-- Accesos Rápidos Operativos -->
                         <h4 class="text-sm font-black text-slate-400 uppercase tracking-widest pt-2">Gestión Operativa</h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <a href="{{ route('academico.usuarios.index') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex items-center gap-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            <!-- Botón 1: Directorio -->
+                            <a href="{{ route('academico.usuarios.index') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex flex-col gap-3">
                                 <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                                 </div>
                                 <div>
-                                    <span class="block font-bold text-slate-800">Directorio de Personal</span>
-                                    <span class="block text-xs font-medium text-slate-400">Gestión de accesos y roles</span>
+                                    <span class="block font-bold text-slate-800 leading-tight">Directorio Personal</span>
+                                    <span class="block text-xs font-medium text-slate-400 mt-1">Accesos y roles</span>
                                 </div>
                             </a>
-                            <a href="{{ route('academico.aulas.index') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex items-center gap-4">
+                            <!-- Botón 2: Aulas -->
+                            <a href="{{ route('academico.aulas.index') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex flex-col gap-3">
                                 <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                                 </div>
                                 <div>
-                                    <span class="block font-bold text-slate-800">Gestión de Aulas</span>
-                                    <span class="block text-xs font-medium text-slate-400">Asignación y espacios</span>
+                                    <span class="block font-bold text-slate-800 leading-tight">Gestión de Aulas</span>
+                                    <span class="block text-xs font-medium text-slate-400 mt-1">Asignación y espacios</span>
+                                </div>
+                            </a>
+                            <!-- Botón 3: Visor de Horarios (NUEVO) -->
+                            <a href="{{ route('academico.visor.index') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex flex-col gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                </div>
+                                <div>
+                                    <span class="block font-bold text-slate-800 leading-tight">Visor de Horarios</span>
+                                    <span class="block text-xs font-medium text-slate-400 mt-1">Consulta rápida</span>
                                 </div>
                             </a>
                         </div>
@@ -197,8 +209,6 @@
                                 </div>
                             </a>
                         </div>
-
-                       
                         <div class="mt-6">
                             @include('components.dashboard.asignatura-stats')
                         </div>
@@ -261,7 +271,8 @@
                         datasets: [{
                             label: 'Rendimiento Global (%)',
                             data: [88, 76, 82], 
-                            backgroundColor: ['#e6ac27', '#3d2c1d', '#78716c'],
+                            // COLORES ACTUALIZADOS: Rosado (Preescolar), Azul (Primaria), Esmeralda (Secundaria)
+                            backgroundColor: ['#f472b6', '#60a5fa', '#34d399'],
                             borderRadius: 6,
                             borderWidth: 0,
                             barPercentage: 0.55 
