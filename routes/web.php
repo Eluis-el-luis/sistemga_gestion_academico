@@ -89,6 +89,14 @@ Route::middleware('auth')->group(function () {
         Route::get('notas/actividades/{asignacion}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'index'])->name('notas.actividades.index');
         Route::post('notas/actividades/{asignacion}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'store'])->name('notas.actividades.store');
         Route::delete('notas/actividades/{asignacion}/{actividad}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'destroy'])->name('notas.actividades.destroy');
+
+        // Fase 6: Asistencia (Docente Guía)
+        Route::get('asistencia/aula', [\App\Http\Controllers\AsistenciaAulaController::class, 'create'])->name('asistencia.aula.create');
+        Route::post('asistencia/aula', [\App\Http\Controllers\AsistenciaAulaController::class, 'store'])->name('asistencia.aula.store');
+        // Fase 6: Asistencia (Docente por Asignatura - Por Excepción)
+        Route::get('asistencia/asignatura/{asignacion}', [\App\Http\Controllers\AsistenciaAsignaturaController::class, 'create'])->name('asistencia.asignatura.create');
+        Route::post('asistencia/asignatura/{asignacion}', [\App\Http\Controllers\AsistenciaAsignaturaController::class, 'store'])->name('asistencia.asignatura.store');
+        Route::delete('asistencia/asignatura/incidencia/{incidencia}', [\App\Http\Controllers\AsistenciaAsignaturaController::class, 'destroy'])->name('asistencia.asignatura.destroy');
     });
 });
 

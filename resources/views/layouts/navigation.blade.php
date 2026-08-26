@@ -98,6 +98,14 @@
                 <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 <span x-show="sidebarOpen" class="whitespace-nowrap">Bloques de Modalidades</span>
             </a>
+
+            <!-- 6. Asistencia (Docente Guía) -->
+            @hasanyrole('Director|Subdirector|Gestor de Usuarios|Docente Guía')
+            <a href="{{ route('academico.asistencia.aula.create') }}" title="Asistencia (Docente Guía)" class="flex items-center gap-3 px-4 mx-3 py-3 rounded-xl transition-all {{ request()->routeIs('academico.asistencia.aula.*') ? 'bg-[#e6ac27]/15 text-[#e6ac27] font-black border border-[#e6ac27]/30 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-[#3d2c1d] font-bold' }}" :class="sidebarOpen ? 'justify-start' : 'justify-center lg:mx-2 lg:px-0'">
+                <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span x-show="sidebarOpen" class="whitespace-nowrap"> Asistencia</span>
+            </a>
+            @endhasanyrole
         </div>
         @endhasanyrole
 

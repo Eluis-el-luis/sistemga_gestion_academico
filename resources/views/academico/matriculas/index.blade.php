@@ -5,6 +5,21 @@
             <h2 class="font-black text-2xl text-[#3d2c1d] tracking-tight">
                 {{ __('Control General de Matrículas') }}
             </h2>
+
+            @if (session('success'))
+                <div class="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl shadow-sm flex items-center font-medium">
+                    <svg class="w-5 h-5 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            <!-- NUEVO: Alerta de Error -->
+            @if (session('error'))
+                <div class="p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl shadow-sm flex items-center font-medium mt-4">
+                    <svg class="w-5 h-5 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    {{ session('error') }}
+                </div>
+            @endif
             
             <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                 <!-- Botón Nuevo Ingreso (Secundario) -->

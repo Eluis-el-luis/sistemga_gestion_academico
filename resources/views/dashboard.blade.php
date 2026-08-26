@@ -31,6 +31,14 @@
                 </div>
             @endif
 
+            <!-- NUEVO: Alerta de Error -->
+            @if (session('error'))
+                <div class="p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl shadow-sm flex items-center font-medium mt-4">
+                    <svg class="w-5 h-5 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    {{ session('error') }}
+                </div>
+            @endif
+
             <!-- ZONA 1: BANNER DE BIENVENIDA DINÁMICO Y LIMPIO -->
             <div class="bg-white rounded-[2rem] p-8 md:p-10 shadow-sm border border-slate-200/80 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-all">
                 
@@ -171,6 +179,16 @@
                                     <span class="block font-bold text-slate-800">Mis Estudiantes</span>
                                     <span class="block text-xs font-medium text-slate-500">Listado y perfiles del aula</span>
                                 </div>
+                                <!-- Botón 2: NUEVO -->
+                                <a href="{{ route('academico.asistencia.aula.create') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-purple-300 transition-all flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    </div>
+                                    <div>
+                                        <span class="block font-bold text-slate-800">Asistencia</span>
+                                        <span class="block text-xs font-medium text-slate-500">Pase de lista diario</span>
+                                    </div>
+                                </a>
                             </a>
                         </div>
                     </div>
@@ -180,17 +198,10 @@
                     @hasanyrole('Docente por Asignatura')
                     <div x-show="rolActivo === 'Docente por Asignatura'" x-transition.opacity style="display: none;" class="space-y-4">
                         <h4 class="text-sm font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2">Gestión Académica de Clases</h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <a href="#" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-emerald-300 transition-all flex items-center gap-4">
-                                <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-                                </div>
-                                <div>
-                                    <span class="block font-bold text-slate-800">Calificaciones</span>
-                                    <span class="block text-xs font-medium text-slate-500">Ingreso de acumulados</span>
-                                </div>
-                            </a>
-                        </div>
+                        
+                       
+                        @include('components.dashboard.asignatura-stats')
+                        
                     </div>
                     @endhasanyrole
 

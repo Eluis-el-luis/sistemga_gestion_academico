@@ -52,11 +52,14 @@
                             <td class="px-6 py-4 text-[#e6ac27] font-black">
                                 {{ $asignacion->asignatura->nombre ?? '' }}
                             </td>
-                            <td class="px-6 py-4 text-center">
-                                
-                                <a href="{{ route('academico.notas.create', $asignacion->id) }}" class="inline-flex items-center gap-1 bg-[#e6ac27] hover:bg-[#d69f22] text-[#3d2c1d] font-black py-1.5 px-4 rounded-lg shadow-sm text-xs transition-transform transform hover:scale-105">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                                    Calificar
+                            <td class="px-6 py-4 text-center space-x-2">
+                                <a href="{{ route('academico.notas.create', $asignacion->id) }}" title="Subir Calificaciones" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded shadow-sm text-xs transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                    Notas
+                                </a>
+                                <a href="{{ route('academico.asistencia.asignatura.create', $asignacion->id) }}" title="Reportar Fugas/Retrasos" class="inline-flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-1.5 px-3 rounded shadow-sm text-xs transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    Asistencia
                                 </a>
                             </td>
                         </tr>

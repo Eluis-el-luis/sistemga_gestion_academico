@@ -13,6 +13,10 @@
 
     <div class="py-10 bg-slate-50 min-h-screen">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-8">
+
+            @php
+                $anioActivo = $anios->first() ?? null;
+            @endphp
             
             <!-- Resumen del Año Escolar -->
             <div class="bg-amber-50 border border-amber-200/60 p-6 rounded-3xl shadow-sm flex items-start gap-4">
@@ -24,6 +28,20 @@
                     <p class="text-slate-600 text-sm mt-1.5 font-medium leading-relaxed">Verifica cuidadosamente el aula antes de procesar la inscripción. Solo las aulas con cupo disponible aparecerán en el listado a continuación.</p>
                 </div>
             </div>
+
+            @if ($errors->any())
+                <div class="bg-red-50 border-l-4 border-red-500 p-5 rounded-2xl shadow-sm">
+                    <div class="flex items-center gap-3 mb-2">
+                        <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <h3 class="text-sm font-black text-red-800 uppercase tracking-widest">No se pudo procesar la matrícula</h3>
+                    </div>
+                    <ul class="text-sm text-red-700 font-medium list-disc list-inside ml-9">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
             <!-- Formulario de Matrícula -->
             <div class="bg-white overflow-hidden shadow-sm rounded-3xl border border-slate-200">
