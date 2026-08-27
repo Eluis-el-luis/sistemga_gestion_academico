@@ -1,16 +1,22 @@
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h2 class="font-black text-2xl text-[#3d2c1d] tracking-tight">
-                {{ __('Directorio General de Alumnos') }}
-            </h2>
-
-            @can('create', App\Models\Alumno::class)
-                <a href="{{ route('academico.alumnos.create') }}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-xl font-black text-sm shadow-lg shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
-                    Nuevo Registro
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div class="flex items-center gap-4">
+                <!-- Flecha de regreso -->
+                <a href="{{ route('dashboard') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors mr-2" title="Volver al Panel">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 </a>
-            @endcan
+                
+                <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">
+                    Directorio de Estudiantes
+                </h2>
+            </div>
+            
+            <!-- Botón de Acción Principal -->
+            <a href="{{ route('academico.alumnos.create') }}" class="bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black py-2.5 px-6 rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 flex items-center gap-2 text-sm">
+                <span>+</span> Registrar Estudiante
+            </a>
         </div>
     </x-slot>
 
@@ -85,7 +91,7 @@
                             <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Estado Académico</label>
                             <select name="estado" class="w-full border-slate-200 bg-white rounded-xl shadow-sm focus:border-[#e6ac27] focus:ring-[#e6ac27] text-sm font-medium text-slate-700 transition-colors">
                                 <option value="">Cualquier estado</option>
-                                <option value="activo" {{ request('estado') == 'activo' ? 'selected' : '' }}>🟢 Activo</option>
+                                <option value="activo" {{ (request('estado') === 'activo' || (!request()->hasAny(['buscar', 'modalidad_id', 'grado_id', 'aula_id', 'estado']) && request('estado') !== '')) ? 'selected' : '' }}>🟢 Activo</option>
                                 <option value="retirado" {{ request('estado') == 'retirado' ? 'selected' : '' }}>🔴 Retirado</option>
                                 <option value="repitente" {{ request('estado') == 'repitente' ? 'selected' : '' }}>🟠 Repitente</option>
                                 <option value="promovido" {{ request('estado') == 'promovido' ? 'selected' : '' }}>🔵 Promovido</option>
@@ -93,7 +99,7 @@
                         </div>
                     </div>
 
-                    <!-- Botones de Acción de Filtro (Aplicando Jerarquía Visual) -->
+                    <!-- Botones de Acción de Filtro -->
                     <div class="flex flex-col sm:flex-row justify-end items-center pt-4 gap-6 border-t border-slate-100 mt-4">
                         @if(request()->hasAny(['buscar', 'modalidad_id', 'grado_id', 'aula_id', 'estado']))
                             <a href="{{ route('academico.alumnos.index') }}" class="text-sm font-bold text-slate-400 hover:text-rose-600 transition-colors underline underline-offset-4 decoration-2 decoration-slate-200 hover:decoration-rose-300">
@@ -115,7 +121,6 @@
                             <tr>
                                 <th class="px-8 py-5">Código (CUP)</th>
                                 <th class="px-6 py-5">Nombre Completo</th>
-                                <!-- NUEVA COLUMNA -->
                                 <th class="px-6 py-5">Grado y Sección</th>
                                 <th class="px-6 py-5 text-center">Sexo / Edad</th>
                                 <th class="px-8 py-5 text-right">Acciones</th>
@@ -136,7 +141,6 @@
                                     <!-- LÓGICA PARA MOSTRAR EL GRADO ACTUAL -->
                                     <td class="px-6 py-5">
                                         @php
-                                            // Extraemos la matrícula activa más reciente
                                             $matriculaActiva = $alumno->matriculas->first();
                                         @endphp
                                         

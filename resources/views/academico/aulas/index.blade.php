@@ -1,24 +1,24 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h2 class="font-black text-2xl text-[#3d2c1d] tracking-tight flex items-center gap-2">
-                <svg class="w-7 h-7 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 01-1-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                <!-- Título Dinámico basado en el Contexto -->
-                {{ $contexto === 'horarios' ? __('Gestor de Horarios') : ($contexto === 'asignacion' ? __('Asignación de Maestros') : __('Gestión de Aulas')) }}
-            </h2>
-            
-            <!-- Solo mostrar "Aperturar" si estamos en Gestión -->
-            @if($contexto === 'gestion')
-                @can('create', App\Models\Aula::class)
-                <a href="{{ route('academico.aulas.create') }}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-xl font-black text-sm shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5 focus:ring-2 focus:ring-offset-2 focus:ring-[#e6ac27]">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
-                    Aperturar Nueva Aula
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div class="flex items-center gap-4">
+                <!-- Flecha de regreso -->
+                <a href="{{ route('dashboard') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors mr-2" title="Volver al Panel">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 </a>
-                @endcan
-            @endif
+                
+                <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight flex items-center gap-2">
+                    <svg class="w-7 h-7 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                    Gestión de Aulas
+                </h2>
+            </div>
+            
+            <!-- Tu botón dorado de + Aperturar Nueva Aula debería estar aquí -->
+            <a href="{{ route('academico.aulas.create') }}" class="bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black py-2.5 px-6 rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 flex items-center gap-2 text-sm">
+                <span>+</span> Aperturar Nueva Aula
+            </a>
         </div>
     </x-slot>
-
     <div class="pb-12 pt-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
             
@@ -125,12 +125,12 @@
                         </div>
                     </div>
                 @empty
-                    <div class="col-span-full">
-                        <div class="bg-white rounded-3xl shadow-sm border border-slate-200 px-6 py-16 text-center text-slate-500">
-                            <svg class="mx-auto h-12 w-12 text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 01-1-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                            <p class="text-lg font-black text-slate-600">No hay aulas aperturadas aún</p>
-                            <p class="text-sm font-medium mt-1">Crea un aula nueva para poder visualizar su locker.</p>
+                    <div class="col-span-full bg-white p-12 text-center rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center justify-center">
+                        <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
+                            <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                         </div>
+                        <h3 class="text-lg font-black text-[#3d2c1d]">No hay aulas aperturadas aún</h3>
+                        <p class="text-sm font-bold text-slate-400 mt-2">Crea una nueva aula para comenzar a organizar los espacios, asignar docentes e inscribir estudiantes.</p>
                     </div>
                 @endforelse
             </div>

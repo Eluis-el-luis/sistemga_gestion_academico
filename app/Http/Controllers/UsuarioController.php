@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Usuario;
-use App\Models\Rol;
 use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -47,11 +46,11 @@ class UsuarioController extends Controller
 
         $request->validate([
             'nombre_completo' => 'required|string|max:120',
-            'email' => 'required|email|unique:usuario,email',
-            'password' => 'required|string|min:8',
-            'roles' => 'required|array|min:1',
-            'codigo_unico_persona' => 'nullable|string|max:20|unique:docente,codigo_unico_persona',
-            'sexo' => 'nullable|in:M,F',
+            'email'           => 'required|email|unique:usuario,email',
+            'password'        => 'required|string|min:8',
+            'roles'           => 'required|array|min:1',
+            'codigo_unico_persona'  => 'nullable|string|max:20|unique:docente,codigo_unico_persona',
+            'sexo'            => 'nullable|in:M,F',
             'modalidad_coordina_id' => 'nullable|exists:modalidad,id'
         ]);
 
@@ -67,17 +66,15 @@ class UsuarioController extends Controller
             return back()->withErrors(['roles' => 'Ya existe una cuenta de Subdirección. No pueden existir dos.'])->withInput();
         }
 
-        // Descomentado para mantener sincronía con tu tabla Rol nativa
-        $rolPrincipal = Rol::where('nombre', $request->roles[0])->first();
-
+        // Creación limpia sin rol_id
         $usuario = Usuario::create([
             'nombre_completo' => $request->nombre_completo,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'rol_id' => $rolPrincipal ? $rolPrincipal->id : 1,
-            'activo' => true
+            'email'           => $request->email,
+            'password'        => Hash::make($request->password),
+            'activo'          => true
         ]);
 
+        // Spatie se encarga de la relación aquí
         $usuario->syncRoles($request->roles);
 
         $esDocente = collect($request->roles)->contains(function ($rol) {
@@ -88,10 +85,10 @@ class UsuarioController extends Controller
             $esCoordinador = collect($request->roles)->contains('Coordinador');
             
             \App\Models\Docente::create([
-                'usuario_id' => $usuario->id,
-                'codigo_unico_persona' => $request->codigo_unico_persona ?? 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
-                'sexo' => $request->sexo ?? 'M',
-                'es_coordinador' => $esCoordinador,
+                'usuario_id'            => $usuario->id,
+                'codigo_unico_persona'  => $request->codigo_unico_persona ?? 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
+                'sexo'                  => $request->sexo ?? 'M',
+                'es_coordinador'        => $esCoordinador,
                 'modalidad_coordina_id' => $esCoordinador ? $request->modalidad_coordina_id : null,
             ]);
         }
@@ -116,11 +113,11 @@ class UsuarioController extends Controller
 
         $request->validate([
             'nombre_completo' => 'required|string|max:120',
-            'email' => 'required|email|unique:usuario,email,' . $usuario->id,
-            'activo' => 'required|boolean',
-            'roles' => 'required|array|min:1',
-            'codigo_unico_persona' => 'nullable|string|max:20',
-            'sexo' => 'nullable|in:M,F',
+            'email'           => 'required|email|unique:usuario,email,' . $usuario->id,
+            'activo'          => 'required|boolean',
+            'roles'           => 'required|array|min:1',
+            'codigo_unico_persona'  => 'nullable|string|max:20',
+            'sexo'            => 'nullable|in:M,F',
             'modalidad_coordina_id' => 'nullable|exists:modalidad,id'
         ]);
 
@@ -136,16 +133,14 @@ class UsuarioController extends Controller
             return back()->withErrors(['roles' => 'Ya existe otra cuenta de Subdirección asignada en el sistema.']);
         }
 
-        $rolPrincipal = Rol::where('nombre', $request->roles[0])->first();
-
-        // ¡CORREGIDO! Usamos ->update() en lugar de ::create()
+        // Actualización limpia sin rol_id
         $usuario->update([
             'nombre_completo' => $request->nombre_completo,
-            'email' => $request->email,
-            'rol_id' => $rolPrincipal ? $rolPrincipal->id : $usuario->rol_id,
-            'activo' => $request->activo
+            'email'           => $request->email,
+            'activo'          => $request->activo
         ]);
 
+        // Spatie se encarga de la actualización de roles
         $usuario->syncRoles($request->roles);
 
         $esDocente = collect($request->roles)->contains(function ($rol) {
@@ -156,9 +151,9 @@ class UsuarioController extends Controller
             \App\Models\Docente::updateOrCreate(
                 ['usuario_id' => $usuario->id],
                 [
-                    'codigo_unico_persona' => $request->codigo_unico_persona ?? $usuario->docente->codigo_unico_persona ?? 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
-                    'sexo' => $request->sexo ?? $usuario->docente->sexo ?? 'M',
-                    'es_coordinador' => collect($request->roles)->contains('Coordinador'),
+                    'codigo_unico_persona'  => $request->codigo_unico_persona ?? $usuario->docente->codigo_unico_persona ?? 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
+                    'sexo'                  => $request->sexo ?? $usuario->docente->sexo ?? 'M',
+                    'es_coordinador'        => collect($request->roles)->contains('Coordinador'),
                     'modalidad_coordina_id' => collect($request->roles)->contains('Coordinador') ? $request->modalidad_coordina_id : null,
                 ]
             );

@@ -1,15 +1,22 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h2 class="font-black text-2xl text-[#3d2c1d] tracking-tight">
-                {{ __('Gestión de Personal y Docentes') }}
-            </h2>
-            <a href="{{ route('academico.usuarios.create') }}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-xl font-black text-sm shadow-lg shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
-                Registrar Personal
-            </a>
-        </div>
-    </x-slot>
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div class="flex items-center gap-4">
+                    <!-- Flecha de regreso -->
+                    <a href="{{ route('dashboard') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors mr-2" title="Volver al Panel">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    </a>
+                    
+                    <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">
+                        Gestión de Personal y Docentes
+                    </h2>
+                </div>
+                
+                <a href="{{ route('academico.usuarios.create') }}" class="bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black py-2.5 px-6 rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 flex items-center gap-2 text-sm">
+                    <span>+</span> Registrar Personal
+                </a>
+            </div>
+        </x-slot>
 
     <!-- ALPINE MAESTRO: Modal, Scroll y Generador de Claves -->
     <div class="py-10 bg-slate-50 min-h-screen relative" x-data="{ 

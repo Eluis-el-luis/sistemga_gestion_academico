@@ -61,16 +61,19 @@ class AlumnoController extends Controller
             });
         }
 
-        if ($request->filled('estado')) {
-            $query->whereHas('matriculas', function($q) use ($request) {
-                $q->where('estado', $request->estado);
+        // Seleccionado "activo" por defecto si no hay filtros aplicados
+        $estadoFiltro = $request->get('estado', !request()->hasAny(['buscar', 'modalidad_id', 'grado_id', 'aula_id', 'estado']) ? 'activo' : null);
+
+        if (!empty($estadoFiltro)) {
+            $query->whereHas('matriculas', function($q) use ($estadoFiltro) {
+                $q->where('estado', $estadoFiltro);
             });
         }
 
         // --- 4. ORDEN ALFABÉTICO Y PAGINACIÓN ---
         $alumnos = $query->orderBy('nombre_completo', 'asc')
                          ->paginate(15)
-                         ->withQueryString(); // <- Mantiene los filtros activos al cambiar de página
+                         ->withQueryString(); // Mantiene los filtros activos al cambiar de página
 
         // Traemos los catálogos para llenar los <select> de los filtros
         $modalidades = \App\Models\Modalidad::all();
@@ -100,7 +103,6 @@ class AlumnoController extends Controller
     {
         $this->authorize('viewAny', Alumno::class);
         
-        // Eager Loading: Cargamos las matrículas, el aula, el grado y el año escolar
         $alumno->load(['matriculas.aula.grado', 'matriculas.anioEscolar']);
         
         return view('academico.alumnos.show', compact('alumno'));

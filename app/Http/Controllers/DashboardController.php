@@ -33,7 +33,30 @@ class DashboardController extends Controller
                     ->take(5) // Historial de los últimos 5
                     ->get();
 
-        return view('dashboard', compact('totalAlumnos', 'totalDocentes', 'avisos'));
+        // 3. NUEVO: Traer el Horario Semanal si es Docente
+        $horarios = collect();
+        $diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+
+        if ($user->hasRole('Docente por Asignatura') && $user->docente) {
+            $docenteId = $user->docente->id;
+            
+            $horarios = \App\Models\Horario::with([
+                    'bloqueHorario', 
+                    'aulaAsignaturaDocente.asignatura', 
+                    'aulaAsignaturaDocente.aula.grado', 
+                    'aulaAsignaturaDocente.aula.modalidad'
+                ])
+                ->whereHas('aulaAsignaturaDocente', function($q) use ($docenteId) {
+                    $q->where('docente_id', $docenteId);
+                })
+                ->get()
+                ->sortBy(function($horario) {
+                    return $horario->bloqueHorario->hora_inicio;
+                })
+                ->groupBy('dia_semana');
+        }
+
+        return view('dashboard', compact('totalAlumnos', 'totalDocentes', 'avisos', 'horarios', 'diasSemana'));
     }
 
     public function storeAviso(Request $request)
