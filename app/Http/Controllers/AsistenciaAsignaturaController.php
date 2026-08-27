@@ -20,10 +20,7 @@ class AsistenciaAsignaturaController extends Controller
      */
     public function create(Request $request, AulaAsignaturaDocente $asignacion)
     {
-        // Seguridad: Solo el dueño de esta clase (o un superior) puede entrar
-        if ($asignacion->docente->usuario_id !== auth()->id() && !auth()->user()->hasRole(['Director', 'Subdirector'])) {
-            abort(403, 'No tiene permisos para registrar asistencia en esta clase.');
-        }
+        $this->authorize('gestionarAsistencia', $asignacion);
 
         $fecha = $request->query('fecha', Carbon::today()->toDateString());
 
@@ -65,9 +62,7 @@ class AsistenciaAsignaturaController extends Controller
      */
     public function store(Request $request, AulaAsignaturaDocente $asignacion)
     {
-        if ($asignacion->docente->usuario_id !== auth()->id() && !auth()->user()->hasRole(['Director', 'Subdirector'])) {
-            abort(403);
-        }
+        $this->authorize('gestionarAsistencia', $asignacion);
 
         $request->validate([
             'fecha' => 'required|date',
@@ -98,8 +93,9 @@ class AsistenciaAsignaturaController extends Controller
     /**
      * Revierte (elimina) una incidencia si el maestro se equivocó.
      */
-    public function destroy(AsistenciaAsignatura $incidencia)
+    public function destroy(AulaAsignaturaDocente $asignacion, AsistenciaAsignatura $incidencia)
     {
+        $this->authorize('gestionarAsistencia', $asignacion);
         $incidencia->delete();
         return back()->with('success', 'Incidencia eliminada. El estudiante vuelve a contar como presente en este bloque.');
     }

@@ -25,7 +25,7 @@ class ExamenReparacionPolicy
      */
     public function viewAny(Usuario $usuario): bool
     {
-        return $usuario->hasPermissionTo('reparacion_examenes.ver') || $usuario->hasPermissionTo('reparacion_examenes.gestionar');
+        return $usuario->hasPermissionTo('reparacion.ver') || $usuario->hasPermissionTo('reparacion.gestionar');
     }
 
     /**
@@ -33,7 +33,7 @@ class ExamenReparacionPolicy
      */
     public function create(Usuario $usuario): bool
     {
-        return $usuario->hasPermissionTo('reparacion_examenes.gestionar');
+        return $usuario->hasPermissionTo('reparacion.gestionar');
     }
 
     /**
@@ -41,7 +41,7 @@ class ExamenReparacionPolicy
      */
     public function update(Usuario $usuario, ExamenReparacion $examenReparacion): bool
     {
-        if (!$usuario->hasPermissionTo('reparacion_examenes.gestionar')) {
+        if (!$usuario->hasPermissionTo('reparacion.gestionar')) {
             return false;
         }
 

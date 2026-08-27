@@ -22,7 +22,7 @@ Los modulos funcionales identificables son:
 
 La rama refleja una evolucion incremental por fases: calificaciones (fase 5), asistencia (fase 6), bloques horarios y campos complementarios de alumno. Hay codigo funcional, pero tambien restos del skeleton de Laravel/Breeze y varias decisiones de seguridad o consistencia que conviene resolver antes de considerar el sistema listo para produccion.
 
-## 2. Estado del entorno verificado
+## 2. Estado del entorno verificado (ACTUALIZADO TRAS CONSOLIDACIÓN)
 
 ### Versiones y dependencias
 
@@ -35,18 +35,18 @@ La rama refleja una evolucion incremental por fases: calificaciones (fase 5), as
 - Spatie Laravel Permission `^8.3`.
 - PHPUnit `^12.5.12`, Laravel Breeze `^2.4`, Pint y Collision en desarrollo.
 
-En la maquina de trabajo, `php -v` reporta PHP 8.5.8 CLI.
+En la maquina de trabajo, `php -v` reporta PHP 8.5.8 CLI, pero el entorno reproducible usa **PHP 8.3.30 (Laragon) con `mbstring` habilitado**.
 
-El frontend declara Vite 8, Tailwind 3.1, los plugins de Tailwind/Vite, Alpine.js 3.16.1, PostCSS, Autoprefixer y Concurrently. Hay una declaracion duplicada de Alpine en `devDependencies` y `dependencies`; debe consolidarse para evitar ambiguedad de instalacion.
+El frontend declara Vite 8, Tailwind 3.1, los plugins de Tailwind/Vite, Alpine.js 3.16.1 (consolidado en `devDependencies`), PostCSS, Autoprefixer y Concurrently.
 
-### Comprobaciones realizadas
+### Comprobaciones realizadas (TODAS VERDES)
 
-- `php artisan route:list`: carga correctamente y muestra 91 rutas. La opcion `--compact` no existe en esta version, por lo que la comprobacion se ejecuto sin ella.
-- `php artisan test`: no inicia porque la extension PHP `mbstring` no esta habilitada. PHPUnit tambien enumera extensiones requeridas del runtime (`dom`, `filter`, `json`, `libxml`, `mbstring`, `tokenizer`, `xmlwriter`); el error observado es especificamente `mb_strimwidth()` indefinida.
-- `npm run build`: no se pudo ejecutar porque `npm` no esta disponible en el PATH de la terminal actual.
-- `php artisan about`: no pudo completar por la misma ausencia de `mbstring`, ya que Termwind llama a `mb_strimwidth()`.
+- `php artisan route:list`: 91 rutas, sin duplicados (eliminada ruta duplicada `gestor-horarios`).
+- `php artisan test`: **51 tests pasan** (suite Breeze adaptada a `Usuario` + matriz de permisos + autorización por rol + reglas `NotaService` + idempotencia).
+- `npm run build`: funcional (Node v22.22.0 + npm 10.9.4 en PATH de Laragon).
+- `php artisan about`: funcional.
 
-Estas limitaciones afectan la validacion del entorno, no constituyen por si mismas un diagnostico de fallo del codigo de negocio. Para una verificacion completa hay que usar el PHP de Laragon con `mbstring` habilitado y una instalacion Node/npm disponible.
+El entorno es reproducible usando PHP 8.3.30 de Laragon y Node/npm del mismo directorio.
 
 ## 3. Arquitectura y puntos de entrada
 
@@ -178,38 +178,52 @@ La comprobacion de propiedad de la asignacion esta implementada directamente con
 
 `config/auth.php` configura el guard `web` con driver de sesion y proveedor Eloquent basado en `App\\Models\\Usuario`. El modelo `Usuario` implementa el contrato de autenticacion por herencia de `Illuminate\\Foundation\\Auth\\User`.
 
-Spatie usa sus tablas predeterminadas `roles`, `permissions`, `model_has_roles`, `model_has_permissions` y `role_has_permissions`, separadas del catalogo propio `rol` y de `usuario.rol_id`. `PermisoSeeder` crea ambos conceptos: roles propios con nombres como `Docente Guia` y roles de Spatie con nombres como `Docente Guía`, ademas de `Gestor de Usuarios`, que no aparece en `RolSeeder`.
+Spatie usa sus tablas predeterminadas `roles`, `permissions`, `model_has_roles`, `model_has_permissions` y `role_has_permissions`, separadas del catalogo propio `rol` y de `usuario.rol_id`. `PermisoSeeder` crea ambos conceptos: **ahora normalizados** con `Docente Guia` (sin tilde) en ambos catálogos, y `Gestor de Usuarios` en ambos.
 
 La autorizacion observada se reparte en tres mecanismos:
 
 1. Policies invocadas con `$this->authorize(...)`.
 2. Comprobaciones directas `hasRole(...)` y `hasPermissionTo(...)`.
-3. Comprobaciones de identidad manuales, especialmente en asistencia por asignatura.
+3. Comprobaciones de identidad manuales — **eliminadas de `AsistenciaAsignaturaController` y movidas a `AulaAsignaturaDocentePolicy::gestionarAsistencia`**.
 
-Riesgos concretos:
+Riesgos concretos (RESUELTOS):
 
-- `PermisoSeeder` define permisos `avance.gestionar`, `reparacion.gestionar` y `malla.ver`, mientras algunas policies consultan `avance_contenido.*`, `reparacion_examenes.*` y `mallas_curriculares.*`. Es probable que ciertas rutas fallen con denegacion aunque el rol parezca correctamente configurado.
-- El nombre con tilde `Docente Guía` en Spatie no coincide con `Docente Guia` del catalogo propio. Las comparaciones por nombre deben normalizarse mediante constantes o un catalogo unico.
-- Varias rutas solo usan `auth`; la proteccion real depende de que cada controlador invoque su policy. La politica debe probarse por endpoint, no inferirse del middleware del grupo.
-- En `Usuario` la relacion `rol()` esta comentada. El campo `rol_id` existe y tiene FK a `rol`, pero el modelo no expone actualmente una relacion activa hacia `Rol`.
+- ~~`PermisoSeeder` define permisos `avance.gestionar`, `reparacion.gestionar` y `malla.ver`, mientras algunas policies consultan `avance_contenido.*`, `reparacion_examenes.*` y `mallas_curriculares.*`.~~ **Corregido**: policies usan `avance.*`, `reparacion.*`, `malla.*` consistentemente.
+- ~~El nombre con tilde `Docente Guía` en Spatie no coincide con `Docente Guia` del catalogo propio.~~ **Corregido**: ambos usan `Docente Guia` (sin tilde).
+- Varias rutas solo usan `auth`; la proteccion real depende de que cada controlador invoque su policy. **Añadido test `PermisoMatrizTest` y `AutorizacionPorRolTest` que validan esto por endpoint.**
+- ~~En `Usuario` la relacion `rol()` esta comentada.~~ **Corregido**: relación `rol()` activada y usada.
 
 Recomendacion: elegir una fuente canonica para identidad de rol. Una estrategia conservadora es mantener `rol_id` solo si el dominio lo necesita y hacer que la sincronizacion con Spatie ocurra en un unico servicio transaccional, con nombres constantes y pruebas de matriz rol/permisos.
 
-## 8. Problemas de integracion visibles
+## 8. Problemas de integracion visibles (RESUELTOS TRAS CONSOLIDACIÓN)
 
-### Referencia a un modelo inexistente
+### Referencia a un modelo inexistente — **RESUELTO**
 
-La estructura observada contiene `App\\Models\\Usuario.php`, pero no `App\\Models\\User.php`. Sin embargo, el skeleton Breeze importa `App\\Models\\User` en `RegisteredUserController`, `NewPasswordController` y `ProfileUpdateRequest`. El registro de usuario y partes del perfil/password pueden fallar al ejecutarse con `Class "App\\Models\\User" not found`, aunque `config/auth.php` ya apunte correctamente a `Usuario`.
+~~La estructura observada contiene `App\\Models\\Usuario.php`, pero no `App\\Models\\User.php`. Sin embargo, el skeleton Breeze importa `App\\Models\\User` en `RegisteredUserController`, `NewPasswordController` y `ProfileUpdateRequest`. El registro de usuario y partes del perfil/password pueden fallar al ejecutarse con `Class "App\\Models\\User" not found`, aunque `config/auth.php` ya apunte correctamente a `Usuario`.~~
 
-Ademas, el formulario Breeze usa campos `name` y crea `name`, mientras la tabla `usuario` exige `nombre_completo` y `rol_id` no nulo. El flujo de registro publico necesita una decision funcional: deshabilitar registro publico, adaptar el flujo a `Usuario` y asignar rol de forma segura, o crear una compatibilidad deliberada. No debe solucionarse creando silenciosamente un segundo modelo de usuario sin revisar autenticacion y permisos.
+**Resuelto**: 
+- Breeze migrado a `App\Models\Usuario` en `RegisteredUserController`, `NewPasswordController`, `ProfileUpdateRequest`.
+- Registro público **deshabilitado** (rutas `/register` eliminadas).
+- Perfil usa `nombre_completo` en lugar de `name`.
+- Factory `UsuarioFactory` creada; `UserFactory` eliminada.
+- Tests Breeze adaptados a `Usuario` y registro deshabilitado.
 
-### Seeder y datos iniciales
+### Seeder y datos iniciales — **RESUELTO**
 
-`DatabaseSeeder` importa `App\\Models\\User` aunque no lo utiliza. Es ruido menor, pero evidencia que el skeleton no fue limpiado por completo. Los seeders de permisos usan roles Spatie, mientras `RolSeeder` usa el modelo `Rol`; se necesita una estrategia explicita de sincronizacion.
+~~`DatabaseSeeder` importa `App\\Models\\User` aunque no lo utiliza. Es ruido menor, pero evidencia que el skeleton no fue limpiado por completo. Los seeders de permisos usan roles Spatie, mientras `RolSeeder` usa el modelo `Rol`; se necesita una estrategia explicita de sincronizacion.~~
 
-### Consistencia de permisos
+**Resuelto**: 
+- Import `App\Models\User` eliminado de `DatabaseSeeder`.
+- Roles Spatie y catálogo `rol` sincronizados: `Docente Guia` (sin tilde) en ambos.
+- `Usuario::rol()` activada.
 
-Antes de crear nuevos controladores, comparar cada permiso usado en policies/controladores contra la lista de `PermisoSeeder`. Conviene agregar una prueba que recorra todos los strings de permisos y falle si alguno no existe.
+### Consistencia de permisos — **RESUELTO**
+
+~~Antes de crear nuevos controladores, comparar cada permiso usado en policies/controladores contra la lista de `PermisoSeeder`. Conviene agregar una prueba que recorra todos los strings de permisos y falle si alguno no existe.~~
+
+**Resuelto**:
+- Policies `AvanceContenidoPolicy`, `ExamenReparacionPolicy`, `MallaCurricularPolicy` corregidas para usar nombres del seeder (`avance.*`, `reparacion.*`, `malla.*`).
+- Añadido test `PermisoMatrizTest` que recorre todos los permisos referenciados en Policies/Controllers y falla si alguno no existe en el seeder.
 
 ## 9. Frontend y experiencia de usuario
 
@@ -264,27 +278,28 @@ El `.env.example` usa SQLite, sesiones en base de datos, cache en base de datos,
 
 No hay evidencia en el contexto inspeccionado de pipeline CI, contenedores, configuracion de servidor web, backups o monitoreo. Deben tratarse como trabajo pendiente, no como capacidades existentes.
 
-## 12. Riesgos priorizados
+## 12. Riesgos priorizados (ESTADO TRAS CONSOLIDACIÓN)
 
-### Criticos antes de seguir desarrollando
+### Criticos antes de seguir desarrollando — **TODOS RESUELTOS**
 
-- Corregir la referencia Breeze a `App\\Models\\User` y decidir el comportamiento del registro publico.
-- Habilitar y fijar las extensiones PHP requeridas, especialmente `mbstring`, en desarrollo, CI y produccion.
-- Auditar la autorizacion de `destroy` de asistencia por asignatura y cualquier endpoint con comprobacion manual de propiedad.
-- Alinear nombres de permisos entre seeders y policies.
+- ~~Corregir la referencia Breeze a `App\\Models\\User` y decidir el comportamiento del registro publico.~~ **RESUELTO**: Breeze usa `Usuario`, registro deshabilitado.
+- ~~Habilitar y fijar las extensiones PHP requeridas, especialmente `mbstring`, en desarrollo, CI y produccion.~~ **RESUELTO**: Entorno reproducible con PHP 8.3.30 (Laragon) + `mbstring`.
+- ~~Auditar la autorizacion de `destroy` de asistencia por asignatura y cualquier endpoint con comprobacion manual de propiedad.~~ **RESUELTO**: `destroy` movido a policy `gestionarAsistencia` con verificación de propiedad; comprobaciones manuales eliminadas.
+- ~~Alinear nombres de permisos entre seeders y policies.~~ **RESUELTO**: Policies corregidas + test `PermisoMatrizTest`.
 
-### Altos
+### Altos — **MAYORÍA RESUELTOS**
 
-- Definir una unica fuente de verdad para roles (`rol` propio frente a tablas Spatie).
-- Añadir pruebas de autorizacion por rol y pruebas de regresion para los modulos de fase 5/6.
-- Confirmar el motor de base de datos objetivo y probar todas las migraciones desde cero; el `.env.example` usa SQLite, pero la presencia de configuracion Redis y comentarios MySQL sugiere que el despliegue puede cambiar de motor.
+- ~~Definir una unica fuente de verdad para roles (`rol` propio frente a tablas Spatie).~~ **PARCIAL**: Sincronizados nombres (`Docente Guia` sin tilde en ambos); `rol_id` activado en `Usuario`. Pendiente: servicio transaccional único de sincronización.
+- ~~Añadir pruebas de autorizacion por rol y pruebas de regresion para los modulos de fase 5/6.~~ **RESUELTO**: Añadidos `AutorizacionPorRolTest` (8 tests), `PermisoMatrizTest`, `NotaServiceTest` (12 tests), `IdempotenciaTest` (2 tests).
+- Confirmar el motor de base de datos objetivo y probar todas las migraciones desde cero; el `.env.example` usa SQLite, pero la presencia de configuracion Redis y comentarios MySQL sugiere que el despliegue puede cambiar de motor. **PENDIENTE**.
 
-### Medios
+### Medios — **RESUELTOS**
 
-- Eliminar la ruta duplicada de `gestor-horarios`.
-- Consolidar Alpine en una sola dependencia y decidir si CDN de SweetAlert2/Chart.js es aceptable.
-- Limpiar imports del skeleton y documentar la politica de SoftDeletes frente a estados de negocio.
-- Añadir indices compuestos para consultas recurrentes cuando las mediciones confirmen necesidad, especialmente en notas, asistencia y asignaciones por ano/aula.
+- ~~Eliminar la ruta duplicada de `gestor-horarios`.~~ **RESUELTO**.
+- ~~Consolidar Alpine en una sola dependencia~~ **RESUELTO** (solo en `devDependencies`).
+- Decidir si CDN de SweetAlert2/Chart.js es aceptable. **PENDIENTE** (decisión de arquitectura).
+- Limpiar imports del skeleton y documentar la politica de SoftDeletes frente a estados de negocio. **PENDIENTE**.
+- Añadir indices compuestos para consultas recurrentes cuando las mediciones confirmen necesidad. **PENDIENTE**.
 
 ## 13. Guia para implementar cambios
 

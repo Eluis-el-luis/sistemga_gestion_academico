@@ -53,7 +53,6 @@ Route::middleware('auth')->group(function () {
         // NUEVA RUTA PARA LOS DETALLES DE ASIGNACIÓN:
         Route::get('asignaciones/{aula}', [AulaController::class, 'showAsignaciones'])->name('asignaciones.show');
         Route::get('gestor-horarios', [AulaController::class, 'indexHorarios'])->name('gestor-horarios.index');
-        Route::get('gestor-horarios', [AulaController::class, 'indexHorarios'])->name('gestor-horarios.index');
         
         Route::post('aulas/{aula}/asignaturas', [\App\Http\Controllers\AulaAsignaturaController::class, 'store'])->name('aulas.asignaturas.store');
         Route::put('aulas/{aula}/asignaturas/{asignatura}', [\App\Http\Controllers\AulaAsignaturaController::class, 'update'])->name('aulas.asignaturas.update');
@@ -101,7 +100,7 @@ Route::middleware('auth')->group(function () {
         // Fase 6: Asistencia (Docente por Asignatura - Por Excepción)
         Route::get('asistencia/asignatura/{asignacion}', [\App\Http\Controllers\AsistenciaAsignaturaController::class, 'create'])->name('asistencia.asignatura.create');
         Route::post('asistencia/asignatura/{asignacion}', [\App\Http\Controllers\AsistenciaAsignaturaController::class, 'store'])->name('asistencia.asignatura.store');
-        Route::delete('asistencia/asignatura/incidencia/{incidencia}', [\App\Http\Controllers\AsistenciaAsignaturaController::class, 'destroy'])->name('asistencia.asignatura.destroy');
+        Route::delete('asistencia/asignatura/{asignacion}/incidencia/{incidencia}', [\App\Http\Controllers\AsistenciaAsignaturaController::class, 'destroy'])->name('asistencia.asignatura.destroy');
     });
 });
 

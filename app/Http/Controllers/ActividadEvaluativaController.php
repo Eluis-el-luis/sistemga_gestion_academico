@@ -84,7 +84,8 @@ class ActividadEvaluativaController extends Controller
     public function destroy(AulaAsignaturaDocente $asignacion, ActividadEvaluativa $actividad)
     {
         $this->authorize('calificar', $asignacion);
-        // Al eliminar, la base de datos debería borrar en cascada las notas de los niños asociadas a esta actividad.
+        // Eliminar explícitamente las calificaciones asociadas (no hay FK cascade en migración)
+        \App\Models\CalificacionActividad::where('actividad_evaluativa_id', $actividad->id)->delete();
         $actividad->delete();
         return back()->with('success', 'Actividad eliminada.');
     }

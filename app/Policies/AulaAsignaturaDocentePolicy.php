@@ -80,4 +80,31 @@ class AulaAsignaturaDocentePolicy
 
         return false;
     }
+
+    /**
+     * Determina si el usuario puede gestionar asistencia para esta asignatura.
+     */
+    public function gestionarAsistencia(Usuario $usuario, AulaAsignaturaDocente $asignatura): bool
+    {
+        // 1. Debe tener el permiso base de Spatie para gestionar asistencia
+        if (!$usuario->hasPermissionTo('asistencia.gestionar')) {
+            return false;
+        }
+
+        // 2. Verificamos la relación del docente con esta materia específica
+        $docente = $usuario->docente;
+        if ($docente) {
+            // Regla A: ¿Es el maestro que imparte esta asignatura exacta?
+            if ($asignatura->docente_id === $docente->id) {
+                return true;
+            }
+
+            // Regla B: ¿Es el docente guía dueño de toda el aula?
+            if ($asignatura->aula->docente_guia_id === $docente->id) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

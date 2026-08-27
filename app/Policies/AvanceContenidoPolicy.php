@@ -25,7 +25,7 @@ class AvanceContenidoPolicy
      */
     public function viewAny(Usuario $usuario): bool
     {
-        return $usuario->hasPermissionTo('avance_contenido.ver') || $usuario->hasPermissionTo('avance_contenido.gestionar');
+        return $usuario->hasPermissionTo('avance.ver') || $usuario->hasPermissionTo('avance.gestionar');
     }
 
     /**
@@ -33,7 +33,7 @@ class AvanceContenidoPolicy
      */
     public function create(Usuario $usuario): bool
     {
-        return $usuario->hasPermissionTo('avance_contenido.gestionar');
+        return $usuario->hasPermissionTo('avance.gestionar');
     }
 
     /**
@@ -41,7 +41,7 @@ class AvanceContenidoPolicy
      */
     public function update(Usuario $usuario, AvanceContenido $avanceContenido): bool
     {
-        if (!$usuario->hasPermissionTo('avance_contenido.gestionar')) {
+        if (!$usuario->hasPermissionTo('avance.gestionar')) {
             return false;
         }
 

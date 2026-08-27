@@ -53,7 +53,7 @@ class PermisoSeeder extends Seeder
         // 3. Obtener o crear los roles
         $director = Role::firstOrCreate(['name' => 'Director', 'guard_name' => 'web']);
         $subdirector = Role::firstOrCreate(['name' => 'Subdirector', 'guard_name' => 'web']);
-        $docente_guia = Role::firstOrCreate(['name' => 'Docente Guía', 'guard_name' => 'web']);
+        $docente_guia = Role::firstOrCreate(['name' => 'Docente Guia', 'guard_name' => 'web']);
         $docente_asignatura = Role::firstOrCreate(['name' => 'Docente por Asignatura', 'guard_name' => 'web']);
         $alumno = Role::firstOrCreate(['name' => 'Alumno', 'guard_name' => 'web']);
         $coordinador = Role::firstOrCreate(['name' => 'Coordinador', 'guard_name' => 'web']);

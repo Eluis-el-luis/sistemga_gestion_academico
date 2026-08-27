@@ -23,7 +23,7 @@ class AlumnoController extends Controller
 
         // --- 1. ALCANCE POR ROL (Scope para Docentes Guías) ---
         $usuario = auth()->user();
-        if ($usuario->hasRole('Docente Guía')) {
+        if ($usuario->hasRole('Docente Guia')) {
             $docente = \App\Models\Docente::where('usuario_id', $usuario->id)->first();
             if ($docente) {
                 $aulas_id = \App\Models\Aula::where('docente_guia_id', $docente->id)->pluck('id');

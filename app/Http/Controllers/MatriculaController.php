@@ -84,4 +84,11 @@ class MatriculaController extends Controller
         $matricula->update(['estado' => 'activo']);
         return redirect()->route('academico.matriculas.index')->with('success', 'Matrícula reactivada correctamente.');
     }
+
+    public function destroy(Request $request, Matricula $matricula)
+    {
+        $this->authorize('delete', $matricula);
+        $matricula->delete();
+        return redirect()->route('academico.matriculas.index')->with('success', 'Matrícula eliminada (borrado lógico).');
+    }
 }

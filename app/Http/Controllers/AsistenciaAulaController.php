@@ -70,10 +70,34 @@ class AsistenciaAulaController extends Controller
     {
         $this->authorize('create', AsistenciaAula::class);
 
+        $usuario = auth()->user();
+        $docente = $usuario->docente;
+
+        if (!$docente) {
+            return back()->with('error', 'Su usuario no tiene un perfil de docente asociado.');
+        }
+
+        $aula = Aula::where('docente_guia_id', $docente->id)
+                    ->whereHas('anioEscolar', function($q) { $q->where('activo', true); })
+                    ->first();
+
+        if (!$aula) {
+            return back()->with('error', 'No tiene un aula asignada como Docente Guía en el ciclo actual.');
+        }
+
         $datos = $request->validated();
         $fecha = $datos['fecha'];
 
+        $matriculaIdsValidos = Matricula::where('aula_id', $aula->id)
+            ->where('estado', 'activo')
+            ->pluck('id')
+            ->toArray();
+
         foreach ($datos['asistencias'] as $asistencia) {
+            if (!in_array($asistencia['matricula_id'], $matriculaIdsValidos)) {
+                return back()->with('error', 'Intento de registrar asistencia para matrícula no autorizada.');
+            }
+
             AsistenciaAula::updateOrCreate(
                 [
                     'matricula_id' => $asistencia['matricula_id'], 

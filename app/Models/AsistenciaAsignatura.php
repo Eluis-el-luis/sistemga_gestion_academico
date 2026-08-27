@@ -20,6 +20,13 @@ class AsistenciaAsignatura extends Model
         'observacion'
     ];
 
+    /**
+     * Semántica de estados:
+     * - La tabla solo registra INCIDENCIAS (excepciones a la presencia).
+     * - Estados válidos: 'Fuga', 'Llegada Tardía', 'Permiso de Salida'.
+     * - NO se registra 'Presente' como fila; la ausencia de registro = alumno presente en ese bloque.
+     * - Índice único sobre (matricula_id, asignatura_id, bloque_horario_id, fecha) evita duplicados.
+     */
     public function matricula()
     {
         return $this->belongsTo(Matricula::class);
