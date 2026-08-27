@@ -31,7 +31,6 @@
                 </div>
             @endif
 
-            <!-- NUEVO: Alerta de Error -->
             @if (session('error'))
                 <div class="p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl shadow-sm flex items-center font-medium mt-4">
                     <svg class="w-5 h-5 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -39,25 +38,12 @@
                 </div>
             @endif
 
-            <!-- ZONA 1: BANNER DE BIENVENIDA DINÁMICO Y LIMPIO -->
+            <!-- ZONA 1: BANNER DE BIENVENIDA -->
             <div class="bg-white rounded-[2rem] p-8 md:p-10 shadow-sm border border-slate-200/80 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-all">
-                
-                <!-- Sutil destello rojo vino opaco en la esquina -->
                 <div class="absolute top-0 right-0 -mt-16 -mr-16 w-72 h-72 bg-gradient-to-br from-rose-950/15 via-rose-900/5 to-transparent rounded-full blur-3xl pointer-events-none"></div>
 
                 <div class="relative z-10">
                     @php
-                        // Lógica precisa para el saludo según la hora local de Nicaragua
-                        $hora = now()->timezone('America/Managua')->hour;
-                        if ($hora < 12) {
-                            $saludo = 'Buenos días';
-                        } elseif ($hora < 18) {
-                            $saludo = 'Buenas tardes';
-                        } else {
-                            $saludo = 'Buenas noches';
-                        }
-
-                        // Extraemos la primera palabra del nombre completo de forma segura
                         $nombreCompleto = Auth::user()->nombre_completo ?? Auth::user()->name ?? 'Usuario';
                         $nombreLimpio = explode(' ', trim($nombreCompleto))[0];
                     @endphp
@@ -89,17 +75,16 @@
                 @endforeach
             </div>
 
-            <!-- GRID PRINCIPAL (ZONAS 4, 5, 6 Y 7) -->
+            <!-- GRID PRINCIPAL -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-4">
                 
                 <!-- COLUMNA IZQUIERDA (Ocupa 2/3): MÓDULOS INTERACTIVOS -->
                 <div class="lg:col-span-2 space-y-6">
                     
-                    <!-- MÓDULO ADMINISTRATIVO (Director / Subdirector / Gestor) -->
+                    <!-- MÓDULO ADMINISTRATIVO -->
                     @hasanyrole('Director|Subdirector|Gestor de Usuarios')
                     <div x-show="['Director', 'Subdirector', 'Gestor de Usuarios'].includes(rolActivo)" x-transition.opacity style="display: none;" class="space-y-6">
                         
-                        <!-- Tarjetas de Métricas Reales desde PostgreSQL -->
                         <div class="grid grid-cols-2 gap-4">
                             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                                 <div>
@@ -132,7 +117,6 @@
                         <!-- Accesos Rápidos Operativos -->
                         <h4 class="text-sm font-black text-slate-400 uppercase tracking-widest pt-2">Gestión Operativa</h4>
                         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                            <!-- Botón 1: Directorio -->
                             <a href="{{ route('academico.usuarios.index') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex flex-col gap-3">
                                 <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
@@ -142,7 +126,6 @@
                                     <span class="block text-xs font-medium text-slate-400 mt-1">Accesos y roles</span>
                                 </div>
                             </a>
-                            <!-- Botón 2: Aulas -->
                             <a href="{{ route('academico.aulas.index') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex flex-col gap-3">
                                 <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
@@ -152,7 +135,6 @@
                                     <span class="block text-xs font-medium text-slate-400 mt-1">Asignación y espacios</span>
                                 </div>
                             </a>
-                            <!-- Botón 3: Visor de Horarios (NUEVO) -->
                             <a href="{{ route('academico.visor.index') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex flex-col gap-3">
                                 <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
@@ -179,16 +161,15 @@
                                     <span class="block font-bold text-slate-800">Mis Estudiantes</span>
                                     <span class="block text-xs font-medium text-slate-500">Listado y perfiles del aula</span>
                                 </div>
-                                <!-- Botón 2: NUEVO -->
-                                <a href="{{ route('academico.asistencia.aula.create') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-purple-300 transition-all flex items-center gap-4">
-                                    <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                    </div>
-                                    <div>
-                                        <span class="block font-bold text-slate-800">Asistencia</span>
-                                        <span class="block text-xs font-medium text-slate-500">Pase de lista diario</span>
-                                    </div>
-                                </a>
+                            </a>
+                            <a href="{{ route('academico.asistencia.aula.create') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-purple-300 transition-all flex items-center gap-4">
+                                <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                </div>
+                                <div>
+                                    <span class="block font-bold text-slate-800">Asistencia</span>
+                                    <span class="block text-xs font-medium text-slate-500">Pase de lista diario</span>
+                                </div>
                             </a>
                         </div>
                     </div>
@@ -196,12 +177,69 @@
 
                     <!-- MÓDULO DOCENTE POR ASIGNATURA -->
                     @hasanyrole('Docente por Asignatura')
-                    <div x-show="rolActivo === 'Docente por Asignatura'" x-transition.opacity style="display: none;" class="space-y-4">
+                    <div x-show="rolActivo === 'Docente por Asignatura'" x-transition.opacity style="display: none;" class="space-y-6">
                         <h4 class="text-sm font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2">Gestión Académica de Clases</h4>
                         
-                       
                         @include('components.dashboard.asignatura-stats')
-                        
+
+                        <!-- SECCIÓN: MI HORARIO SEMANAL -->
+                        <div class="mt-8 mb-4 flex items-center justify-between">
+                            <h3 class="text-xl font-black text-[#3d2c1d]">Mi Agenda Semanal</h3>
+                            <p class="text-xs font-bold text-slate-400">Haz clic en una clase para gestionarla</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                            @foreach($diasSemana as $dia)
+                                <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
+                                    <div class="bg-[#FFFDF5] text-center py-3 border-b border-[#e6ac27]/20">
+                                        <h4 class="font-black text-[#3d2c1d] uppercase tracking-widest text-sm">{{ $dia }}</h4>
+                                    </div>
+                                    
+                                    <div class="p-4 flex-1 flex flex-col gap-3 bg-slate-50/30">
+                                        @if(isset($horarios[$dia]) && $horarios[$dia]->count() > 0)
+                                            @foreach($horarios[$dia] as $item)
+                                                @php
+                                                    $modalidad = strtolower($item->aulaAsignaturaDocente->aula->modalidad->nombre ?? '');
+                                                    $estilosCaja = match(true) {
+                                                        str_contains($modalidad, 'preescolar') => 'bg-amber-50 border-amber-200 text-amber-900 hover:bg-amber-100 hover:border-amber-300',
+                                                        str_contains($modalidad, 'primaria')   => 'bg-blue-50 border-blue-200 text-blue-900 hover:bg-blue-100 hover:border-blue-300',
+                                                        str_contains($modalidad, 'secundaria') => 'bg-emerald-50 border-emerald-200 text-emerald-900 hover:bg-emerald-100 hover:border-emerald-300',
+                                                        default => 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300'
+                                                    };
+
+                                                    $asignacionId = $item->aulaAsignaturaDocente->id;
+                                                    $asignaturaNombre = $item->aulaAsignaturaDocente->asignatura->nombre;
+                                                    $aulaNombre = $item->aulaAsignaturaDocente->aula->grado->nombre . ' - ' . $item->aulaAsignaturaDocente->aula->nombre;
+                                                    $horaTexto = \Carbon\Carbon::parse($item->bloqueHorario->hora_inicio)->format('h:i') . ' - ' . \Carbon\Carbon::parse($item->bloqueHorario->hora_fin)->format('h:i A');
+                                                @endphp
+
+                                                <div x-on:click="$dispatch('abrir-modal-decision', { 
+                                                        id: '{{ $asignacionId }}', 
+                                                        asignatura: '{{ addslashes($asignaturaNombre) }}', 
+                                                        aula: '{{ addslashes($aulaNombre) }}',
+                                                        hora: '{{ $horaTexto }}'
+                                                     })"
+                                                     class="border rounded-2xl p-3 shadow-sm transition-all transform hover:-translate-y-1 cursor-pointer {{ $estilosCaja }}">
+                                                    
+                                                    <div class="flex items-center gap-1.5 mb-1.5 opacity-70">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                        <span class="text-[10px] font-black uppercase tracking-widest">{{ $horaTexto }}</span>
+                                                    </div>
+                                                    
+                                                    <h5 class="font-black text-sm leading-tight mb-1">{{ $asignaturaNombre }}</h5>
+                                                    <p class="text-[11px] font-bold opacity-80 uppercase tracking-wide">{{ $aulaNombre }}</p>
+                                                </div>
+                                            @endforeach
+                                        @else
+                                            <div class="h-full flex flex-col items-center justify-center text-center opacity-50 py-4">
+                                                <svg class="w-8 h-8 mb-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                                                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Libre</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
                     </div>
                     @endhasanyrole
 
@@ -228,7 +266,7 @@
 
                 </div>
 
-                <!-- COLUMNA DERECHA (Ocupa 1/3): TABLERO DE COMUNICADOS (ZONA 4) -->
+                <!-- COLUMNA DERECHA (Ocupa 1/3): TABLERO DE COMUNICADOS -->
                 <div class="space-y-6">
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200">
                         <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl">
@@ -268,6 +306,58 @@
 
             </div>
         </div>
+        
+        <!-- MODAL DE DECISIÓN (AL HACER CLIC EN CLASE) -->
+        <div x-data="{ asignacionId: '', asignaturaInfo: '', aulaInfo: '', horaInfo: '' }" 
+             @abrir-modal-decision.window="
+                asignacionId = $event.detail.id; 
+                asignaturaInfo = $event.detail.asignatura; 
+                aulaInfo = $event.detail.aula;
+                horaInfo = $event.detail.hora;
+                $dispatch('open-modal', 'modal-decision-clase')
+             ">
+            
+            <x-modal name="modal-decision-clase" focusable maxWidth="md">
+                <div class="bg-[#FFFDF5] px-8 py-5 border-b border-[#e6ac27]/20 flex items-center gap-3 rounded-t-2xl">
+                    <div class="w-10 h-10 rounded-full bg-[#e6ac27]/10 flex items-center justify-center text-[#e6ac27]">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-black text-[#3d2c1d] leading-tight" x-text="asignaturaInfo"></h2>
+                        <p class="text-[11px] font-bold text-slate-500 uppercase tracking-widest mt-0.5" x-text="aulaInfo + ' | ' + horaInfo"></p>
+                    </div>
+                </div>
+                
+                <div class="p-8 bg-white">
+                    <h3 class="text-center font-bold text-slate-600 mb-6">¿Qué deseas gestionar para esta clase?</h3>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        
+                        <!-- BOTÓN: ASISTENCIA -->
+                        <a x-bind:href="'{{ url('academico/asistencia/asignatura') }}/' + asignacionId + '/create'" 
+                           class="flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border-2 border-emerald-100 bg-emerald-50 text-emerald-700 hover:bg-emerald-500 hover:text-white hover:border-emerald-600 transition-all transform hover:-translate-y-1 shadow-sm group">
+                            <svg class="w-8 h-8 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span class="font-black uppercase tracking-widest text-[11px] text-center">Pasar<br>Asistencia</span>
+                        </a>
+
+                        <!-- BOTÓN: NOTAS -->
+                        <a x-bind:href="'{{ url('academico/notas/actividades') }}/' + asignacionId" 
+                           class="flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border-2 border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white hover:border-blue-700 transition-all transform hover:-translate-y-1 shadow-sm group">
+                            <svg class="w-8 h-8 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                            <span class="font-black uppercase tracking-widest text-[11px] text-center">Gestionar<br>Notas</span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 px-8 py-4 border-t border-slate-100 rounded-b-2xl text-center">
+                    <button type="button" x-on:click="$dispatch('close')" class="text-xs font-bold text-slate-400 hover:text-slate-800 transition-colors uppercase tracking-widest py-2">
+                        Cancelar y Cerrar
+                    </button>
+                </div>
+            </x-modal>
+        </div>
+
     </div>
 
     <!-- Script de Chart.js para la Gráfica de Rendimiento -->
@@ -282,7 +372,6 @@
                         datasets: [{
                             label: 'Rendimiento Global (%)',
                             data: [88, 76, 82], 
-                            // COLORES ACTUALIZADOS: Rosado (Preescolar), Azul (Primaria), Esmeralda (Secundaria)
                             backgroundColor: ['#f472b6', '#60a5fa', '#34d399'],
                             borderRadius: 6,
                             borderWidth: 0,
