@@ -13,20 +13,20 @@ Route::get('/', function () {
 
 // --- RUTAS DEL PANEL PRINCIPAL Y TABLERO DE AVISOS ---
 Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth'])
     ->name('dashboard');
 
 // Gestión de Avisos
 Route::post('/dashboard/avisos', [\App\Http\Controllers\DashboardController::class, 'storeAviso'])
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth'])
     ->name('dashboard.avisos.store');
 
 Route::put('/dashboard/avisos/{id}', [\App\Http\Controllers\DashboardController::class, 'updateAviso'])
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth'])
     ->name('dashboard.avisos.update');
 
 Route::delete('/dashboard/avisos/{id}', [\App\Http\Controllers\DashboardController::class, 'destroyAviso'])
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth'])
     ->name('dashboard.avisos.destroy');
 // -----------------------------------------------------
 
