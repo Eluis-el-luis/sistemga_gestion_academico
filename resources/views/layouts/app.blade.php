@@ -20,7 +20,6 @@
         $mostrarSidebar = auth()->check() && auth()->user()->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Coordinador']);
     @endphp
 
-    <!-- Alpine.js ahora recuerda tu elección guardándola en localStorage -->
     <body class="font-sans antialiased text-[#3d2c1d] bg-slate-50" 
           x-data="{ 
               sidebarOpen: localStorage.getItem('sidebarOpen') !== null ? localStorage.getItem('sidebarOpen') === 'true' : window.innerWidth >= 1024,
@@ -35,23 +34,28 @@
             @include('layouts.navigation')
         @endif
 
-        <!-- CONTENEDOR DINÁMICO: lg:pl-64 (abierto) o lg:pl-20 (cerrado) para Admins. 100% ancho para Docentes. -->
+        <!-- CONTENEDOR DINÁMICO -->
         <div class="flex flex-col min-h-screen transition-all duration-300 {{ !$mostrarSidebar ? 'w-full' : '' }}" 
              @if($mostrarSidebar) :class="sidebarOpen ? 'lg:pl-64' : 'lg:pl-20'" @endif>
             
-            <!-- TOPBAR (Solo Menú Hamburguesa y Perfil del Usuario) -->
+            <!-- TOPBAR GLOBAL (Logo, Menú Hamburguesa y Perfil) -->
             <nav class="sticky top-0 z-30 bg-white border-b border-slate-200/60 shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 transition-all">
                 
-                <div class="flex items-center gap-4">
-                    <!-- Botón Hamburguesa (Solo visible si hay sidebar) -->
+                <div class="flex items-center gap-4 lg:gap-6">
+                    <!-- Botón Hamburguesa -->
                     @if($mostrarSidebar)
                         <button @click="sidebarOpen = !sidebarOpen" class="text-slate-500 hover:text-[#e6ac27] bg-slate-50 hover:bg-amber-50 p-2 rounded-lg transition-colors focus:outline-none">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                         </button>
-                    @else
-                        <!-- Espaciador para mantener el logo o título alineado si decides agregarlo aquí -->
-                        <div class="w-6"></div>
                     @endif
+
+                    <!-- LOGO INSTITUCIONAL (Siempre visible, libre y sin círculo) -->
+                    <a href="{{ route('dashboard') }}" class="flex items-center gap-3 group">
+                        <x-application-logo class="block h-10 w-auto object-contain shrink-0 group-hover:scale-105 transition-transform drop-shadow-sm" />
+                        <span class="font-black text-[#3d2c1d] text-xl tracking-tight group-hover:text-[#e6ac27] transition-colors hidden sm:block">
+                            Colegio Cristiano En Nicaragua 
+                        </span>
+                    </a>
                 </div>
 
                 <!-- Menú de Usuario a la derecha -->
@@ -66,7 +70,7 @@
                                 <div class="w-7 h-7 rounded-full bg-[#e6ac27] text-white flex items-center justify-center text-xs">
                                     {{ $inicial }}
                                 </div>
-                                <span>{{ $nombreCorto }}</span>
+                                <span class="hidden sm:block">{{ $nombreCorto }}</span>
                                 <svg class="fill-current h-4 w-4 text-[#e6ac27]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                             </button>
                         </x-slot>
@@ -91,7 +95,7 @@
                 </div>
             </nav>
 
-            <!-- ENCABEZADO DE PÁGINA (Título y Botones, ahora libre y con su propio espacio) -->
+            <!-- ENCABEZADO DE PÁGINA -->
             @isset($header)
                 <header class="bg-transparent pt-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
                     {{ $header }}

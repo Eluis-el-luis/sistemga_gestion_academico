@@ -8,7 +8,7 @@ use App\Http\Controllers\AulaController;
 use App\Http\Controllers\MallaCurricularController;
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
 });
 
 // --- RUTAS DEL PANEL PRINCIPAL Y TABLERO DE AVISOS ---

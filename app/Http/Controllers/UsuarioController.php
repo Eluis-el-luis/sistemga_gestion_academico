@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Usuario;
+use App\Models\Rol; // <-- IMPORTANTE: Traemos el modelo nativo Rol
 use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -24,7 +25,6 @@ class UsuarioController extends Controller
                   ->orWhere('email', 'like', "%{$busqueda}%");
         }
         
-        // ¡Orden alfabético restaurado!
         $usuarios = $query->orderBy('nombre_completo', 'asc')->paginate(15);
         
         return view('academico.usuarios.index', compact('usuarios'));
@@ -66,15 +66,20 @@ class UsuarioController extends Controller
             return back()->withErrors(['roles' => 'Ya existe una cuenta de Subdirección. No pueden existir dos.'])->withInput();
         }
 
-        // Creación limpia sin rol_id
+        // 🔒 PARCHE: Obtenemos el ID del primer rol seleccionado para satisfacer a PostgreSQL
+        $primerRolSpatie = is_array($request->roles) ? $request->roles[0] : 'Docente por Asignatura';
+        $rolNativoId = Rol::firstOrCreate(['nombre' => $primerRolSpatie])->id;
+
+        // Creación inyectando el rol_id obligatorio
         $usuario = Usuario::create([
             'nombre_completo' => $request->nombre_completo,
             'email'           => $request->email,
             'password'        => Hash::make($request->password),
-            'activo'          => true
+            'activo'          => true,
+            'rol_id'          => $rolNativoId // <-- Inyectamos el ID aquí
         ]);
 
-        // Spatie se encarga de la relación aquí
+        // Spatie se encarga de la relación real de permisos aquí
         $usuario->syncRoles($request->roles);
 
         $esDocente = collect($request->roles)->contains(function ($rol) {
@@ -133,14 +138,18 @@ class UsuarioController extends Controller
             return back()->withErrors(['roles' => 'Ya existe otra cuenta de Subdirección asignada en el sistema.']);
         }
 
-        // Actualización limpia sin rol_id
+        // 🔒 PARCHE: Obtenemos el ID del primer rol seleccionado para satisfacer a PostgreSQL
+        $primerRolSpatie = is_array($request->roles) ? $request->roles[0] : 'Docente por Asignatura';
+        $rolNativoId = Rol::firstOrCreate(['nombre' => $primerRolSpatie])->id;
+
+        // Actualización inyectando el rol_id
         $usuario->update([
             'nombre_completo' => $request->nombre_completo,
             'email'           => $request->email,
-            'activo'          => $request->activo
+            'activo'          => $request->activo,
+            'rol_id'          => $rolNativoId // <-- Inyectamos el ID aquí
         ]);
 
-        // Spatie se encarga de la actualización de roles
         $usuario->syncRoles($request->roles);
 
         $esDocente = collect($request->roles)->contains(function ($rol) {

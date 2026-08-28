@@ -15,7 +15,7 @@ class DashboardController extends Controller
         /** @var \App\Models\Usuario $user */
         $user = Auth::user();
 
-        // 1. OPTIMIZACIÓN: Solo contamos si el usuario tiene rol administrativo
+        // 1. KPIs Minimalistas (Solo para roles administrativos)
         $totalAlumnos = 0;
         $totalDocentes = 0;
 
@@ -24,16 +24,70 @@ class DashboardController extends Controller
             $totalDocentes = Docente::count();
         }
         
-        // 2. Traer Avisos (Para todos los usuarios)
+        // 2. Comunicados Oficiales (Para la campana de notificaciones)
         $avisos = DB::table('aviso')
                     ->join('usuario', 'aviso.autor_id', '=', 'usuario.id')
                     ->select('aviso.*', 'usuario.nombre_completo as autor_nombre')
                     ->where('aviso.activo', true)
                     ->orderBy('aviso.created_at', 'desc')
-                    ->take(5) // Historial de los últimos 5
+                    ->take(5)
                     ->get();
 
-        // 3. NUEVO: Traer el Horario Semanal si es Docente
+        // 3. Extracción de Datos Reales para Gráficas (Por Modalidad)
+        $nombresModalidades = [];
+        $rendimientoData = [];
+        $asistenciaAlumnosData = [];
+        $asistenciaDocentesData = [];
+
+        if ($user->hasAnyRole(['Director', 'Subdirector'])) {
+            $modalidades = DB::table('modalidad')->orderBy('id')->get();
+            
+            foreach($modalidades as $mod) {
+                $nombresModalidades[] = $mod->nombre;
+
+                // A. Rendimiento (Promedio de nota_cuantitativa)
+                $promedioNota = DB::table('nota')
+                    ->join('aula_asignatura_docente', 'nota.aula_asignatura_docente_id', '=', 'aula_asignatura_docente.id')
+                    ->join('aula', 'aula_asignatura_docente.aula_id', '=', 'aula.id')
+                    ->where('aula.modalidad_id', $mod->id)
+                    ->avg('nota.nota_cuantitativa') ?? 0;
+                $rendimientoData[] = round($promedioNota, 1);
+
+                // B. Asistencia Alumnos (% de 'Presente')
+                $totalAsistencias = DB::table('asistencia_aula')
+                    ->join('matricula', 'asistencia_aula.matricula_id', '=', 'matricula.id')
+                    ->join('aula', 'matricula.aula_id', '=', 'aula.id')
+                    ->where('aula.modalidad_id', $mod->id)
+                    ->count();
+                    
+                $presentesAlumnos = DB::table('asistencia_aula')
+                    ->join('matricula', 'asistencia_aula.matricula_id', '=', 'matricula.id')
+                    ->join('aula', 'matricula.aula_id', '=', 'aula.id')
+                    ->where('aula.modalidad_id', $mod->id)
+                    ->whereIn('estado_asistencia', ['Presente', 'presente', 'Asistio', 'P']) 
+                    ->count();
+                    
+                $asistenciaAlumnosData[] = $totalAsistencias > 0 ? round(($presentesAlumnos / $totalAsistencias) * 100, 1) : 0;
+
+                // C. Asistencia Docentes (% de presente = true)
+                $totalAsistenciasDoc = DB::table('asistencia_docente')
+                    ->join('aula_asignatura_docente', 'asistencia_docente.aula_asignatura_docente_id', '=', 'aula_asignatura_docente.id')
+                    ->join('aula', 'aula_asignatura_docente.aula_id', '=', 'aula.id')
+                    ->where('aula.modalidad_id', $mod->id)
+                    ->count();
+                    
+                $presentesDoc = DB::table('asistencia_docente')
+                    ->join('aula_asignatura_docente', 'asistencia_docente.aula_asignatura_docente_id', '=', 'aula_asignatura_docente.id')
+                    ->join('aula', 'aula_asignatura_docente.aula_id', '=', 'aula.id')
+                    ->where('aula.modalidad_id', $mod->id)
+                    ->where('presente', true)
+                    ->count();
+
+                $asistenciaDocentesData[] = $totalAsistenciasDoc > 0 ? round(($presentesDoc / $totalAsistenciasDoc) * 100, 1) : 0;
+            }
+        }
+
+        // 4. Horario Semanal si es Docente
         $horarios = collect();
         $diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 
@@ -56,31 +110,21 @@ class DashboardController extends Controller
                 ->groupBy('dia_semana');
         }
 
-        return view('dashboard', compact('totalAlumnos', 'totalDocentes', 'avisos', 'horarios', 'diasSemana'));
+        return view('dashboard', compact(
+            'totalAlumnos', 'totalDocentes', 'avisos', 'horarios', 'diasSemana',
+            'nombresModalidades', 'rendimientoData', 'asistenciaAlumnosData', 'asistenciaDocentesData'
+        ));
     }
 
     public function storeAviso(Request $request)
     {
-        /** @var \App\Models\Usuario $user */
         $user = Auth::user();
+        if (!$user->hasAnyRole(['Director', 'Subdirector'])) { abort(403); }
 
-        // 🔒 BLINDAJE: Solo Director o Subdirector
-        if (!$user->hasAnyRole(['Director', 'Subdirector'])) {
-            abort(403, 'No autorizado para publicar avisos.');
-        }
-
-        $request->validate([
-            'titulo' => 'required|string|max:120',
-            'mensaje' => 'required|string|max:1000',
-        ]);
-
+        $request->validate(['titulo' => 'required|string|max:120', 'mensaje' => 'required|string|max:1000']);
         DB::table('aviso')->insert([
-            'titulo' => $request->titulo,
-            'mensaje' => $request->mensaje,
-            'autor_id' => Auth::id(),
-            'activo' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
+            'titulo' => $request->titulo, 'mensaje' => $request->mensaje, 'autor_id' => Auth::id(),
+            'activo' => true, 'created_at' => now(), 'updated_at' => now(),
         ]);
 
         return redirect()->route('dashboard')->with('success', 'Aviso publicado correctamente.');
@@ -88,40 +132,21 @@ class DashboardController extends Controller
 
     public function updateAviso(Request $request, $id)
     {
-        /** @var \App\Models\Usuario $user */
         $user = Auth::user();
+        if (!$user->hasAnyRole(['Director', 'Subdirector'])) { abort(403); }
 
-        // 🔒 BLINDAJE: Solo Director o Subdirector
-        if (!$user->hasAnyRole(['Director', 'Subdirector'])) {
-            abort(403, 'No autorizado para editar avisos.');
-        }
-
-        $request->validate([
-            'titulo' => 'required|string|max:120',
-            'mensaje' => 'required|string|max:1000',
-        ]);
-
-        DB::table('aviso')->where('id', $id)->update([
-            'titulo' => $request->titulo,
-            'mensaje' => $request->mensaje,
-            'updated_at' => now(),
-        ]);
+        $request->validate(['titulo' => 'required|string|max:120', 'mensaje' => 'required|string|max:1000']);
+        DB::table('aviso')->where('id', $id)->update(['titulo' => $request->titulo, 'mensaje' => $request->mensaje, 'updated_at' => now()]);
 
         return redirect()->route('dashboard')->with('success', 'Aviso actualizado correctamente.');
     }
 
     public function destroyAviso($id)
     {
-        /** @var \App\Models\Usuario $user */
         $user = Auth::user();
-
-        // 🔒 BLINDAJE: Solo Director o Subdirector
-        if (!$user->hasAnyRole(['Director', 'Subdirector'])) {
-            abort(403, 'No autorizado para eliminar avisos.');
-        }
+        if (!$user->hasAnyRole(['Director', 'Subdirector'])) { abort(403); }
 
         DB::table('aviso')->where('id', $id)->delete();
-
         return redirect()->route('dashboard')->with('success', 'Aviso eliminado del sistema.');
     }
 }
