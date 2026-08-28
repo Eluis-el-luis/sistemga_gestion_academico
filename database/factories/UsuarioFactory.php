@@ -2,16 +2,19 @@
 
 namespace Database\Factories;
 
-use App\Models\User;
+use App\Models\Rol;
+use App\Models\Usuario;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * @extends Factory<User>
+ * @extends Factory<Usuario>
  */
-class UserFactory extends Factory
+class UsuarioFactory extends Factory
 {
+    protected $model = Usuario::class;
+
     /**
      * The current password being used by the factory.
      */
@@ -25,10 +28,12 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
+            'nombre_completo' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'rol_id' => Rol::firstOrCreate(['nombre' => 'Docente'])->id,
+            'activo' => true,
             'remember_token' => Str::random(10),
         ];
     }

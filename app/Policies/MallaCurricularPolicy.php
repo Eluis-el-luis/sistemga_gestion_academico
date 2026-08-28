@@ -25,7 +25,7 @@ class MallaCurricularPolicy
      */
     public function viewAny(Usuario $usuario): bool
     {
-        return $usuario->hasPermissionTo('mallas_curriculares.ver') || $usuario->hasPermissionTo('mallas_curriculares.gestionar');
+        return $usuario->hasPermissionTo('malla.ver') || $usuario->hasPermissionTo('malla.gestionar');
     }
 
     /**
@@ -33,7 +33,7 @@ class MallaCurricularPolicy
      */
     public function create(Usuario $usuario): bool
     {
-        return $usuario->hasPermissionTo('mallas_curriculares.gestionar');
+        return $usuario->hasPermissionTo('malla.gestionar');
     }
 
     /**

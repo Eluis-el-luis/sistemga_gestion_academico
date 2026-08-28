@@ -1,22 +1,37 @@
 <!-- resources/views/academico/matriculas/index.blade.php -->
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <h2 class="font-bold text-2xl text-gray-800 leading-tight">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h2 class="font-black text-2xl text-[#3d2c1d] tracking-tight">
                 {{ __('Control General de Matrículas') }}
             </h2>
+
+            @if (session('success'))
+                <div class="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl shadow-sm flex items-center font-medium">
+                    <svg class="w-5 h-5 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            <!-- NUEVO: Alerta de Error -->
+            @if (session('error'))
+                <div class="p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl shadow-sm flex items-center font-medium mt-4">
+                    <svg class="w-5 h-5 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    {{ session('error') }}
+                </div>
+            @endif
             
-            <div class="flex space-x-3">
-                <!-- Botón Nuevo Ingreso: Dirige a crear el Expediente primero -->
+            <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <!-- Botón Nuevo Ingreso (Secundario) -->
                 @can('create', App\Models\Alumno::class)
-                    <a href="{{ route('academico.alumnos.create') }}" class="inline-flex items-center px-4 py-2 bg-white text-blue-600 border border-blue-200 rounded-lg shadow-sm font-bold text-sm hover:bg-blue-50 transition-colors">
-                        + Nuevo Ingreso (Expediente)
+                    <a href="{{ route('academico.alumnos.create') }}" class="inline-flex justify-center items-center px-5 py-2.5 bg-white text-[#3d2c1d] border border-slate-200 rounded-xl shadow-sm font-bold text-sm hover:bg-slate-50 hover:border-slate-300 transition-all">
+                        + Nuevo Ingreso (Ficha)
                     </a>
                 @endcan
                 
-                <!-- Botón Reingreso: Dirige directo a la matrícula -->
+                <!-- Botón Reingreso (Principal) -->
                 @can('create', App\Models\Matricula::class)
-                    <a href="{{ route('academico.matriculas.create') }}" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white border border-transparent rounded-lg shadow-sm font-bold text-sm hover:bg-emerald-700 transition-colors focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500">
+                    <a href="{{ route('academico.matriculas.create') }}" class="inline-flex justify-center items-center px-5 py-2.5 bg-[#e6ac27] text-white border border-transparent rounded-xl shadow-md shadow-[#e6ac27]/20 font-black text-sm hover:bg-[#c48e1b] transition-all transform hover:-translate-y-0.5 focus:ring-2 focus:ring-offset-2 focus:ring-[#e6ac27]">
                         + Matricular (Reingreso)
                     </a>
                 @endcan
@@ -24,22 +39,23 @@
         </div>
     </x-slot>
 
-    <div class="py-12 relative" x-data="{ showTopBtn: false }" @scroll.window="showTopBtn = (window.pageYOffset > 150)">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+    <div class="py-10 bg-slate-50 min-h-screen relative" x-data="{ showTopBtn: false }" @scroll.window="showTopBtn = (window.pageYOffset > 150)">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
 
             <!-- Mensajes de Sesión -->
             @if (session('success'))
-                <div class="p-4 mb-4 text-sm text-green-800 rounded-lg bg-green-50 border border-green-200 shadow-sm">
+                <div class="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl shadow-sm flex items-center gap-3 font-medium">
+                    <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
                     {{ session('success') }}
                 </div>
             @endif
 
             <!-- TARJETA DE FILTROS -->
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <form method="GET" action="{{ route('academico.matriculas.index') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+                <form method="GET" action="{{ route('academico.matriculas.index') }}" class="grid grid-cols-1 md:grid-cols-4 gap-5">
                     <div>
-                        <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Año Escolar</label>
-                        <select name="anio_escolar_id" class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Año Escolar</label>
+                        <select name="anio_escolar_id" class="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm shadow-sm focus:border-[#e6ac27] focus:ring-[#e6ac27] font-medium text-slate-700 transition-colors">
                             @foreach ($aniosEscolares ?? [] as $anio)
                                 <option value="{{ $anio->id }}" {{ request('anio_escolar_id', $anioActivo->id ?? null) == $anio->id ? 'selected' : '' }}>
                                     {{ $anio->nombre }} {{ $anio->activo ? '(Activo)' : '' }}
@@ -49,8 +65,8 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Aula / Sección</label>
-                        <select name="aula_id" class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Aula / Sección</label>
+                        <select name="aula_id" class="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm shadow-sm focus:border-[#e6ac27] focus:ring-[#e6ac27] font-medium text-slate-700 transition-colors">
                             <option value="">Todas las aulas</option>
                             @foreach ($aulas ?? [] as $aula)
                                 <option value="{{ $aula->id }}" {{ request('aula_id') == $aula->id ? 'selected' : '' }}>
@@ -61,23 +77,23 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Estado</label>
-                        <select name="estado" class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Estado</label>
+                        <select name="estado" class="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm shadow-sm focus:border-[#e6ac27] focus:ring-[#e6ac27] font-medium text-slate-700 transition-colors">
                             <option value="">Todos los Estados</option>
-                            <option value="activo" {{ request('estado') === 'activo' ? 'selected' : '' }}>Activo</option>
-                            <option value="retirado" {{ request('estado') === 'retirado' ? 'selected' : '' }}>Retirado (Baja)</option>
-                            <option value="repitente" {{ request('estado') === 'repitente' ? 'selected' : '' }}>Repitente</option>
-                            <option value="promovido" {{ request('estado') === 'promovido' ? 'selected' : '' }}>Promovido</option>
+                            <option value="activo" {{ request('estado') === 'activo' ? 'selected' : '' }}>🟢 Activo</option>
+                            <option value="retirado" {{ request('estado') === 'retirado' ? 'selected' : '' }}>🔴 Retirado (Baja)</option>
+                            <option value="repitente" {{ request('estado') === 'repitente' ? 'selected' : '' }}>🟠 Repitente</option>
+                            <option value="promovido" {{ request('estado') === 'promovido' ? 'selected' : '' }}>🔵 Promovido</option>
                         </select>
                     </div>
 
-                    <div class="flex items-end gap-2 pt-2 md:pt-0">
+                    <div class="flex flex-col sm:flex-row justify-end items-end gap-5 pt-2">
                         @if(request()->hasAny(['aula_id', 'estado', 'anio_escolar_id']))
-                            <a href="{{ route('academico.matriculas.index') }}" class="w-full text-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-semibold transition-colors border border-gray-200">
+                            <a href="{{ route('academico.matriculas.index') }}" class="text-sm font-bold text-slate-400 hover:text-rose-600 transition-colors underline underline-offset-4 decoration-2 decoration-slate-200 hover:decoration-rose-300 pb-2">
                                 Limpiar
                             </a>
                         @endif
-                        <button type="submit" class="w-full px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-bold shadow-sm transition-colors">
+                        <button type="submit" class="w-full sm:w-auto px-6 py-2.5 bg-[#3d2c1d] text-white rounded-xl hover:bg-slate-800 text-sm font-black shadow-sm transition-all transform hover:-translate-y-0.5">
                             Filtrar
                         </button>
                     </div>
@@ -85,52 +101,59 @@
             </div>
 
             <!-- TABLA DE MATRÍCULAS -->
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-xl border border-gray-100">
-                <div class="overflow-x-auto p-6 pt-0">
-                    <table class="min-w-full divide-y divide-gray-200 text-sm mt-4">
-                        <thead class="bg-gray-50 text-gray-500 uppercase text-xs font-bold tracking-wider">
+            <div class="bg-white overflow-hidden shadow-sm rounded-3xl border border-slate-200">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-100 text-sm border-collapse text-left">
+                        <thead class="bg-[#FFFDF5] text-slate-500 uppercase text-[11px] font-black tracking-widest border-b border-slate-200">
                             <tr>
-                                <th class="px-6 py-4 text-left rounded-tl-lg">CUP</th>
-                                <th class="px-6 py-4 text-left">Estudiante</th>
-                                <th class="px-6 py-4 text-left">Aula Asignada</th>
-                                <th class="px-6 py-4 text-center">Estado</th>
-                                <th class="px-6 py-4 text-right rounded-tr-lg">Acciones (Depuración)</th>
+                                <th class="px-8 py-5">CUP</th>
+                                <th class="px-6 py-5">Estudiante</th>
+                                <th class="px-6 py-5">Aula Asignada</th>
+                                <th class="px-6 py-5 text-center">Estado</th>
+                                <th class="px-8 py-5 text-right">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200 text-gray-700">
+                        <tbody class="divide-y divide-slate-100 text-slate-700 bg-white">
                             @forelse ($matriculas as $matricula)
-                                <tr class="hover:bg-gray-50 transition-colors">
-                                    <td class="px-6 py-4 font-mono font-bold text-indigo-600">{{ $matricula->alumno->codigo_unico_persona }}</td>
-                                    <td class="px-6 py-4 font-medium text-gray-900">{{ $matricula->alumno->nombre_completo }}</td>
-                                    <td class="px-6 py-4">
-                                        <span class="block text-gray-900">{{ $matricula->aula->nombre }}</span>
-                                        <span class="text-xs text-gray-500">{{ $matricula->anioEscolar->nombre }}</span>
+                                <tr class="hover:bg-slate-50/80 transition-colors group">
+                                    <!-- APLICACIÓN DE LA RED DE SEGURIDAD AQUÍ -->
+                                    <td class="px-8 py-5 font-black {{ $matricula->alumno ? 'text-slate-500' : 'text-rose-400' }}">
+                                        {{ $matricula->alumno?->codigo_unico_persona ?? 'SIN-CUP' }}
                                     </td>
-                                    <td class="px-6 py-4 text-center">
-                                        <span class="px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full shadow-sm border
-                                            {{ $matricula->estado === 'activo' ? 'bg-green-50 text-green-700 border-green-200' : '' }}
-                                            {{ $matricula->estado === 'retirado' ? 'bg-red-50 text-red-700 border-red-200' : '' }}
-                                            {{ $matricula->estado === 'promovido' ? 'bg-blue-50 text-blue-700 border-blue-200' : '' }}
-                                            {{ $matricula->estado === 'repitente' ? 'bg-amber-50 text-amber-700 border-amber-200' : '' }}">
+                                    <td class="px-6 py-5 font-black text-base {{ $matricula->alumno ? 'text-[#3d2c1d]' : 'text-rose-600' }}">
+                                        {{ $matricula->alumno?->nombre_completo ?? '⚠️ Alumno no encontrado (Registro Huérfano)' }}
+                                    </td>
+                                    <td class="px-6 py-5">
+                                        <span class="block font-bold text-slate-800">{{ $matricula->aula->nombre ?? 'N/A' }}</span>
+                                        <span class="text-[11px] font-black uppercase tracking-widest text-slate-400 mt-1">{{ $matricula->anioEscolar->nombre ?? 'N/A' }}</span>
+                                    </td>
+                                    <td class="px-6 py-5 text-center">
+                                        <span class="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm border
+                                            {{ $matricula->estado === 'activo' ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' : '' }}
+                                            {{ $matricula->estado === 'retirado' ? 'bg-rose-50 text-rose-700 border-rose-200/60' : '' }}
+                                            {{ $matricula->estado === 'promovido' ? 'bg-blue-50 text-blue-700 border-blue-200/60' : '' }}
+                                            {{ $matricula->estado === 'repitente' ? 'bg-amber-50 text-amber-700 border-amber-200/60' : '' }}">
                                             {{ $matricula->estado }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 text-right space-x-3">
+                                    <td class="px-8 py-5 text-right space-x-3">
                                         
-                                        <!-- Ver Expediente del Alumno -->
-                                        <a href="{{ route('academico.alumnos.show', $matricula->alumno_id) }}" class="text-indigo-600 hover:text-indigo-900 font-bold text-xs uppercase tracking-wider" title="Ver Expediente">
-                                            Ficha
-                                        </a>
+                                        <!-- Ver Expediente del Alumno (Deshabilitado si es huérfano) -->
+                                        @if($matricula->alumno)
+                                            <a href="{{ route('academico.alumnos.show', $matricula->alumno_id) }}" class="inline-flex p-2 bg-slate-50 text-blue-600 rounded-xl hover:bg-blue-100 border border-slate-200 hover:border-blue-300 shadow-sm transition-all" title="Ver Expediente">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                            </a>
+                                        @endif
 
                                         @can('update', $matricula)
-                                            <span class="text-gray-300">|</span>
+                                            <span class="text-slate-300">|</span>
                                             
                                             @if($matricula->estado === 'activo')
-                                                <!-- Botón Dar Baja (SweetAlert) -->
+                                                <!-- Botón Dar Baja -->
                                                 <form method="POST" action="{{ route('academico.matriculas.retirar', $matricula) }}" class="inline-block alerta-baja">
                                                     @csrf
                                                     @method('PATCH')
-                                                    <button type="submit" class="text-red-600 hover:text-red-900 font-bold text-xs uppercase tracking-wider transition-colors">
+                                                    <button type="submit" class="text-rose-600 hover:text-rose-800 font-bold text-xs uppercase tracking-wider transition-colors ml-2">
                                                         Retirar
                                                     </button>
                                                 </form>
@@ -139,7 +162,7 @@
                                                 <form method="POST" action="{{ route('academico.matriculas.reactivar', $matricula) }}" class="inline-block alerta-reactivar">
                                                     @csrf
                                                     @method('PATCH')
-                                                    <button type="submit" class="text-emerald-600 hover:text-emerald-900 font-bold text-xs uppercase tracking-wider transition-colors">
+                                                    <button type="submit" class="text-emerald-600 hover:text-emerald-800 font-bold text-xs uppercase tracking-wider transition-colors ml-2">
                                                         Reactivar
                                                     </button>
                                                 </form>
@@ -149,28 +172,32 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="px-6 py-12 text-center text-gray-500">
-                                        <svg class="mx-auto h-12 w-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                        <p class="text-lg font-medium text-gray-900">No hay matrículas registradas</p>
-                                        <p class="text-sm">Ajusta los filtros o inscribe a un nuevo estudiante.</p>
+                                    <td colspan="5" class="px-6 py-16 text-center text-slate-500">
+                                        <svg class="mx-auto h-12 w-12 text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                        <p class="text-lg font-black text-slate-600">No encontramos matrículas</p>
+                                        <p class="text-sm font-medium mt-1">Ajusta los filtros arriba o inscribe a un nuevo estudiante.</p>
                                     </td>
                                 </tr>
                             @endforelse
                         </tbody>
                     </table>
-                    <div class="mt-6 mb-2">{{ $matriculas->appends(request()->query())->links() ?? '' }}</div>
+                    
+                    <div class="p-6 border-t border-slate-100 bg-white">
+                        {{ $matriculas->appends(request()->query())->links() ?? '' }}
+                    </div>
                 </div>
             </div>
 
         </div>
 
         <!-- Botón Volver Arriba -->
-        <button x-show="showTopBtn" @click="window.scrollTo({top: 0, behavior: 'smooth'})" class="fixed bottom-6 right-6 z-50 p-3.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-full shadow-lg transition-all transform hover:scale-110">
+        <button x-show="showTopBtn" @click="window.scrollTo({top: 0, behavior: 'smooth'})" class="fixed bottom-8 right-8 z-50 p-3.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-full shadow-lg transition-all transform hover:scale-110 focus:outline-none">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
         </button>
     </div>
 
-    <!-- Script de SweetAlert2 -->
+    <!-- Script de SweetAlert2 con UX Tip #2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             // Alerta Baja (Retiro)
@@ -178,14 +205,15 @@
                 formulario.addEventListener('submit', function (e) {
                     e.preventDefault();
                     Swal.fire({
-                        title: '¿Confirmar Retiro?',
-                        text: "El estudiante será dado de baja en el sistema para este año escolar.",
+                        title: '¿Retirar a este estudiante?',
+                        text: "Pasará a estado Inactivo y liberará su cupo en el aula actual.",
                         icon: 'warning',
                         showCancelButton: true,
-                        confirmButtonColor: '#ef4444',
-                        cancelButtonColor: '#6b7280',
-                        confirmButtonText: 'Sí, Retirar',
-                        cancelButtonText: 'Cancelar'
+                        confirmButtonColor: '#e11d48',
+                        cancelButtonColor: '#94a3b8',
+                        confirmButtonText: 'Sí, retirar',
+                        cancelButtonText: 'Cancelar',
+                        customClass: { popup: 'rounded-3xl border border-slate-200' }
                     }).then((result) => { if (result.isConfirmed) this.submit(); });
                 });
             });
@@ -195,14 +223,15 @@
                 formulario.addEventListener('submit', function (e) {
                     e.preventDefault();
                     Swal.fire({
-                        title: '¿Reactivar Matrícula?',
-                        text: "El estudiante volverá a estar Activo en su aula.",
+                        title: '¿Reactivar matrícula?',
+                        text: "El estudiante volverá a figurar como Activo en su grado y sección.",
                         icon: 'info',
                         showCancelButton: true,
-                        confirmButtonColor: '#10b981',
-                        cancelButtonColor: '#6b7280',
-                        confirmButtonText: 'Sí, Reactivar',
-                        cancelButtonText: 'Cancelar'
+                        confirmButtonColor: '#059669',
+                        cancelButtonColor: '#94a3b8',
+                        confirmButtonText: 'Sí, reactivar',
+                        cancelButtonText: 'Cancelar',
+                        customClass: { popup: 'rounded-3xl border border-slate-200' }
                     }).then((result) => { if (result.isConfirmed) this.submit(); });
                 });
             });

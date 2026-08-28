@@ -51,4 +51,18 @@ class MatriculaPolicy
         }
         return false;
     }
+
+    /**
+     * Eliminar matrícula (soft delete).
+     */
+    public function delete(Usuario $usuario, Matricula $matricula): bool
+    {
+        if (!$usuario->hasPermissionTo('alumnos.gestionar')) return false;
+
+        $docente = $usuario->docente;
+        if ($docente && $docente->es_coordinador) {
+            return $docente->modalidad_coordina_id === $matricula->aula->modalidad_id;
+        }
+        return false;
+    }
 }
