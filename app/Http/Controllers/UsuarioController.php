@@ -66,7 +66,7 @@ class UsuarioController extends Controller
             return back()->withErrors(['roles' => 'Ya existe una cuenta de Subdirección. No pueden existir dos.'])->withInput();
         }
 
-        // 🔒 PARCHE: Obtenemos el ID del primer rol seleccionado para satisfacer a PostgreSQL
+        
         $primerRolSpatie = is_array($request->roles) ? $request->roles[0] : 'Docente por Asignatura';
         $rolNativoId = Rol::firstOrCreate(['nombre' => $primerRolSpatie])->id;
 
@@ -76,7 +76,7 @@ class UsuarioController extends Controller
             'email'           => $request->email,
             'password'        => Hash::make($request->password),
             'activo'          => true,
-            'rol_id'          => $rolNativoId // <-- Inyectamos el ID aquí
+            'rol_id'          => $rolNativoId 
         ]);
 
         // Spatie se encarga de la relación real de permisos aquí
