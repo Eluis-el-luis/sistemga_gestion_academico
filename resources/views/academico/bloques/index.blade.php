@@ -10,14 +10,6 @@
 
     <div class="pb-12 pt-6 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
         
-        <!-- Mensajes de Sesión -->
-        @if(session('success'))
-            <div class="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl shadow-sm flex items-center gap-3 font-medium">
-                <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
-                {{ session('success') }}
-            </div>
-        @endif
-
         <!-- FORMULARIO PARA AGREGAR UN BLOQUE -->
         <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
             <div class="bg-[#FFFDF5] px-8 py-5 border-b border-[#e6ac27]/20 flex items-center gap-2">
@@ -88,7 +80,6 @@
                 @foreach($modalidades as $modalidad)
                     @foreach(['Matutino', 'Vespertino'] as $turno)
                         @php 
-                            // Ordenamos los bloques por hora de inicio para que tenga lógica visual
                             $bloquesFiltrados = $bloques->where('modalidad_id', $modalidad->id)
                                                         ->where('turno', $turno)
                                                         ->sortBy('hora_inicio');
@@ -104,16 +95,20 @@
                                 <div class="p-0">
                                     <ul class="divide-y divide-slate-100">
                                         @foreach($bloquesFiltrados as $bloque)
-                                            <li class="flex justify-between items-center px-6 py-4 text-sm {{ $bloque->es_recreo ? 'bg-amber-50/30' : 'hover:bg-slate-50' }} transition-colors group">
+                                            <li class="flex justify-between items-center px-6 py-4 text-sm {{ $bloque->es_recreo ? 'bg-amber-50/40' : 'hover:bg-slate-50' }} transition-colors group">
                                                 <div class="flex items-center gap-4">
                                                     @if($bloque->es_recreo)
-                                                        <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+                                                        <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                        </div>
                                                     @else
-                                                        <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                        <div class="w-8 h-8 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                        </div>
                                                     @endif
                                                     
                                                     <div class="flex flex-col">
-                                                        <span class="font-black text-base {{ $bloque->es_recreo ? 'text-amber-700' : 'text-slate-700' }}">{{ $bloque->nombre }}</span>
+                                                        <span class="font-black text-base {{ $bloque->es_recreo ? 'text-amber-800' : 'text-slate-700' }}">{{ $bloque->nombre }}</span>
                                                         <span class="text-[11px] {{ $bloque->es_recreo ? 'text-amber-600' : 'text-slate-400' }} font-bold uppercase tracking-widest mt-1">
                                                             {{ \Carbon\Carbon::parse($bloque->hora_inicio)->format('h:i A') }} - {{ \Carbon\Carbon::parse($bloque->hora_fin)->format('h:i A') }}
                                                         </span>
@@ -139,9 +134,30 @@
         </div>
     </div>
 
-    <!-- Script para SweetAlert2 -->
+    <!-- Script para SweetAlert2 Premium -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            // Toast de Éxito Premium
+            @if(session('success'))
+                Swal.mixin({
+                    toast: true, position: 'top', showConfirmButton: false, timer: 3500, timerProgressBar: true,
+                    customClass: { popup: 'rounded-2xl shadow-lg border border-slate-100' }
+                }).fire({ icon: 'success', title: '{{ session("success") }}' });
+            @endif
+
+            // Alerta de Error / Advertencia
+            @if(session('error'))
+                Swal.fire({
+                    title: 'Atención',
+                    text: '{{ session("error") }}',
+                    icon: 'warning',
+                    confirmButtonColor: '#3d2c1d',
+                    customClass: { popup: 'rounded-3xl border border-stone-200 shadow-xl' }
+                });
+            @endif
+
+            // Alerta de confirmación para eliminar
             document.querySelectorAll('.alerta-eliminar').forEach(formulario => {
                 formulario.addEventListener('submit', function (e) {
                     e.preventDefault();

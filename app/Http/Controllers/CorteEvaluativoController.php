@@ -10,14 +10,12 @@ class CorteEvaluativoController extends Controller
 {
     public function index()
     {
-        // Seguridad: Solo roles administrativos pueden entrar aquí
         if (!auth()->user()->hasRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
             abort(403, 'No tienes permisos para configurar los parámetros de evaluación.');
         }
 
         $anioActivo = AnioEscolar::where('activo', true)->first();
         
-        // Traemos los cortes ordenados por número (1er Parcial, 2do Parcial...)
         $cortes = $anioActivo 
             ? CorteEvaluativo::where('anio_escolar_id', $anioActivo->id)->orderBy('numero')->get() 
             : collect();
@@ -28,21 +26,26 @@ class CorteEvaluativoController extends Controller
     public function update(Request $request, CorteEvaluativo $corte)
     {
         $request->validate([
+            'fecha_inicio' => 'required|date',
+            'fecha_fin' => 'required|date|after:fecha_inicio',
             'peso_acumulado' => 'required|integer|min:0|max:100',
             'peso_examen' => 'required|integer|min:0|max:100',
+        ], [
+            'fecha_fin.after' => 'La fecha de fin no puede ser anterior ni igual a la fecha de inicio.',
         ]);
 
-        // REGLA DE NEGOCIO: La suma debe ser exactamente 100
         $suma = $request->peso_acumulado + $request->peso_examen;
         if ($suma !== 100) {
-            return back()->with('error', "La suma del Acumulado y el Examen debe ser exactamente 100. Actualmente suma: {$suma}");
+            return back()->with('error', "La suma del Acumulado y el Examen debe ser exactamente 100 puntos. Has enviado: {$suma} puntos.");
         }
 
         $corte->update([
+            'fecha_inicio' => $request->fecha_inicio,
+            'fecha_fin' => $request->fecha_fin,
             'peso_acumulado' => $request->peso_acumulado,
             'peso_examen' => $request->peso_examen
         ]);
 
-        return back()->with('success', 'Pesos evaluativos actualizados correctamente.');
+        return back()->with('success', 'Parámetros del corte evaluativo actualizados correctamente.');
     }
 }
