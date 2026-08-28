@@ -7,6 +7,8 @@ use App\Models\Boletin;
 use App\Models\Matricula;
 use App\Models\Nota;
 use App\Models\AulaAsignaturaDocente;
+use App\Models\CorteEvaluativo;
+use App\Models\AsistenciaAula;
 use App\Services\NotaService;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -59,35 +61,139 @@ class BoletinController extends Controller
     {
         $this->authorize('view', $matricula);
 
-        $matricula->load(['alumno', 'aula.grado', 'aula.modalidad', 'anioEscolar']);
+        $matricula->load([
+            'alumno',
+            'aula.grado',
+            'aula.modalidad',
+            'aula.docenteGuia.usuario',
+            'anioEscolar',
+        ]);
+
+        $anioEscolarId = $matricula->anio_escolar_id;
+
+        // Cortes evaluativos del año (ordenados por número: I, II, III, IV)
+        $cortes = CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)
+            ->orderBy('numero')
+            ->get();
+
+        $corteActual = $request->query('corte_evaluativo_id')
+            ? $cortes->firstWhere('id', $request->query('corte_evaluativo_id'))
+            : $cortes->last();
 
         // Asignaturas de esta aula en el año activo
         $asignaciones = AulaAsignaturaDocente::with('asignatura')
             ->where('aula_id', $matricula->aula_id)
+            ->where('anio_escolar_id', $anioEscolarId)
             ->get();
 
+        // Notas del alumno en el año
         $notas = Nota::with(['aulaAsignaturaDocente.asignatura', 'indicadorLogro'])
             ->where('matricula_id', $matricula->id)
-            ->get();
+            ->whereHas('aulaAsignaturaDocente', fn ($q) => $q->where('anio_escolar_id', $anioEscolarId))
+            ->get()
+            ->groupBy('aula_asignatura_docente_id');
 
-        // Calcular nota y promedio por asignatura
-        $detalle = [];
+        // Mapa de corte numérico -> id
+        $cortePorNumero = $cortes->keyBy('numero');
+
+        // Construir la estructura por áreas (el esquema no tiene "áreas"; agrupamos
+        // todas las asignaturas bajo una sola área institucional).
+        $areas = [];
+        $acumuladoCortes = [1 => [], 2 => [], 3 => [], 4 => []];
+
         foreach ($asignaciones as $asignacion) {
-            $notasAsignatura = $notas->where('aula_asignatura_docente_id', $asignacion->id);
-            $promedio = $notasAsignatura->avg('nota_cuantitativa');
+            $notasAsignatura = $notas->get($asignacion->id, collect());
 
-            $detalle[] = [
-                'asignatura' => $asignacion->asignatura->nombre,
-                'promedio' => is_null($promedio) ? null : round($promedio, 2),
-                'notas' => $notasAsignatura->values(),
+            $cortesData = [1 => null, 2 => null, 3 => null, 4 => null];
+            $finalCuan = null;
+
+            // Mapa id de corte -> número para notas
+            $notaPorCorte = [];
+            foreach ($notasAsignatura as $nota) {
+                $corte = $cortes->firstWhere('id', $nota->corte_evaluativo_id);
+                if (!$corte) continue;
+                $numero = $corte->numero;
+                $notaPorCorte[$numero] = $nota;
+            }
+
+            $notasFinales = [];
+            foreach ([1, 2, 3, 4] as $numero) {
+                $nota = $notaPorCorte[$numero] ?? null;
+                if ($nota && !is_null($nota->nota_cuantitativa)) {
+                    $cuan = (float) $nota->nota_cuantitativa;
+                    $cua = $this->notaService->calcularIndicadorLogro((int) round($cuan));
+
+                    $cortesData[$numero] = ['cua' => $cua, 'cuan' => number_format($cuan, 0)];
+                    $acumuladoCortes[$numero][] = $cuan;
+                    $notasFinales[$numero] = $cuan;
+                }
+            }
+
+            // Nota final: promedio de los cortes con nota (si hay los 4, usar promedio simple)
+            if (count($notasFinales) === 4) {
+                $finalCuan = $this->notaService->calcularNotaFinal(
+                    (int) round($notasFinales[1]),
+                    (int) round($notasFinales[2]),
+                    (int) round($notasFinales[3]),
+                    (int) round($notasFinales[4]),
+                );
+            } elseif (count($notasFinales) > 0) {
+                $finalCuan = (int) round(array_sum($notasFinales) / count($notasFinales));
+            }
+
+            $final = ($finalCuan !== null)
+                ? ['cua' => $this->notaService->calcularIndicadorLogro($finalCuan), 'cuan' => number_format($finalCuan, 0)]
+                : null;
+
+            $areas['ÁREA ACADÉMICA'][] = [
+                'nombre' => $asignacion->asignatura->nombre,
+                'cortes' => $cortesData,
+                'final' => $final,
             ];
         }
 
-        $promediosValidos = array_filter(array_column($detalle, 'promedio'), fn ($p) => !is_null($p));
-        $promedioGeneral = count($promediosValidos) > 0
-            ? $this->notaService->calcularPromedioGeneral($promediosValidos)
-            : 0.00;
+        // Promedios por corte
+        $promedios = [];
+        foreach ([1, 2, 3, 4] as $numero) {
+            $valores = $acumuladoCortes[$numero];
+            if (count($valores) > 0) {
+                $promCuan = round(array_sum($valores) / count($valores), 2);
+                $promedios[$numero] = [
+                    'cua' => $this->notaService->calcularIndicadorLogro((int) round($promCuan)),
+                    'cuan' => number_format($promCuan, 0),
+                ];
+            } else {
+                $promedios[$numero] = null;
+            }
+        }
 
-        return view('academico.boletin.show', compact('matricula', 'detalle', 'promedioGeneral'));
+        // Asistencia por corte (ausencias justificadas/injustificadas por rango de fechas)
+        $asistencia = [];
+        foreach ([1, 2, 3, 4] as $numero) {
+            $corte = $cortePorNumero->get($numero);
+            $query = AsistenciaAula::where('matricula_id', $matricula->id);
+            if ($corte) {
+                $query->whereBetween('fecha', [$corte->fecha_inicio, $corte->fecha_fin]);
+            }
+            $registros = $query->get();
+
+            $injustificadas = $registros->where('estado_asistencia', 'Ausencia Injustificada')->count();
+            $justificadas = $registros->where('estado_asistencia', 'Ausencia Justificada')->count();
+
+            $asistencia[$numero] = [
+                'injustificadas' => $injustificadas,
+                'justificadas' => $justificadas,
+            ];
+        }
+
+        // Compromiso de padres: derivado del expediente (acepta_compromiso_cristiano)
+        $compromiso = [];
+        foreach ([1, 2, 3, 4] as $numero) {
+            $compromiso[$numero] = $matricula->alumno->acepta_compromiso_cristiano ? 'MB' : '—';
+        }
+
+        return view('academico.boletin.show', compact(
+            'matricula', 'areas', 'promedios', 'asistencia', 'compromiso', 'corteActual'
+        ));
     }
 }

@@ -36,7 +36,7 @@
                     </select>
                     
                     <!-- Botón para ir a Calificar (Solo aparece si ya completaron los 100 puntos) -->
-                    @if($corteActivo && $sumaAcumulados == $corteActivo->peso_acumulado && $sumaExamen == $corteActivo->peso_examen)
+                    @if($corteActivo && $sumaAcumulados == $corteActivo->peso_acumulado && $sumaExamen == $cortsoeActivo->pe_examen)
                     <div class="ml-auto">
                         <a href="{{ route('academico.notas.create', ['asignacion' => $asignacion->id, 'corte_evaluativo_id' => $corteSeleccionado]) }}" class="bg-[#e6ac27] hover:bg-[#d69f22] text-[#3d2c1d] font-black py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center gap-2">
                             Ir a Calificar Planilla 
