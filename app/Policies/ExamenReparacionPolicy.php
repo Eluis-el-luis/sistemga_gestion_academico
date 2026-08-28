@@ -45,12 +45,20 @@ class ExamenReparacionPolicy
             return false;
         }
 
-        // Validación de alcance: El docente solo puede editar si él imparte esa clase
+        // Validación de alcance: El docente solo puede editar si es guía del aula de la matrícula
         $docente = $usuario->docente;
         if ($docente) {
-            return $examenReparacion->aulaAsignaturaDocente->docente_id === $docente->id;
+            return $examenReparacion->matricula->aula->docente_guia_id === $docente->id;
         }
 
         return false;
+    }
+
+    /**
+     * Eliminar un examen de reparación.
+     */
+    public function delete(Usuario $usuario, ExamenReparacion $examenReparacion): bool
+    {
+        return $this->update($usuario, $examenReparacion);
     }
 }

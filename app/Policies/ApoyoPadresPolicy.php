@@ -50,4 +50,12 @@ class ApoyoPadresPolicy
         }
         return false;
     }
+
+    /**
+     * Eliminar un registro de apoyo de padres.
+     */
+    public function delete(Usuario $usuario, ApoyoPadres $apoyoPadres): bool
+    {
+        return $this->update($usuario, $apoyoPadres);
+    }
 }
