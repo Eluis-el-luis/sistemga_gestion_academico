@@ -14,6 +14,8 @@ class BloqueHorario extends Model
     protected $fillable = [
         'modalidad_id',
         'turno',
+        'numero_bloque',
+        'tipo_jornada',
         'nombre',
         'hora_inicio',
         'hora_fin',

@@ -17,59 +17,82 @@
             </div>
             
             <div class="p-8">
-                <form action="{{ route('academico.bloques.store') }}" method="POST" class="grid grid-cols-1 md:grid-cols-12 gap-5 items-end">
+                <form action="{{ route('academico.bloques.store') }}" method="POST">
                     @csrf
                     
-                    <div class="md:col-span-3">
-                        <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Modalidad <span class="text-rose-500">*</span></label>
-                        <select name="modalidad_id" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm transition-colors font-medium text-slate-700" required>
-                            <option value="">Seleccione...</option>
-                            @foreach($modalidades as $mod)
-                                <option value="{{ $mod->id }}">{{ $mod->nombre }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="md:col-span-2">
-                        <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Turno <span class="text-rose-500">*</span></label>
-                        <select name="turno" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm transition-colors font-medium text-slate-700" required>
-                            <option value="Matutino">Matutino</option>
-                            <option value="Vespertino">Vespertino</option>
-                        </select>
-                    </div>
-
-                    <div class="md:col-span-2">
-                        <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5" title="Ej: 1ra Hora, Receso, etc.">Nombre <span class="text-rose-500">*</span></label>
-                        <input type="text" name="nombre" placeholder="Ej: 1ra Hora" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm font-bold text-[#3d2c1d] transition-colors" required>
-                    </div>
-
-                    <div class="md:col-span-2">
-                        <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Inicio <span class="text-rose-500">*</span></label>
-                        <input type="time" name="hora_inicio" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm font-black text-[#3d2c1d] transition-colors" required>
-                    </div>
-
-                    <div class="md:col-span-2">
-                        <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Fin <span class="text-rose-500">*</span></label>
-                        <input type="time" name="hora_fin" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm font-black text-[#3d2c1d] transition-colors" required>
-                    </div>
-
-                    <div class="md:col-span-1 flex flex-col justify-end h-full">
-                        <div class="mb-3 flex items-center justify-center">
-                            <label class="inline-flex items-center cursor-pointer" title="Marcar si es un espacio libre/receso">
-                                <input type="hidden" name="es_recreo" value="0">
-                                <input type="checkbox" name="es_recreo" value="1" class="rounded border-slate-300 text-[#e6ac27] shadow-sm focus:ring-[#e6ac27] w-5 h-5">
-                                <span class="ml-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Receso</span>
-                            </label>
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                        
+                        <!-- SECCIÓN 1: Contexto General -->
+                        <div class="md:col-span-4">
+                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Modalidad <span class="text-rose-500">*</span></label>
+                            <select name="modalidad_id" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm transition-colors font-medium text-slate-700" required>
+                                <option value="">Seleccione...</option>
+                                @foreach($modalidades as $mod)
+                                    <option value="{{ $mod->id }}">{{ $mod->nombre }}</option>
+                                @endforeach
+                            </select>
                         </div>
-                        <button type="submit" class="w-full bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black py-2 rounded-xl shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5 text-sm h-[42px] flex items-center justify-center">
+
+                        <div class="md:col-span-4">
+                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Turno <span class="text-rose-500">*</span></label>
+                            <select name="turno" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm transition-colors font-medium text-slate-700" required>
+                                <option value="Matutino">Matutino</option>
+                                <option value="Vespertino">Vespertino</option>
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-4">
+                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Tipo de Jornada <span class="text-rose-500">*</span></label>
+                            <select name="tipo_jornada" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm transition-colors font-medium text-slate-700" required>
+                                <option value="Regular">Regular</option>
+                                <option value="Viernes">Viernes</option>
+                                <option value="Corto 40m">Corto 40m</option>
+                                <option value="Especial 30m">Especial 30m</option>
+                            </select>
+                        </div>
+
+                        <div class="col-span-full border-t border-slate-100 my-2"></div>
+
+                        <!-- SECCIÓN 2: Detalles Específicos del Bloque -->
+                        <div class="md:col-span-2">
+                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5" title="Indica el orden de la clase (Ej: 1 para 1ra Hora)">N° Bloque</label>
+                            <input type="number" name="numero_bloque" placeholder="Ej: 1" min="1" max="20" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm font-bold text-[#3d2c1d] transition-colors">
+                        </div>
+
+                        <div class="md:col-span-4">
+                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Nombre del Bloque <span class="text-rose-500">*</span></label>
+                            <input type="text" name="nombre" placeholder="Ej: 1ra Hora / Receso" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm font-bold text-[#3d2c1d] transition-colors" required>
+                        </div>
+
+                        <div class="md:col-span-3">
+                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Hora Inicio <span class="text-rose-500">*</span></label>
+                            <input type="time" name="hora_inicio" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm font-black text-[#3d2c1d] transition-colors" required>
+                        </div>
+
+                        <div class="md:col-span-3">
+                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Hora Fin <span class="text-rose-500">*</span></label>
+                            <input type="time" name="hora_fin" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm font-black text-[#3d2c1d] transition-colors" required>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 3: Acciones -->
+                    <div class="mt-8 pt-6 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
+                        <label class="inline-flex items-center cursor-pointer bg-amber-50 px-5 py-3 rounded-xl border border-amber-200/60 hover:bg-amber-100 transition-colors shadow-sm w-full md:w-auto">
+                            <input type="hidden" name="es_recreo" value="0">
+                            <input type="checkbox" name="es_recreo" value="1" class="rounded border-amber-300 text-amber-500 shadow-sm focus:ring-amber-500 w-5 h-5">
+                            <span class="ml-3 text-[11px] font-black text-amber-700 uppercase tracking-widest">Marcar como Receso / Libre</span>
+                        </label>
+                        
+                        <button type="submit" class="w-full md:w-auto bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black py-3 px-8 rounded-xl shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5 text-sm flex items-center justify-center gap-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                            Guardar Bloque Oficial
                         </button>
                     </div>
                 </form>
             </div>
         </div>
 
-        <!-- LISTADO DE BLOQUES POR MODALIDAD -->
+        <!-- LISTADO DE BLOQUES POR MODALIDAD Y JORNADA -->
         <div class="pt-4">
             <h3 class="text-xl font-black text-[#3d2c1d] mb-6 flex items-center gap-2">
                 <svg class="w-5 h-5 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
@@ -79,55 +102,62 @@
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 @foreach($modalidades as $modalidad)
                     @foreach(['Matutino', 'Vespertino'] as $turno)
-                        @php 
-                            $bloquesFiltrados = $bloques->where('modalidad_id', $modalidad->id)
-                                                        ->where('turno', $turno)
-                                                        ->sortBy('hora_inicio');
-                        @endphp
-                        
-                        @if($bloquesFiltrados->count() > 0)
-                            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-                                <div class="bg-[#FFFDF5] px-6 py-5 border-b border-[#e6ac27]/20 flex justify-between items-center">
-                                    <h4 class="font-black text-[#3d2c1d] text-base tracking-tight">{{ $modalidad->nombre }}</h4>
-                                    <span class="bg-slate-100 border border-slate-200 text-slate-600 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">{{ $turno }}</span>
-                                </div>
-                                
-                                <div class="p-0">
-                                    <ul class="divide-y divide-slate-100">
-                                        @foreach($bloquesFiltrados as $bloque)
-                                            <li class="flex justify-between items-center px-6 py-4 text-sm {{ $bloque->es_recreo ? 'bg-amber-50/40' : 'hover:bg-slate-50' }} transition-colors group">
-                                                <div class="flex items-center gap-4">
-                                                    @if($bloque->es_recreo)
-                                                        <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        @foreach(['Regular', 'Viernes', 'Corto 40m', 'Especial 30m'] as $jornada)
+                            @php 
+                                $bloquesFiltrados = $bloques->where('modalidad_id', $modalidad->id)
+                                                            ->where('turno', $turno)
+                                                            ->where('tipo_jornada', $jornada);
+                            @endphp
+                            
+                            @if($bloquesFiltrados->count() > 0)
+                                <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                                    <div class="bg-[#FFFDF5] px-6 py-5 border-b border-[#e6ac27]/20 flex justify-between items-start">
+                                        <div>
+                                            <h4 class="font-black text-[#3d2c1d] text-base tracking-tight">{{ $modalidad->nombre }}</h4>
+                                            <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest block mt-1">Jornada: {{ $jornada }}</span>
+                                        </div>
+                                        <span class="bg-slate-100 border border-slate-200 text-slate-600 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">{{ $turno }}</span>
+                                    </div>
+                                    
+                                    <div class="p-0">
+                                        <ul class="divide-y divide-slate-100">
+                                            @foreach($bloquesFiltrados as $bloque)
+                                                <li class="flex justify-between items-center px-6 py-4 text-sm {{ $bloque->es_recreo ? 'bg-amber-50/40' : 'hover:bg-slate-50' }} transition-colors group">
+                                                    <div class="flex items-center gap-4">
+                                                        @if($bloque->es_recreo)
+                                                            <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                            </div>
+                                                        @else
+                                                            <div class="w-8 h-8 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                            </div>
+                                                        @endif
+                                                        
+                                                        <div class="flex flex-col">
+                                                            <span class="font-black text-base {{ $bloque->es_recreo ? 'text-amber-800' : 'text-slate-700' }}">
+                                                                {{ $bloque->numero_bloque ? $bloque->numero_bloque.'° - ' : '' }}{{ $bloque->nombre }}
+                                                            </span>
+                                                            <span class="text-[11px] {{ $bloque->es_recreo ? 'text-amber-600' : 'text-slate-400' }} font-bold uppercase tracking-widest mt-1">
+                                                                {{ \Carbon\Carbon::parse($bloque->hora_inicio)->format('h:i A') }} - {{ \Carbon\Carbon::parse($bloque->hora_fin)->format('h:i A') }}
+                                                            </span>
                                                         </div>
-                                                    @else
-                                                        <div class="w-8 h-8 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
-                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                                        </div>
-                                                    @endif
-                                                    
-                                                    <div class="flex flex-col">
-                                                        <span class="font-black text-base {{ $bloque->es_recreo ? 'text-amber-800' : 'text-slate-700' }}">{{ $bloque->nombre }}</span>
-                                                        <span class="text-[11px] {{ $bloque->es_recreo ? 'text-amber-600' : 'text-slate-400' }} font-bold uppercase tracking-widest mt-1">
-                                                            {{ \Carbon\Carbon::parse($bloque->hora_inicio)->format('h:i A') }} - {{ \Carbon\Carbon::parse($bloque->hora_fin)->format('h:i A') }}
-                                                        </span>
                                                     </div>
-                                                </div>
-                                                
-                                                <form action="{{ route('academico.bloques.destroy', $bloque->id) }}" method="POST" class="alerta-eliminar">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-2 rounded-xl transition-colors opacity-0 group-hover:opacity-100" title="Eliminar Bloque">
-                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                                    </button>
-                                                </form>
-                                            </li>
-                                        @endforeach
-                                    </ul>
+                                                    
+                                                    <form action="{{ route('academico.bloques.destroy', $bloque->id) }}" method="POST" class="alerta-eliminar">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-2 rounded-xl transition-colors opacity-0 group-hover:opacity-100" title="Eliminar Bloque">
+                                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
                                 </div>
-                            </div>
-                        @endif
+                            @endif
+                        @endforeach
                     @endforeach
                 @endforeach
             </div>
@@ -138,7 +168,6 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            // Toast de Éxito Premium
             @if(session('success'))
                 Swal.mixin({
                     toast: true, position: 'top', showConfirmButton: false, timer: 3500, timerProgressBar: true,
@@ -146,7 +175,6 @@
                 }).fire({ icon: 'success', title: '{{ session("success") }}' });
             @endif
 
-            // Alerta de Error / Advertencia
             @if(session('error'))
                 Swal.fire({
                     title: 'Atención',
@@ -157,7 +185,6 @@
                 });
             @endif
 
-            // Alerta de confirmación para eliminar
             document.querySelectorAll('.alerta-eliminar').forEach(formulario => {
                 formulario.addEventListener('submit', function (e) {
                     e.preventDefault();
