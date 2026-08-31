@@ -16,8 +16,12 @@ class MallaCurricularController extends Controller
     {
         $this->authorize('malla.gestionar');
 
-        // Traemos los grados con sus materias
-        $grados = Grado::with(['mallaCurricular.asignatura', 'modalidad'])->get();
+        // Ordenamiento estricto por modalidad e ID para que los bloques nunca cambien de lugar
+        $grados = Grado::with(['mallaCurricular.asignatura', 'modalidad'])
+                    ->orderBy('modalidad_id', 'asc')
+                    ->orderBy('id', 'asc')
+                    ->get();
+                    
         $asignaturas = Asignatura::all();
 
         return view('academico.malla.index', compact('grados', 'asignaturas'));

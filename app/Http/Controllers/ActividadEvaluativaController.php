@@ -14,12 +14,15 @@ class ActividadEvaluativaController extends Controller
 
     public function index(Request $request, AulaAsignaturaDocente $asignacion)
     {
-        // Reutilizamos la misma política de notas para saber si es su clase
         $this->authorize('calificar', $asignacion);
 
-        $asignacion->load('aula.grado', 'asignatura');
+        // Cargamos la asignatura, el aula, y vitalmente: el docente y su usuario
+        $asignacion->load('aula.grado', 'asignatura', 'docente.usuario');
 
-        // Traer cortes evaluativos del año activo
+        // Determinamos si quien entra es un supervisor (Solo Lectura) o el docente (Escritura)
+        $usuario = auth()->user();
+        $modoSupervision = $usuario->hasRole(['Subdirector', 'Director', 'Coordinador', 'Gestor de Usuarios']);
+
         $cortes = CorteEvaluativo::whereHas('anioEscolar', function($q) {
             $q->where('activo', true);
         })->orderBy('numero')->get();
@@ -27,18 +30,16 @@ class ActividadEvaluativaController extends Controller
         $corteSeleccionado = $request->query('corte_id', $cortes->first()->id ?? null);
         $corteActivo = $cortes->where('id', $corteSeleccionado)->first();
 
-        // Traer las actividades creadas por el docente para esta materia y corte
         $actividades = ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
             ->where('corte_evaluativo_id', $corteSeleccionado)
             ->get();
 
-        // Sumatorias actuales para las barras de progreso
         $sumaAcumulados = $actividades->where('tipo', 'acumulado')->sum('puntaje_maximo');
         $sumaExamen = $actividades->where('tipo', 'examen')->sum('puntaje_maximo');
 
         return view('academico.notas.actividades', compact(
             'asignacion', 'cortes', 'corteSeleccionado', 'corteActivo', 
-            'actividades', 'sumaAcumulados', 'sumaExamen'
+            'actividades', 'sumaAcumulados', 'sumaExamen', 'modoSupervision'
         ));
     }
 
@@ -47,23 +48,19 @@ class ActividadEvaluativaController extends Controller
         $this->authorize('calificar', $asignacion);
 
         $request->validate([
-            // 1. CORRECCIÓN A SINGULAR:
             'corte_evaluativo_id' => 'required|exists:corte_evaluativo,id',
             'nombre' => 'required|string|max:100',
             'tipo' => 'required|in:acumulado,examen', 
-            
             'puntaje_maximo' => 'required|integer|min:1|max:100'
         ]);
 
         $corte = CorteEvaluativo::findOrFail($request->corte_evaluativo_id);
 
-        // 3. Usa también la misma palabra exacta en esta consulta:
         $sumaActual = ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
             ->where('corte_evaluativo_id', $corte->id)
             ->where('tipo', $request->tipo)
             ->sum('puntaje_maximo');
 
-        // 4. Mismo ajuste aquí:
         $limite = $request->tipo === 'acumulado' ? $corte->peso_acumulado : $corte->peso_examen;
 
         if (($sumaActual + $request->puntaje_maximo) > $limite) {
@@ -84,9 +81,10 @@ class ActividadEvaluativaController extends Controller
     public function destroy(AulaAsignaturaDocente $asignacion, ActividadEvaluativa $actividad)
     {
         $this->authorize('calificar', $asignacion);
-        // Eliminar explícitamente las calificaciones asociadas (no hay FK cascade en migración)
+        
         \App\Models\CalificacionActividad::where('actividad_evaluativa_id', $actividad->id)->delete();
         $actividad->delete();
+        
         return back()->with('success', 'Actividad eliminada.');
     }
 }
