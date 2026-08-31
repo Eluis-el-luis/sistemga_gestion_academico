@@ -38,11 +38,12 @@
                         @endforeach
                     </select>
                     
-                    @if($corteActivo && $sumaAcumulados == $corteActivo->peso_acumulado && $sumaExamen == $corteActivo->peso_examen)
-                    <div class="ml-auto w-full md:w-auto mt-4 md:mt-0">
-                        <a href="{{ route('academico.notas.create', ['asignacion' => $asignacion->id, 'corte_evaluativo_id' => $corteSeleccionado]) }}" class="bg-[#3d2c1d] hover:bg-stone-800 text-white font-black py-3 px-6 rounded-xl shadow-md transition-transform transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
-                            {{ $modoSupervision ? 'Auditar Planilla de Notas' : 'Ir a Calificar Planilla' }}
-                            <svg class="w-5 h-5 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
+                    <!-- Botón para ir a Calificar (Solo aparece si ya completaron los 100 puntos) -->
+                    @if($corteActivo && $sumaAcumulados == $corteActivo->peso_acumulado && $sumaExamen == $cortsoeActivo->pe_examen)
+                    <div class="ml-auto">
+                        <a href="{{ route('academico.notas.create', ['asignacion' => $asignacion->id, 'corte_evaluativo_id' => $corteSeleccionado]) }}" class="bg-[#e6ac27] hover:bg-[#d69f22] text-[#3d2c1d] font-black py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center gap-2">
+                            Ir a Calificar Planilla 
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
                         </a>
                     </div>
                     @endif

@@ -104,6 +104,25 @@ Route::middleware('auth')->group(function () {
         Route::get('asistencia/asignatura/{asignacion}', [\App\Http\Controllers\AsistenciaAsignaturaController::class, 'create'])->name('asistencia.asignatura.create');
         Route::post('asistencia/asignatura/{asignacion}', [\App\Http\Controllers\AsistenciaAsignaturaController::class, 'store'])->name('asistencia.asignatura.store');
         Route::delete('asistencia/asignatura/{asignacion}/incidencia/{incidencia}', [\App\Http\Controllers\AsistenciaAsignaturaController::class, 'destroy'])->name('asistencia.asignatura.destroy');
+
+        // Fase 7: Boletines
+        Route::get('boletines', [\App\Http\Controllers\BoletinController::class, 'index'])->name('boletines.index');
+        Route::get('boletines/{matricula}', [\App\Http\Controllers\BoletinController::class, 'show'])->name('boletines.show');
+
+        // Fase 7: Examen de Reparación
+        Route::get('reparacion', [\App\Http\Controllers\ExamenReparacionController::class, 'index'])->name('reparacion.index');
+        Route::post('reparacion', [\App\Http\Controllers\ExamenReparacionController::class, 'store'])->name('reparacion.store');
+        Route::delete('reparacion/{examen}', [\App\Http\Controllers\ExamenReparacionController::class, 'destroy'])->name('reparacion.destroy');
+
+        // Fase 7: Avance de Contenidos
+        Route::get('avance-contenido', [\App\Http\Controllers\AvanceContenidoController::class, 'index'])->name('avance.index');
+        Route::post('avance-contenido', [\App\Http\Controllers\AvanceContenidoController::class, 'store'])->name('avance.store');
+        Route::delete('avance-contenido/{avance}', [\App\Http\Controllers\AvanceContenidoController::class, 'destroy'])->name('avance.destroy');
+
+        // Fase 7: Apoyo de Padres
+        Route::get('apoyo-padres', [\App\Http\Controllers\ApoyoPadresController::class, 'index'])->name('apoyo-padres.index');
+        Route::post('apoyo-padres', [\App\Http\Controllers\ApoyoPadresController::class, 'store'])->name('apoyo-padres.store');
+        Route::delete('apoyo-padres/{apoyo}', [\App\Http\Controllers\ApoyoPadresController::class, 'destroy'])->name('apoyo-padres.destroy');
     });
 });
 
