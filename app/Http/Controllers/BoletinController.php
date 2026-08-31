@@ -96,8 +96,7 @@ class BoletinController extends Controller
         // Mapa de corte numérico -> id
         $cortePorNumero = $cortes->keyBy('numero');
 
-        // Construir la estructura por áreas (el esquema no tiene "áreas"; agrupamos
-        // todas las asignaturas bajo una sola área institucional).
+        // Construir la estructura por áreas reales (campo 'area' de la asignatura).
         $areas = [];
         $acumuladoCortes = [1 => [], 2 => [], 3 => [], 4 => []];
 
@@ -145,7 +144,9 @@ class BoletinController extends Controller
                 ? ['cua' => $this->notaService->calcularIndicadorLogro($finalCuan), 'cuan' => number_format($finalCuan, 0)]
                 : null;
 
-            $areas['ÁREA ACADÉMICA'][] = [
+            $area = $asignacion->asignatura->area ?? 'Otras Áreas';
+
+            $areas[$area][] = [
                 'nombre' => $asignacion->asignatura->nombre,
                 'cortes' => $cortesData,
                 'final' => $final,
