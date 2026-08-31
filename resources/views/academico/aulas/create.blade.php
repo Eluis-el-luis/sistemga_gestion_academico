@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center space-x-3">
-            <a href="{{ url()->previous() }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors" title="Volver atrás">
+            <a href="{{ route('dashboard') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors" title="Volver atrás">
                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </a>
             <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight tracking-tight">
@@ -27,7 +27,6 @@
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             
-                            <!-- Año Escolar -->
                             <div>
                                 <label class="block text-sm font-bold text-slate-700 mb-1.5">Año Escolar <span class="text-red-500">*</span></label>
                                 <select name="anio_escolar_id" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] transition-colors" required autofocus>
@@ -40,13 +39,11 @@
                                 </select>
                             </div>
 
-                            <!-- Cupo -->
                             <div>
                                 <label class="block text-sm font-bold text-slate-700 mb-1.5">Cupo Máximo <span class="text-red-500">*</span></label>
                                 <input type="number" name="cupo" value="{{ old('cupo', 35) }}" min="1" max="50" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] transition-colors" required>
                             </div>
 
-                            <!-- Modalidad (Cascada) -->
                             <div>
                                 <label class="block text-sm font-bold text-slate-700 mb-1.5">Modalidad <span class="text-red-500">*</span></label>
                                 <select name="modalidad_id" id="filtro_modalidad" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] transition-colors" required>
@@ -57,7 +54,6 @@
                                 </select>
                             </div>
 
-                            <!-- Grado (Cascada) -->
                             <div>
                                 <label class="block text-sm font-bold text-slate-700 mb-1.5">Grado <span class="text-red-500">*</span></label>
                                 <select name="grado_id" id="filtro_grado" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] transition-colors" required>
@@ -68,13 +64,11 @@
                                 </select>
                             </div>
 
-                            <!-- Nombre/Sección (Valor A por defecto) -->
                             <div>
                                 <label class="block text-sm font-bold text-slate-700 mb-1.5">Sección / Nombre <span class="text-red-500">*</span></label>
                                 <input type="text" name="nombre" value="{{ old('nombre', 'A') }}" placeholder="Ej: A, B, Única..." class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] uppercase transition-colors font-bold text-[#3d2c1d]" required>
                             </div>
 
-                            <!-- Turno (Matutino por defecto) -->
                             <div>
                                 <label class="block text-sm font-bold text-slate-700 mb-1.5">Turno <span class="text-red-500">*</span></label>
                                 <select name="turno" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] transition-colors font-bold text-[#3d2c1d]" required>
@@ -83,7 +77,6 @@
                                 </select>
                             </div>
 
-                            <!-- Docente Guía -->
                             <div class="md:col-span-2">
                                 <label class="block text-sm font-bold text-slate-700 mb-1.5">Docente Guía Titular <span class="text-red-500">*</span></label>
                                 <select name="docente_guia_id" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] transition-colors" required>
@@ -97,7 +90,6 @@
                             </div>
                         </div>
 
-                        <!-- Info sobre automatización -->
                         <div class="mt-8 p-5 bg-blue-50/50 border border-blue-200/60 rounded-2xl flex gap-4 items-start shadow-sm">
                             <div class="text-blue-500 mt-0.5">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -108,9 +100,8 @@
                             </div>
                         </div>
 
-                        <!-- BOTONES DE ACCIÓN (Jerarquía UX) -->
                         <div class="flex items-center justify-end gap-6 mt-8 pt-6 border-t border-slate-100">
-                            <a href="{{ url()->previous() }}" class="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">
+                            <a href="{{ route('dashboard') }}" class="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">
                                 Cancelar
                             </a>
                             <button type="submit" class="px-8 py-3.5 bg-[#e6ac27] text-white rounded-xl hover:bg-[#c48e1b] font-black text-sm shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#e6ac27] focus:ring-offset-2">
@@ -123,7 +114,6 @@
         </div>
     </div>
 
-    <!-- Script de Cascada -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const modSelect = document.getElementById('filtro_modalidad');

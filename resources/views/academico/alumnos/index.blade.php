@@ -1,22 +1,15 @@
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div class="flex items-center gap-4">
-                <!-- Flecha de regreso -->
-                <a href="{{ route('dashboard') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors mr-2" title="Volver al Panel">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                </a>
-                
-                <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">
-                    Directorio de Estudiantes
-                </h2>
-            </div>
-            
-            <!-- Botón de Acción Principal -->
-            <a href="{{ route('academico.alumnos.create') }}" class="bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black py-2.5 px-6 rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 flex items-center gap-2 text-sm">
-                <span>+</span> Registrar Estudiante
+        <div class="flex items-center gap-4">
+            <!-- Flecha de regreso apuntando al Dashboard -->
+            <a href="{{ route('dashboard') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors mr-2" title="Volver al Panel Principal">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </a>
+            
+            <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">
+                Directorio de Estudiantes 
+            </h2>
         </div>
     </x-slot>
 
@@ -31,7 +24,7 @@
                 </div>
             @endif
 
-            <!-- PANEL DE FILTROS AVANZADOS (Estilo Premium) -->
+            <!-- PANEL DE FILTROS AVANZADOS -->
             <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
                 <form method="GET" action="{{ route('academico.alumnos.index') }}" class="space-y-6">
                     
@@ -281,7 +274,7 @@
                         cancelButtonColor: '#64748b', 
                         confirmButtonText: 'Sí, eliminar',
                         cancelButtonText: 'Cancelar',
-                        customClass: { popup: 'rounded-3xl border border-slate-200' }
+                        customClass: { popup: 'rounded-3xl border border-slate-200 shadow-xl' }
                     }).then((result) => {
                         if (result.isConfirmed) {
                             this.submit(); 

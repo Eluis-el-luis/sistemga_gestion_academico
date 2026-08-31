@@ -37,9 +37,12 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+
+    Route::post('/asistencia-personal/marcar', [\App\Http\Controllers\AsistenciaPersonalController::class, 'marcarLlegada'])->name('asistencia.personal.marcar');
     
     Route::prefix('academico')->name('academico.')->group(function () {
         
+        Route::get('asistencia/personal', [\App\Http\Controllers\AsistenciaPersonalController::class, 'index'])->name('asistencia.personal.index');
         Route::resource('alumnos', AlumnoController::class);
         Route::resource('matriculas', MatriculaController::class);
         Route::patch('matriculas/{matricula}/retirar', [MatriculaController::class, 'retirar'])->name('matriculas.retirar');

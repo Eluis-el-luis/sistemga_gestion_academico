@@ -17,40 +17,74 @@ class NotaController extends Controller
 
     protected $notaService;
 
-    // Inyectamos el servicio matemático en el constructor
     public function __construct(NotaService $notaService)
     {
         $this->notaService = $notaService;
     }
 
-    /**
-     * Recibe la sábana de notas, calcula los indicadores y guarda todo en lote.
-     */
+    public function index(Request $request)
+    {
+        $usuario = auth()->user();
+        
+        if ($usuario->hasRole(['Subdirector', 'Director', 'Coordinador', 'Gestor de Usuarios'])) {
+            $modoSupervision = true;
+            
+            // 1. Grados ordenados jerárquicamente por modalidad e ID
+            $grados = \App\Models\Grado::with('modalidad')
+                        ->orderBy('modalidad_id', 'asc')
+                        ->orderBy('id', 'asc')
+                        ->get();
+                        
+            $aulas = \App\Models\Aula::with('grado')->get();
+            
+            // 2. Lógica de Pre-selección: Si no hay request, tomamos el primer grado
+            $gradoSeleccionadoId = $request->filled('grado_id') ? $request->grado_id : ($grados->first()->id ?? null);
+            
+            // 3. Pre-selección de Aula: Si no hay request, tomamos la primera aula (Sección A) del grado seleccionado
+            $aulaSeleccionadaId = $request->filled('aula_id') 
+                ? $request->aula_id 
+                : ($aulas->where('grado_id', $gradoSeleccionadoId)->first()->id ?? null);
+            
+            // 4. Consulta final
+            $asignaciones = collect();
+            if ($aulaSeleccionadaId) {
+                $asignaciones = \App\Models\AulaAsignaturaDocente::with(['aula.grado', 'asignatura', 'docente.usuario'])
+                    ->where('aula_id', $aulaSeleccionadaId)
+                    ->get();
+            }
+        } 
+        else {
+            $modoSupervision = false;
+            $grados = collect();
+            $aulas = collect();
+            $gradoSeleccionadoId = null;
+            $aulaSeleccionadaId = null;
+            
+            $docente = \App\Models\Docente::where('usuario_id', $usuario->id)->first();
+            $asignaciones = $docente 
+                ? \App\Models\AulaAsignaturaDocente::with(['aula.grado', 'asignatura'])->where('docente_id', $docente->id)->get() 
+                : collect();
+        }
+
+        return view('academico.notas.index', compact('asignaciones', 'modoSupervision', 'grados', 'aulas', 'gradoSeleccionadoId', 'aulaSeleccionadaId'));
+    }
+
     public function store(StoreNotaRequest $request)
     {
         $datos = $request->validated();
-
-    
         $aulaAsignatura = AulaAsignaturaDocente::findOrFail($datos['aula_asignatura_docente_id']);
         $this->authorize('calificar', $aulaAsignatura);
 
-    
         DB::transaction(function () use ($datos) {
-            
             foreach ($datos['notas'] as $item) {
-                
                 $notaCuantitativa = $item['nota_cuantitativa'] ?? null;
-                
-                // A. Llamamos al Cerebro para saber la letra (AA, AS, AF, AI)
                 $codigoIndicador = $this->notaService->calcularIndicadorLogro($notaCuantitativa);
                 
-                // B. Buscamos el ID de esa letra en la base de datos
                 $indicadorId = null;
                 if ($codigoIndicador) {
                     $indicadorId = IndicadorLogro::where('codigo', $codigoIndicador)->value('id');
                 }
 
-            
                 Nota::updateOrCreate(
                     [
                         'matricula_id' => $item['matricula_id'],
@@ -65,55 +99,20 @@ class NotaController extends Controller
             }
         });
 
-        // Retornamos a la vista con el mensaje de éxito
         return back()->with('success', 'Planilla de calificaciones procesada y guardada exitosamente.');
     }
 
-    /**
-     * Pantalla principal del docente: Muestra sus materias asignadas para elegir cuál calificar.
-     */
-    public function index()
-    {
-        // Buscamos al docente asociado al usuario logueado
-        $usuario = auth()->user();
-        
-        if ($usuario->hasRole(['Subdirector', 'Director', 'Coordinador'])) {
-            // Traemos todas las aulas con sus asignaturas para supervisar
-            $asignaciones = \App\Models\AulaAsignaturaDocente::with(['aula.grado', 'asignatura', 'docente'])
-                ->get();
-            $modoSupervision = true;
-        } 
-        // MODO OPERATIVO: Docente
-        else {
-            $docente = \App\Models\Docente::where('usuario_id', $usuario->id)->first();
-            $asignaciones = $docente 
-                ? \App\Models\AulaAsignaturaDocente::with(['aula.grado', 'asignatura'])->where('docente_id', $docente->id)->get() 
-                : collect();
-            $modoSupervision = false;
-        }
-
-        return view('academico.notas.index', compact('asignaciones', 'modoSupervision'));
-    }
-
-    /**
-     * Muestra la planilla de calificaciones para un aula y materia específica.
-     */
     public function create(Request $request, AulaAsignaturaDocente $asignacion)
     {
-        // 1. Autorización: ¿Es el profe asignado a esta materia o es el Director?
         $this->authorize('calificar', $asignacion);
 
-        // 2. Traemos los cortes evaluativos del Año Escolar Activo
         $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', function($q) {
             $q->where('activo', true);
         })->get();
 
-        // Si el profesor cambia el select, agarramos ese ID. Si no, usamos el primer corte por defecto.
         $corteSeleccionado = $request->query('corte_evaluativo_id', $cortes->first()->id ?? null);
 
-        // 3. Cargamos a los estudiantes MATRICULADOS Y ACTIVOS en esta aula
         $matriculas = \App\Models\Matricula::with(['alumno', 'notas' => function($query) use ($asignacion, $corteSeleccionado) {
-            // Solo traemos las notas de ESTA materia y ESTE corte evaluativo
             $query->where('aula_asignatura_docente_id', $asignacion->id)
                   ->where('corte_evaluativo_id', $corteSeleccionado);
         }, 'notas.indicadorLogro'])
@@ -121,10 +120,9 @@ class NotaController extends Controller
         ->where('estado', 'activo')
         ->get()
         ->sortBy(function($matricula) {
-            return $matricula->alumno->nombre_completo; // Ordenamos alfabéticamente
+            return $matricula->alumno->nombre_completo;
         });
 
-        // Cargamos relaciones extra para la cabecera de la vista
         $asignacion->load('aula.grado', 'asignatura');
 
         return view('academico.notas.planilla', compact('asignacion', 'cortes', 'corteSeleccionado', 'matriculas'));
