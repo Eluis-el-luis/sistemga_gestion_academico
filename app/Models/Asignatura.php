@@ -7,5 +7,5 @@ class Asignatura extends Model
 {
     use HasFactory;
     protected $table = 'asignatura'; 
-    protected $fillable = ['nombre', 'es_extracurricular'];
+    protected $fillable = ['nombre', 'area', 'es_extracurricular'];
 }

@@ -8,4 +8,9 @@ class ApoyoPadres extends Model
 {
     protected $table = 'apoyo_padres';
     protected $fillable = ['aula_id', 'mes', 'cantidad_apoyan', 'total_padres'];
+
+    public function aula()
+    {
+        return $this->belongsTo(Aula::class, 'aula_id');
+    }
 }
