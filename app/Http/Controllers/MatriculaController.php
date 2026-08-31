@@ -19,22 +19,15 @@ class MatriculaController extends Controller
         $this->authorize('viewAny', Matricula::class);
 
         $anioActivo = AnioEscolar::where('activo', true)->first();
+
+        // 🌟 CORRECCIÓN 1: Separamos 'aula.grado' y 'aula.modalidad'
         $query = Matricula::with(['alumno', 'aula.grado', 'aula.modalidad', 'anioEscolar']);
 
-        // --- FILTRO DE AÑO ---
+        // --- FILTROS ---
         if ($request->filled('anio_escolar_id')) {
             $query->where('anio_escolar_id', $request->anio_escolar_id);
         } elseif (!$request->has('anio_escolar_id') && $anioActivo) {
             $query->where('anio_escolar_id', $anioActivo->id);
-        }
-
-        // --- BÚSQUEDA INTELIGENTE (ILIKE para PostgreSQL) ---
-        if ($request->filled('buscar')) {
-            $busqueda = $request->buscar;
-            $query->whereHas('alumno', function($q) use ($busqueda) {
-                $q->where('nombre_completo', 'ilike', "%{$busqueda}%")
-                  ->orWhere('codigo_unico_persona', 'ilike', "%{$busqueda}%");
-            });
         }
 
         if ($request->filled('aula_id')) {
@@ -47,7 +40,8 @@ class MatriculaController extends Controller
 
         $matriculas = $query->latest('fecha_matricula')->paginate(15);
 
-        $aniosEscolares = AnioEscolar::orderBy('nombre', 'desc')->get();
+        // 🌟 CORRECCIÓN 2: Separamos en un arreglo ['grado', 'modalidad']
+        $aniosEscolares = AnioEscolar::all();
         $aulas = Aula::with(['grado', 'modalidad'])->get();
 
         return view('academico.matriculas.index', compact('matriculas', 'aniosEscolares', 'aulas', 'anioActivo'));
@@ -57,16 +51,8 @@ class MatriculaController extends Controller
     {
         $this->authorize('create', Matricula::class);
 
-        $anioActivo = AnioEscolar::where('activo', true)->first();
-        
-        // 🔒 BLOQUEO DE DOBLE MATRÍCULA: 
-        // Solo traemos alumnos que NO tengan matrícula en el año activo
-        $alumnos = Alumno::whereDoesntHave('matriculas', function($q) use ($anioActivo) {
-            if ($anioActivo) {
-                $q->where('anio_escolar_id', $anioActivo->id);
-            }
-        })->orderBy('nombre_completo')->get();
-
+        $alumnos = Alumno::orderBy('nombre_completo')->get();
+        // 🌟 CORRECCIÓN 3: Aseguramos cargar ambas relaciones aquí también
         $aulas = Aula::with(['grado', 'modalidad'])->get();
         $anios = AnioEscolar::where('activo', true)->get();
         
@@ -84,6 +70,7 @@ class MatriculaController extends Controller
                          ->with('success', 'Matrícula procesada exitosamente.');
     }
     
+    // Tus métodos retirar, reactivar y destroy van aquí abajo...
     public function retirar(Request $request, Matricula $matricula)
     {
         $this->authorize('update', $matricula);

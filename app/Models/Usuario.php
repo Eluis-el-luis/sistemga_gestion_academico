@@ -37,9 +37,4 @@ class Usuario extends Authenticatable implements MustVerifyEmail
         return $this->hasOne(Alumno::class, 'usuario_id');
     }
 
-    public function asistencias()
-    {
-        return $this->hasMany(AsistenciaPersonal::class, 'usuario_id');
-    }
-
 }

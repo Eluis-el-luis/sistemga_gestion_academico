@@ -16,8 +16,8 @@
     </head>
     
     @php
-        // Validación estricta: Solo Director y Subdirector activan el menú lateral
-        $mostrarSidebar = auth()->check() && auth()->user()->hasAnyRole(['Director', 'Subdirector']);
+        // Validamos si el usuario tiene permiso para ver el menú lateral
+        $mostrarSidebar = auth()->check() && auth()->user()->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Coordinador']);
     @endphp
 
     <body class="font-sans antialiased text-[#3d2c1d] bg-slate-50" 
@@ -29,7 +29,7 @@
           @resize.window="if(window.innerWidth < 1024) sidebarOpen = false" 
           @scroll.window="showTopBtnGlobal = (window.pageYOffset > 150)">
         
-        <!-- SIDEBAR (Exclusivo para Directora y Subdirectora) -->
+        <!-- SIDEBAR (Solo visible para administradores y coordinadores) -->
         @if($mostrarSidebar)
             @include('layouts.navigation')
         @endif
@@ -38,18 +38,18 @@
         <div class="flex flex-col min-h-screen transition-all duration-300 {{ !$mostrarSidebar ? 'w-full' : '' }}" 
              @if($mostrarSidebar) :class="sidebarOpen ? 'lg:pl-64' : 'lg:pl-20'" @endif>
             
-            <!-- TOPBAR GLOBAL -->
+            <!-- TOPBAR GLOBAL (Logo, Menú Hamburguesa y Perfil) -->
             <nav class="sticky top-0 z-30 bg-white border-b border-slate-200/60 shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 transition-all">
                 
                 <div class="flex items-center gap-4 lg:gap-6">
-                    <!-- Botón Hamburguesa solo si tiene sidebar -->
+                    <!-- Botón Hamburguesa -->
                     @if($mostrarSidebar)
                         <button @click="sidebarOpen = !sidebarOpen" class="text-slate-500 hover:text-[#e6ac27] bg-slate-50 hover:bg-amber-50 p-2 rounded-lg transition-colors focus:outline-none">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                         </button>
                     @endif
 
-                    <!-- LOGO INSTITUCIONAL -->
+                    <!-- LOGO INSTITUCIONAL (Siempre visible, libre y sin círculo) -->
                     <a href="{{ route('dashboard') }}" class="flex items-center gap-3 group">
                         <x-application-logo class="block h-10 w-auto object-contain shrink-0 group-hover:scale-105 transition-transform drop-shadow-sm" />
                         <span class="font-black text-[#3d2c1d] text-xl tracking-tight group-hover:text-[#e6ac27] transition-colors hidden sm:block">
@@ -58,7 +58,7 @@
                     </a>
                 </div>
 
-                <!-- Menú de Usuario -->
+                <!-- Menú de Usuario a la derecha -->
                 <div class="flex items-center">
                     <x-dropdown align="right" width="48">
                         <x-slot name="trigger">
