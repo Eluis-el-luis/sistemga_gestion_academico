@@ -32,7 +32,7 @@ class DashboardController extends Controller
         // 3. CARGA DE DATOS PARA DIRECTIVA Y GESTIÓN
         if ($user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
             $totalAlumnos = \App\Models\Alumno::count();
-            $totalDocentes = \App\Models\Usuario::role(['Docente Guía', 'Docente por Asignatura'])->count(); 
+            $totalDocentes = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count(); 
             
             // --- PRIMERA CONSULTA 100% REAL (Mejorada con Eloquent) ---
             try {

@@ -163,7 +163,7 @@
             <!-- BARRA DE PESTAÑAS DINÁMICA -->
             <div class="flex space-x-2 border-b border-slate-200 overflow-x-auto pb-px">
                 @php
-                    $rolesPermitidos = ['Director', 'Subdirector', 'Gestor de Usuarios', 'Coordinador', 'Secretaria', 'Docente Guía', 'Docente por Asignatura'];
+                    $rolesPermitidos = ['Director', 'Subdirector', 'Gestor de Usuarios', 'Coordinador', 'Secretaria', 'Docente Guia', 'Docente por Asignatura'];
                     $rolesDashboard = auth()->user()->roles->filter(fn($rol) => in_array($rol->name, $rolesPermitidos));
                 @endphp
                 
@@ -202,8 +202,8 @@
                     </div>
                 @endhasanyrole
 
-                @hasanyrole('Docente Guía')
-                    <div x-show="rolActivo === 'Docente Guía'" x-transition.opacity style="display: none;" class="space-y-4">
+                @hasanyrole('Docente Guia')
+                    <div x-show="rolActivo === 'Docente Guia'" x-transition.opacity style="display: none;" class="space-y-4">
                         @include('components.dashboard.docente-guia')
                     </div>
                 @endhasanyrole
