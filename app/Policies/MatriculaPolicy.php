@@ -53,6 +53,28 @@ class MatriculaPolicy
     }
 
     /**
+     * Ver una matrícula (incluye boletín del alumno).
+     */
+    public function view(Usuario $usuario, Matricula $matricula): bool
+    {
+        if ($usuario->hasPermissionTo('boletines.ver') || $usuario->hasPermissionTo('boletines.gestionar')) {
+            return true;
+        }
+
+        $docente = $usuario->docente;
+        if ($docente) {
+            // Coordinador: solo su modalidad
+            if ($docente->es_coordinador) {
+                return $docente->modalidad_coordina_id === $matricula->aula->modalidad_id;
+            }
+            // Docente guía: solo su aula
+            return $matricula->aula->docente_guia_id === $docente->id;
+        }
+
+        return false;
+    }
+
+    /**
      * Eliminar matrícula (soft delete).
      */
     public function delete(Usuario $usuario, Matricula $matricula): bool

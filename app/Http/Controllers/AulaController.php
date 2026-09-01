@@ -14,15 +14,11 @@ class AulaController extends Controller
 
     protected $aulaService;
 
-    // Inyectamos el servicio en el constructor
     public function __construct(AulaService $aulaService)
     {
         $this->aulaService = $aulaService;
     }
 
-    /**
-     * Helper privado para no repetir la consulta a la BD
-     */
     private function getAulasPaginadas()
     {
         return Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
@@ -31,21 +27,15 @@ class AulaController extends Controller
                      ->paginate(15);
     }
 
-    /**
-     * 1. ACCESO: Gestión de Aulas
-     */
     public function index()
     {
         $this->authorize('viewAny', Aula::class);
         $aulas = $this->getAulasPaginadas();
-        $contexto = 'gestion'; // Le decimos a la vista de dónde venimos
+        $contexto = 'gestion'; 
 
         return view('academico.aulas.index', compact('aulas', 'contexto'));
     }
 
-    /**
-     * 2. ACCESO: Asignación de Maestros
-     */
     public function indexAsignaciones()
     {
         $this->authorize('viewAny', Aula::class);
@@ -55,12 +45,8 @@ class AulaController extends Controller
         return view('academico.aulas.index', compact('aulas', 'contexto'));
     }
 
-    /**
-     * 3. ACCESO: Gestor de Horarios
-     */
     public function indexHorarios()
     {
-        // Nota: Asumo que si pueden ver aulas, pueden ver esta vista.
         $this->authorize('viewAny', Aula::class); 
         $aulas = $this->getAulasPaginadas();
         $contexto = 'horarios'; 
@@ -68,9 +54,6 @@ class AulaController extends Controller
         return view('academico.aulas.index', compact('aulas', 'contexto'));
     }
 
-    /**
-     * Muestra el formulario para crear una nueva aula.
-     */
     public function create()
     {
         $this->authorize('create', Aula::class);
@@ -94,8 +77,20 @@ class AulaController extends Controller
     public function store(StoreAulaRequest $request)
     {
         $this->authorize('create', Aula::class);
+        $datos = $request->validated();
 
-        $this->aulaService->crearAulaConMalla($request->validated());
+        // 🔒 FILTRO ANTI-DUPLICADOS (REGLA DE NEGOCIO ESTRICTA)
+        $existeDuplicado = Aula::where('anio_escolar_id', $datos['anio_escolar_id'])
+            ->where('grado_id', $datos['grado_id'])
+            ->where('nombre', $datos['nombre']) // Identificador de la sección (A, B, etc.)
+            ->where('turno', $datos['turno'])
+            ->exists();
+
+        if ($existeDuplicado) {
+            return back()->withInput()->with('error', '¡Bloqueo de seguridad! Ya existe un aula aperturada con esa misma combinación de Año Escolar, Grado, Sección y Turno.');
+        }
+
+        $this->aulaService->crearAulaConMalla($datos);
 
         return redirect()->route('academico.aulas.index')
                          ->with('success', 'Aula creada exitosamente. Las asignaturas de la malla curricular han sido asignadas automáticamente.');
@@ -107,7 +102,8 @@ class AulaController extends Controller
 
         $modalidades = \App\Models\Modalidad::all();
         $grados = \App\Models\Grado::all();
-        $anios = \App\Models\AnioEscolar::all();
+        // Tomamos el año escolar activo por defecto
+        $anios = \App\Models\AnioEscolar::where('activo', true)->get();
         
         $docentesOcupados = Aula::where('anio_escolar_id', $aula->anio_escolar_id)
                                 ->where('id', '!=', $aula->id)
@@ -125,26 +121,19 @@ class AulaController extends Controller
     {
         $this->authorize('update', $aula);
 
-        // Validamos ÚNICAMENTE los campos permitidos para edición
+        // Exigimos que el docente guía sea OBLIGATORIO (required)
         $validated = $request->validate([
             'anio_escolar_id' => 'required|exists:anio_escolar,id',
-            'docente_guia_id' => 'nullable|exists:docente,id',
+            'docente_guia_id' => 'required|exists:docente,id',
         ]);
 
-        // Los campos como grado_id, modalidad_id, nombre, turno y cupo 
-        // quedan completamente protegidos contra modificaciones.
         $aula->update($validated);
 
         return redirect()->route('academico.aulas.index')
                          ->with('success', 'Asignación del aula actualizada exitosamente.');
     }
-
-    /**
-     * Elimina un aula del sistema.
-     */
     public function destroy(\App\Models\Aula $aula)
     {
-        // CORRECCIÓN: El permiso debe ser 'delete', no 'create'
         $this->authorize('delete', $aula);
 
         try {
@@ -152,7 +141,6 @@ class AulaController extends Controller
             return back()->with('success', 'Aula eliminada correctamente.');
             
         } catch (\Illuminate\Database\QueryException $e) {
-            // El código 23000, 23503 indica violación de llave foránea (Integridad Referencial)
             if ($e->getCode() == 23000 || $e->getCode() == 23503) {
                 return back()->with('error', 'No se puede eliminar esta aula porque tiene clases asignadas o alumnos. Elimine sus clases o traslade a los alumnos primero.');
             }
@@ -170,18 +158,15 @@ class AulaController extends Controller
                             ->where('aula_id', $aula->id)
                             ->get();
 
-        // --- FILTRO ANTI-DUPLICADOS ---
         $asignaturasYaAsignadas = $asignaciones->pluck('asignatura_id')->toArray();
         $todasAsignaturas = \App\Models\Asignatura::whereNotIn('id', $asignaturasYaAsignadas)->get();
-        // ------------------------------
 
         $todosDocentes = \App\Models\Docente::with('usuario')->get();
-        $contexto = 'gestion'; // Añadimos el contexto
+        $contexto = 'gestion'; 
 
         return view('academico.aulas.show', compact('aula', 'asignaciones', 'todasAsignaturas', 'todosDocentes', 'contexto'));
     }
 
-    // NUEVO MÉTODO PARA ASIGNACIONES
     public function showAsignaciones(Aula $aula)
     {
         $this->authorize('viewAny', Aula::class);
@@ -191,13 +176,11 @@ class AulaController extends Controller
                             ->where('aula_id', $aula->id)
                             ->get();
 
-        // --- FILTRO ANTI-DUPLICADOS ---
         $asignaturasYaAsignadas = $asignaciones->pluck('asignatura_id')->toArray();
         $todasAsignaturas = \App\Models\Asignatura::whereNotIn('id', $asignaturasYaAsignadas)->get();
-        // ------------------------------
 
         $todosDocentes = \App\Models\Docente::with('usuario')->get();
-        $contexto = 'asignacion'; // Contexto diferente
+        $contexto = 'asignacion'; 
 
         return view('academico.aulas.show', compact('aula', 'asignaciones', 'todasAsignaturas', 'todosDocentes', 'contexto'));
     }

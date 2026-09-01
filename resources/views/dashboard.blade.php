@@ -8,11 +8,18 @@
     $nombreLimpio = explode(' ', trim(Auth::user()->nombre_completo ?? Auth::user()->name))[0];
     
     $ultimoAvisoId = $avisos->first()->id ?? 0;
+
+    $asistenciaHoy = null;
+    if (class_exists('\App\Models\AsistenciaPersonal') && \Illuminate\Support\Facades\Schema::hasTable('asistencia_personal')) {
+        $asistenciaHoy = \App\Models\AsistenciaPersonal::where('usuario_id', auth()->id())
+            ->where('fecha', now()->timezone('America/Managua')->toDateString())
+            ->first();
+    }
 @endphp
 
 <x-app-layout>
     <x-slot name="header">
-        <div class="relative flex justify-between items-center w-full min-h-[2rem]">
+        <div class="relative flex justify-between items-center w-full min-h-[2rem] z-50">
             
             <div class="flex items-center gap-3 relative z-10">
                 <h2 class="text-xl font-black text-[#3d2c1d] tracking-tight">
@@ -95,34 +102,72 @@
         </div>
     </x-slot>
 
+    <!-- AQUÍ SE INICIALIZA ALPINE.JS (Rol Activo) -->
     <div class="py-6 min-h-screen relative bg-slate-50" x-data="{ rolActivo: '{{ $rolPorDefecto }}' }">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
-            @hasanyrole('Director|Subdirector|Gestor de Usuarios')
-            <div x-show="['Director', 'Subdirector', 'Gestor de Usuarios'].includes(rolActivo)" class="flex flex-col sm:flex-row gap-4 mb-2">
-                <div class="w-full sm:w-64 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alumnos</p>
-                        <h4 class="text-2xl font-black text-[#3d2c1d]">{{ $totalAlumnos ?? 0 }}</h4>
+            <!-- WIDGET DE ASISTENCIA UNIVERSAL -->
+            @unless(auth()->user()->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios']))
+            <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-full bg-gradient-to-l from-[#e6ac27]/10 to-transparent pointer-events-none"></div>
+                
+                <div class="flex items-center gap-5 relative z-10">
+                    <div class="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-[#e6ac27] shadow-sm">
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     </div>
-                    <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    <div>
+                        <h3 class="font-black text-[#3d2c1d] text-lg">Registro de Asistencia Diaria</h3>
+                        <p class="text-xs font-bold text-slate-400 mt-0.5">{{ now()->timezone('America/Managua')->format('d/m/Y') }}</p>
                     </div>
                 </div>
-                <div class="w-full sm:w-64 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Docentes</p>
-                        <h4 class="text-2xl font-black text-[#3d2c1d]">{{ $totalDocentes ?? 0 }}</h4>
-                    </div>
-                    <div class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                    </div>
+
+                <div class="relative z-10 w-full md:w-auto min-w-[300px]">
+                    @if($asistenciaHoy)
+                        <div class="px-6 py-3 rounded-xl border flex items-center gap-3 w-full justify-center
+                            {{ $asistenciaHoy->estado === 'Presente' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : '' }}
+                            {{ $asistenciaHoy->estado === 'Retardo' ? 'bg-amber-50 border-amber-200 text-amber-700' : '' }}
+                            {{ in_array($asistenciaHoy->estado, ['Ausente', 'Justificado']) ? 'bg-rose-50 border-rose-200 text-rose-700' : '' }}
+                        ">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                            <div class="flex flex-col">
+                                <span class="font-black text-sm leading-tight">{{ $asistenciaHoy->estado }}</span>
+                                <span class="text-[10px] font-bold uppercase tracking-widest opacity-80">Marcó: {{ \Carbon\Carbon::parse($asistenciaHoy->hora_entrada)->format('h:i A') }}</span>
+                            </div>
+                        </div>
+                    @else
+                        @if(Route::has('asistencia.personal.marcar'))
+                        <form action="{{ route('asistencia.personal.marcar') }}" method="POST" class="flex flex-col gap-3">
+                            @csrf
+                            @php
+                                $esTarde = now()->timezone('America/Managua')->format('H:i:s') > '07:15:00';
+                            @endphp
+                            
+                            @if($esTarde)
+                                <div class="w-full">
+                                    <label class="block text-[10px] font-black text-rose-500 uppercase tracking-widest mb-1.5">Justificación Obligatoria</label>
+                                    <textarea name="observaciones" rows="2" required placeholder="Has excedido la hora límite de llegada (7:15 AM). Explica el motivo de tu retardo..." class="w-full border-rose-200 bg-rose-50 rounded-xl focus:ring-rose-500 focus:border-rose-500 text-sm text-[#3d2c1d] shadow-sm"></textarea>
+                                </div>
+                            @endif
+                            
+                            <button type="submit" class="w-full bg-[#3d2c1d] hover:bg-slate-800 text-white font-black py-3 px-8 rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                                <svg class="w-5 h-5 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
+                                Registrar mi Llegada
+                            </button>
+                        </form>
+                        @endif
+                    @endif
                 </div>
             </div>
-            @endhasanyrole
+            @endunless
 
+            <!-- BARRA DE PESTAÑAS DINÁMICA -->
             <div class="flex space-x-2 border-b border-slate-200 overflow-x-auto pb-px">
-                @foreach(auth()->user()->roles as $rol)
+                @php
+                    $rolesPermitidos = ['Director', 'Subdirector', 'Gestor de Usuarios', 'Coordinador', 'Secretaria', 'Docente Guía', 'Docente por Asignatura'];
+                    $rolesDashboard = auth()->user()->roles->filter(fn($rol) => in_array($rol->name, $rolesPermitidos));
+                @endphp
+                
+                @foreach($rolesDashboard as $rol)
                     <button @click="rolActivo = '{{ $rol->name }}'"
                             :class="rolActivo === '{{ $rol->name }}' ? 'border-[#e6ac27] text-[#3d2c1d] font-black bg-white shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-bold'"
                             class="px-6 py-3 border-b-4 text-sm transition-all whitespace-nowrap rounded-t-xl">
@@ -131,157 +176,45 @@
                 @endforeach
             </div>
 
-            <div>
-                @hasanyrole('Director|Subdirector|Gestor de Usuarios')
-                <div x-show="['Director', 'Subdirector', 'Gestor de Usuarios'].includes(rolActivo)" x-transition.opacity style="display: none;" class="space-y-6">
-                    
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <a href="{{ route('academico.usuarios.index') }}" class="group bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex items-center gap-4 cursor-pointer">
-                            <div class="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                            </div>
-                            <div>
-                                <span class="block font-black text-sm text-[#3d2c1d]">Personal</span>
-                                <span class="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Directorio</span>
-                            </div>
-                        </a>
-
-                        <a href="{{ route('academico.aulas.index') }}" class="group bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex items-center gap-4 cursor-pointer">
-                            <div class="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                            </div>
-                            <div>
-                                <span class="block font-black text-sm text-[#3d2c1d]">Aulas</span>
-                                <span class="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Asignaciones</span>
-                            </div>
-                        </a>
-
-                        <button @click.prevent="$dispatch('abrir-modal-horarios')" class="text-left group bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex items-center gap-4 cursor-pointer w-full">
-                            <div class="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                            </div>
-                            <div>
-                                <span class="block font-black text-sm text-[#3d2c1d]">Horarios</span>
-                                <span class="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Visor Global</span>
-                            </div>
-                        </button>
-
-                        <a href="{{ route('academico.alumnos.index') }}" class="group bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex items-center gap-4 cursor-pointer">
-                            <div class="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                            </div>
-                            <div>
-                                <span class="block font-black text-sm text-[#3d2c1d]">Alumnos</span>
-                                <span class="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Directorio</span>
-                            </div>
-                        </a>
-
-                        <a href="{{ route('academico.alumnos.create') }}" class="group bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex items-center gap-4 cursor-pointer">
-                            <div class="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                            </div>
-                            <div>
-                                <span class="block font-black text-sm text-[#3d2c1d]">Matrículas</span>
-                                <span class="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Nuevo Ingreso</span>
-                            </div>
-                        </a>
-
-                        <button @click.prevent="$dispatch('abrir-modal-asistencia')" class="text-left group bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex items-center gap-4 cursor-pointer w-full">
-                            <div class="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            </div>
-                            <div>
-                                <span class="block font-black text-sm text-[#3d2c1d]">Asistencia</span>
-                                <span class="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Monitoreo Global</span>
-                            </div>
-                        </button>
+            <!-- INYECCIÓN DINÁMICA DE COMPONENTES POR ROL -->
+            <div class="mt-6">
+                @hasanyrole('Director|Subdirector')
+                    <div x-show="['Director', 'Subdirector'].includes(rolActivo)" x-transition.opacity style="display: none;" class="space-y-6">
+                        @include('components.dashboard.directiva')
                     </div>
+                @endhasanyrole
 
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                            <h4 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4">Rendimiento Promedio</h4>
-                            <div class="relative h-48 w-full"><canvas id="chartRendimiento"></canvas></div>
-                        </div>
-                        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                            <h4 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4">Asistencia Estudiantes</h4>
-                            <div class="relative h-48 w-full"><canvas id="chartAsistenciaAlumnos"></canvas></div>
-                        </div>
-                        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                            <h4 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4">Asistencia Docentes</h4>
-                            <div class="relative h-48 w-full"><canvas id="chartAsistenciaDocentes"></canvas></div>
-                        </div>
+                @hasanyrole('Gestor de Usuarios')
+                    <div x-show="rolActivo === 'Gestor de Usuarios'" x-transition.opacity style="display: none;" class="space-y-6">
+                        @include('components.dashboard.gestor')
                     </div>
-                </div>
+                @endhasanyrole
+
+                @hasanyrole('Coordinador')
+                    <div x-show="rolActivo === 'Coordinador'" x-transition.opacity style="display: none;" class="space-y-6">
+                        @include('components.dashboard.coordinador')
+                    </div>
+                @endhasanyrole
+
+                @hasanyrole('Secretaria')
+                    <div x-show="rolActivo === 'Secretaria'" x-transition.opacity style="display: none;" class="space-y-6">
+                        @include('components.dashboard.secretaria')
+                    </div>
                 @endhasanyrole
 
                 @hasanyrole('Docente Guía')
-                <div x-show="rolActivo === 'Docente Guía'" x-transition.opacity style="display: none;" class="space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <a href="{{ route('academico.alumnos.index') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex items-center gap-4">
-                            <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                            </div>
-                            <div>
-                                <span class="block font-bold text-slate-800">Mis Estudiantes</span>
-                                <span class="block text-xs font-medium text-slate-500">Listado y perfiles del aula</span>
-                            </div>
-                        </a>
-                        <a href="{{ route('academico.asistencia.aula.create') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex items-center gap-4">
-                            <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            </div>
-                            <div>
-                                <span class="block font-bold text-slate-800">Asistencia</span>
-                                <span class="block text-xs font-medium text-slate-500">Pase de lista diario</span>
-                            </div>
-                        </a>
+                    <div x-show="rolActivo === 'Docente Guía'" x-transition.opacity style="display: none;" class="space-y-4">
+                        @include('components.dashboard.docente-guia')
                     </div>
-                </div>
                 @endhasanyrole
 
                 @hasanyrole('Docente por Asignatura')
-                <div x-show="rolActivo === 'Docente por Asignatura'" x-transition.opacity style="display: none;" class="space-y-6">
-                    @include('components.dashboard.asignatura-stats')
-                    <div class="mt-8 mb-4 flex items-center justify-between">
-                        <h3 class="text-xl font-black text-[#3d2c1d]">Mi Agenda Semanal</h3>
-                        <p class="text-xs font-bold text-slate-400">Haz clic en una clase para gestionarla</p>
+                    <div x-show="rolActivo === 'Docente por Asignatura'" x-transition.opacity style="display: none;" class="space-y-6">
+                        @include('components.dashboard.docente-asignatura')
                     </div>
-                    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                        @foreach($diasSemana as $dia)
-                            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
-                                <div class="bg-[#FFFDF5] text-center py-3 border-b border-[#e6ac27]/20">
-                                    <h4 class="font-black text-[#3d2c1d] uppercase tracking-widest text-sm">{{ $dia }}</h4>
-                                </div>
-                                <div class="p-4 flex-1 flex flex-col gap-3 bg-slate-50/30">
-                                    @if(isset($horarios[$dia]) && $horarios[$dia]->count() > 0)
-                                        @foreach($horarios[$dia] as $item)
-                                            @php
-                                                $modalidad = strtolower($item->aulaAsignaturaDocente->aula->modalidad->nombre ?? '');
-                                                $estilosCaja = match(true) {
-                                                    str_contains($modalidad, 'preescolar') => 'bg-amber-50 border-amber-200 text-amber-900',
-                                                    str_contains($modalidad, 'primaria')   => 'bg-blue-50 border-blue-200 text-blue-900',
-                                                    str_contains($modalidad, 'secundaria') => 'bg-emerald-50 border-emerald-200 text-emerald-900',
-                                                    default => 'bg-white border-slate-200 text-slate-800'
-                                                };
-                                                $horaTexto = \Carbon\Carbon::parse($item->bloqueHorario->hora_inicio)->format('h:i') . ' - ' . \Carbon\Carbon::parse($item->bloqueHorario->hora_fin)->format('h:i A');
-                                            @endphp
-                                            <div x-on:click="$dispatch('abrir-modal-decision-clase', { id: '{{ $item->aulaAsignaturaDocente->id }}', asignatura: '{{ addslashes($item->aulaAsignaturaDocente->asignatura->nombre) }}', aula: '{{ addslashes($item->aulaAsignaturaDocente->aula->grado->nombre . ' - ' . $item->aulaAsignaturaDocente->aula->nombre) }}', hora: '{{ $horaTexto }}' })" class="border rounded-2xl p-3 shadow-sm hover:-translate-y-1 cursor-pointer {{ $estilosCaja }}">
-                                                <h5 class="font-black text-sm leading-tight mb-1">{{ $item->aulaAsignaturaDocente->asignatura->nombre }}</h5>
-                                                <p class="text-[11px] font-bold opacity-80 uppercase">{{ $item->aulaAsignaturaDocente->aula->grado->nombre }}</p>
-                                            </div>
-                                        @endforeach
-                                    @else
-                                        <div class="h-full flex flex-col items-center justify-center text-center opacity-50 py-4">
-                                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Libre</span>
-                                        </div>
-                                    @endif
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
                 @endhasanyrole
             </div>
+
         </div>
     </div>
 
@@ -294,7 +227,7 @@
                 <button @click="open = false" class="text-slate-400 hover:text-rose-500 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div class="p-6 grid gap-4">
-                <a href="{{ url('academico/visor-horarios/aulas') }}" class="group flex items-center p-4 border border-slate-200 rounded-2xl hover:border-[#e6ac27] hover:bg-[#FFFDF5] transition-all">
+                <a href="{{ route('academico.visor.aulas') }}" class="group flex items-center p-4 border border-slate-200 rounded-2xl hover:border-[#e6ac27] hover:bg-[#FFFDF5] transition-all">
                     <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] group-hover:bg-[#e6ac27] group-hover:text-white flex items-center justify-center mr-4 transition-colors">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                     </div>
@@ -303,7 +236,7 @@
                         <span class="block text-xs text-slate-500 font-medium mt-0.5">Por grado y sección</span>
                     </div>
                 </a>
-                <a href="{{ url('academico/visor-horarios/docentes') }}" class="group flex items-center p-4 border border-slate-200 rounded-2xl hover:border-[#e6ac27] hover:bg-[#FFFDF5] transition-all">
+                <a href="{{ route('academico.visor.docentes') }}" class="group flex items-center p-4 border border-slate-200 rounded-2xl hover:border-[#e6ac27] hover:bg-[#FFFDF5] transition-all">
                     <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] group-hover:bg-[#e6ac27] group-hover:text-white flex items-center justify-center mr-4 transition-colors">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                     </div>
@@ -324,7 +257,7 @@
                 <button @click="open = false" class="text-slate-400 hover:text-rose-500 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div class="p-6 grid gap-4">
-                <a href="{{ route('academico.asistencia.aula.create') }}" class="group flex items-center p-4 border border-slate-200 rounded-2xl hover:border-[#e6ac27] hover:bg-[#FFFDF5] transition-all">
+                <a href="{{ route('academico.asistencia.aula.create') }}" class="group flex items-center p-4 border border-slate-200 rounded-2xl hover:border-[#e6ac27] hover:bg-[#FFFDF5] transition-all cursor-pointer">
                     <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] group-hover:bg-[#e6ac27] group-hover:text-white flex items-center justify-center mr-4 transition-colors">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                     </div>
@@ -333,13 +266,14 @@
                         <span class="block text-xs text-slate-500 font-medium mt-0.5">Control de estudiantes</span>
                     </div>
                 </a>
-                <a href="#" class="group flex items-center p-4 border border-slate-200 rounded-2xl hover:border-[#e6ac27] hover:bg-[#FFFDF5] transition-all">
+
+                <a href="{{ route('academico.asistencia.personal.index') }}" class="group flex items-center p-4 border border-slate-200 rounded-2xl hover:border-[#e6ac27] hover:bg-[#FFFDF5] transition-all cursor-pointer">
                     <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] group-hover:bg-[#e6ac27] group-hover:text-white flex items-center justify-center mr-4 transition-colors">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                     </div>
                     <div>
-                        <span class="block font-black text-[#3d2c1d]">Asistencia de Docentes</span>
-                        <span class="block text-xs text-slate-500 font-medium mt-0.5">Control del personal</span>
+                        <span class="block font-black text-[#3d2c1d]">Asistencia del Personal</span>
+                        <span class="block text-xs text-slate-500 font-medium mt-0.5">Lista maestra diaria</span>
                     </div>
                 </a>
             </div>
@@ -443,62 +377,6 @@
         </div>
     </div>
 
-    @hasanyrole('Director|Subdirector|Gestor de Usuarios')
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const labels = {!! json_encode($nombresModalidades ?? []) !!};
-            
-            const coloresModalidad = labels.map(label => {
-                const nombre = label.toLowerCase();
-                if (nombre.includes('preescolar')) return '#fbbf24'; 
-                if (nombre.includes('primaria')) return '#60a5fa';   
-                if (nombre.includes('secundaria')) return '#34d399'; 
-                return '#cbd5e1'; 
-            });
-
-            const chartOptions = {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { 
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: '#3d2c1d', padding: 12, cornerRadius: 8,
-                        titleFont: { size: 13, family: "'Figtree', sans-serif" },
-                        bodyFont: { size: 14, weight: 'bold', family: "'Figtree', sans-serif" },
-                        callbacks: { label: context => ' Porcentaje: ' + context.parsed.y + '%' }
-                    }
-                },
-                scales: { 
-                    y: { beginAtZero: true, max: 100, border: {display: false}, grid: { borderDash: [4, 4], color: '#f1f5f9' }, ticks: { font: { family: "'Figtree', sans-serif" }, color: '#94a3b8', stepSize: 25 } },
-                    x: { border: {display: false}, grid: { display: false }, ticks: { font: { family: "'Figtree', sans-serif", weight: 'bold' }, color: '#64748b' } }
-                }
-            };
-
-            const crearGrafica = (id, data) => {
-                const canvas = document.getElementById(id);
-                if (canvas) {
-                    new Chart(canvas, {
-                        type: 'bar',
-                        data: { 
-                            labels: labels, 
-                            datasets: [{ 
-                                data: data, 
-                                backgroundColor: coloresModalidad, 
-                                borderRadius: 8, 
-                                barPercentage: 0.5 
-                            }] 
-                        },
-                        options: chartOptions
-                    });
-                }
-            };
-
-            crearGrafica('chartRendimiento', {!! json_encode($rendimientoData ?? []) !!});
-            crearGrafica('chartAsistenciaAlumnos', {!! json_encode($asistenciaAlumnosData ?? []) !!});
-            crearGrafica('chartAsistenciaDocentes', {!! json_encode($asistenciaDocentesData ?? []) !!});
-        });
-    </script>
-    @endhasanyrole
-
     <!-- SWEETALERT2 PARA NOTIFICACIONES PREMIUM -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
@@ -520,6 +398,16 @@
                 Toast.fire({
                     icon: 'success',
                     title: '{{ session("success") }}'
+                });
+            @endif
+
+            @if(session('error'))
+                Swal.fire({
+                    title: 'Atención',
+                    text: '{{ session("error") }}',
+                    icon: 'warning',
+                    confirmButtonColor: '#3d2c1d',
+                    customClass: { popup: 'rounded-3xl border border-stone-200 shadow-xl' }
                 });
             @endif
 

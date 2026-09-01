@@ -33,7 +33,7 @@ class AulaService
                     'docente_id' => null, // Queda en blanco hasta que coordinación asigne al profesor
                     'anio_escolar_id' => $aula->anio_escolar_id,
                     'horas_semanales' => $materia->horas_semanales_sugeridas ?? 0,
-                    //'activo' => true,
+                    'activo' => true,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];

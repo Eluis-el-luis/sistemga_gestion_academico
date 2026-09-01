@@ -53,4 +53,12 @@ class AvanceContenidoPolicy
 
         return false;
     }
+
+    /**
+     * Eliminar un registro de avance.
+     */
+    public function delete(Usuario $usuario, AvanceContenido $avanceContenido): bool
+    {
+        return $this->update($usuario, $avanceContenido);
+    }
 }
