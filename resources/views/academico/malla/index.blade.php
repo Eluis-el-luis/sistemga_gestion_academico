@@ -33,12 +33,13 @@
                 </div>
                 
                 <div class="p-8">
-                    <form action="{{ route('academico.malla.store') }}" method="POST" class="grid grid-cols-1 md:grid-cols-12 gap-5 items-end">
+                    <!-- ENVOLVEMOS EL FORMULARIO EN ALPINE -->
+                    <form action="{{ route('academico.malla.store') }}" method="POST" class="grid grid-cols-1 md:grid-cols-12 gap-5 items-end" x-data="filtroMalla()">
                         @csrf
                         
                         <div class="md:col-span-3">
                             <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Grado <span class="text-rose-500">*</span></label>
-                            <select name="grado_id" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm transition-colors font-medium text-slate-700" required>
+                            <select name="grado_id" x-model="gradoSeleccionado" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm transition-colors font-medium text-slate-700" required>
                                 <option value="">Seleccione...</option>
                                 @foreach($grados as $grado)
                                     <option value="{{ $grado->id }}" data-modalidad="{{ strtolower($grado->modalidad->nombre ?? '') }}">
@@ -52,11 +53,10 @@
                             <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Asignatura Oficial <span class="text-rose-500">*</span></label>
                             <select name="asignatura_id" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm transition-colors font-medium text-slate-700" required>
                                 <option value="">Seleccione la Materia...</option>
-                                @foreach($asignaturas as $asignatura)
-                                    <option value="{{ $asignatura->id }}" data-is-preescolar="{{ $asignatura->nombre === 'Tema motivador' ? 'true' : 'false' }}">
-                                        {{ $asignatura->nombre }}
-                                    </option>
-                                @endforeach
+                                <!-- ITERACIÓN DINÁMICA DE ALPINE -->
+                                <template x-for="asignatura in asignaturasFiltradas()" :key="asignatura.id">
+                                    <option :value="asignatura.id" x-text="asignatura.nombre"></option>
+                                </template>
                             </select>
                         </div>
 
@@ -85,19 +85,15 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     @foreach($grados as $grado)
                         @php
-                            // Cálculo del progreso para la barra
-                            $limiteHoras = $grado->horas_maximas_semanales ?? 35; // Fallback a 35 si no existe en BD
+                            $limiteHoras = $grado->horas_maximas_semanales ?? 35;
                             $horasUsadas = $grado->mallaCurricular->sum('horas_semanales_sugeridas');
                             $porcentaje = $limiteHoras > 0 ? ($horasUsadas / $limiteHoras) * 100 : 0;
-                            
-                            // Color dinámico según qué tan lleno esté
                             $colorBarra = $porcentaje > 90 ? 'bg-rose-500' : 'bg-[#e6ac27]';
                             $estaLleno = $porcentaje >= 100;
                         @endphp
 
                         <div class="bg-white rounded-3xl shadow-sm border {{ $estaLleno ? 'border-rose-200' : 'border-slate-200' }} overflow-hidden flex flex-col hover:shadow-md transition-shadow">
                             
-                            <!-- Cabecera de la Tarjeta -->
                             <div class="bg-[#FFFDF5] px-6 py-5 border-b border-[#e6ac27]/20">
                                 <div class="flex justify-between items-start mb-3">
                                     <div>
@@ -107,7 +103,6 @@
                                     <div class="text-right flex items-center justify-end gap-1">
                                         <span class="text-xl font-black {{ $estaLleno ? 'text-rose-600' : 'text-[#e6ac27]' }}">{{ $horasUsadas }}</span>
                                         
-                                        <!-- BOTÓN PARA EDITAR HORAS (MAGIA AQUÍ) -->
                                         <form action="{{ route('academico.malla.grado.horas', $grado->id) }}" method="POST" class="inline-block form-editar-horas">
                                             @csrf
                                             @method('PUT')
@@ -120,13 +115,11 @@
                                     </div>
                                 </div>
                                 
-                                <!-- BARRA DE PROGRESO -->
                                 <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                                     <div class="h-1.5 rounded-full transition-all duration-500 {{ $colorBarra }}" style="width: {{ min(100, $porcentaje) }}%"></div>
                                 </div>
                             </div>
                             
-                            <!-- Lista de Materias -->
                             <div class="p-6 flex-grow">
                                 @if($grado->mallaCurricular->count() > 0)
                                     <ul class="space-y-4">
@@ -162,11 +155,28 @@
         </div>
     </div>
 
-    <!-- SCRIPT DE ALERTAS DINÁMICAS -->
+    <!-- SCRIPT ALPINEJS + SWEETALERT -->
     <script>
+        // FILTRADO DINÁMICO ALPINEJS
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('filtroMalla', () => ({
+                gradoSeleccionado: '',
+                todasAsignaturas: @json($asignaturas),
+                materiasPorGrado: {
+                    @foreach($grados as $grado)
+                        "{{ $grado->id }}": @json($grado->mallaCurricular->pluck('asignatura_id')),
+                    @endforeach
+                },
+                asignaturasFiltradas() {
+                    if (!this.gradoSeleccionado) return this.todasAsignaturas; 
+                    const materiasAsignadas = this.materiasPorGrado[this.gradoSeleccionado] || [];
+                    return this.todasAsignaturas.filter(asig => !materiasAsignadas.includes(asig.id));
+                }
+            }));
+        });
+
+        // SWEETALERT2 
         document.addEventListener('DOMContentLoaded', function () {
-            
-            // SCRIPT PARA ELIMINAR MATERIA
             document.querySelectorAll('.alerta-eliminar').forEach(formulario => {
                 formulario.addEventListener('submit', function (e) {
                     e.preventDefault();
@@ -184,7 +194,6 @@
                 });
             });
 
-            // SCRIPT PARA EDITAR LÍMITE DE HORAS
             document.querySelectorAll('.btn-editar-horas').forEach(boton => {
                 boton.addEventListener('click', function () {
                     const gradoNombre = this.getAttribute('data-grado');
@@ -212,7 +221,7 @@
                     });
                 });
             });
-
         });
+        
     </script>
 </x-app-layout>
