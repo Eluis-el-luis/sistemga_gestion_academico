@@ -3,18 +3,12 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use App\Models\Aviso;
-use App\Models\Docente;
-use App\Models\AulaAsignaturaDocente;
-use App\Models\BloqueHorario;
-use App\Models\AsistenciaPersonal;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
-    public function index()
+   public function index()
     {
         /** @var \App\Models\Usuario $user */
         $user = Auth::user();
@@ -59,82 +53,76 @@ class DashboardController extends Controller
                 $preescolar = 0; $primaria = 0; $secundaria = 0;
             }
 
-            foreach ($asignaciones as $asignacion) {
-                foreach ($asignacion->horarios as $horario) {
-                    if ($horario->bloqueHorario->tipo_jornada === $esquemaActivo) {
-                        $matrizHorario[$horario->dia_semana][$horario->bloqueHorario->hora_inicio] = [
-                            'asignacion_id' => $asignacion->id,
-                            'asignatura' => $asignacion->asignatura->nombre,
-                            'aula' => $asignacion->aula->grado->nombre . ' - ' . $asignacion->aula->nombre,
-                            'modalidad_id' => $asignacion->aula->modalidad_id,
-                            'hora_inicio' => Carbon::parse($horario->bloqueHorario->hora_inicio)->format('h:i A'),
-                            'hora_fin' => Carbon::parse($horario->bloqueHorario->hora_fin)->format('h:i A')
-                        ];
-                    }
-                }
+            // --- ARMAMOS EL PAQUETE DE GRÁFICAS PARA ENVIAR A JAVASCRIPT ---
+            $dbMetricas = [
+                'matriculados'          => ['titulo' => 'Alumnos Matriculados Activos (Dato Real)', 'datos' => [$preescolar, $primaria, $secundaria]],
+                'asistencia_alumnos'    => ['titulo' => 'Asistencia de Alumnos (%)', 'datos' => [0, 0, 0]],
+                'asistencia_docentes'   => ['titulo' => 'Asistencia de Docentes (%)', 'datos' => [0, 0, 0]],
+                'rendimiento_modalidad' => ['titulo' => 'Rendimiento Académico General (%)', 'datos' => [0, 0, 0]],
+                'apoyo_padres'          => ['titulo' => 'Participación de Padres (%)', 'datos' => [0, 0, 0]],
+                'aprobados'             => ['titulo' => 'Alumnos Aprobados Limpios (%)', 'datos' => [0, 0, 0]],
+                'reprobados_leves'      => ['titulo' => 'Reprobados (1 a 2 Clases) (%)', 'datos' => [0, 0, 0]],
+                'reprobados_graves'     => ['titulo' => 'Reprobados Críticos (3+ Clases) (%)', 'datos' => [0, 0, 0]],
+                'promedio_notas'        => ['titulo' => 'Promedio de Calificaciones (Escala 0-100)', 'datos' => [0, 0, 0]],
+                'avances_silabo'        => ['titulo' => 'Avance Curricular del Maestro (%)', 'datos' => [0, 0, 0]],
+                'retencion'             => ['titulo' => 'Retención Estudiantil (%)', 'datos' => [0, 0, 0]],
+                'puntualidad'           => ['titulo' => 'Puntualidad en Horario de Entrada (%)', 'datos' => [0, 0, 0]]
+            ];
+        }
+
+        // 4. CARGA DE DATOS PARA DOCENTE POR ASIGNATURA (Horarios)
+        if ($user->hasRole('Docente por Asignatura')) {
+            $docenteId = $user->docente->id ?? null;
+            if ($docenteId) {
+                $horarios = \App\Models\Horario::with([
+                        'bloqueHorario', 'aulaAsignaturaDocente.asignatura', 'aulaAsignaturaDocente.aula.grado', 'aulaAsignaturaDocente.aula.modalidad'
+                    ])
+                    ->whereHas('aulaAsignaturaDocente', function($q) use ($docenteId) {
+                        $q->where('docente_id', $docenteId);
+                    })
+                    ->get()
+                    ->sortBy(fn($horario) => $horario->bloqueHorario->hora_inicio)
+                    ->groupBy('dia_semana');
             }
         }
 
+        // 5. ENRUTAMIENTO ÚNICO AL DASHBOARD COMPONENTIZADO
         return view('dashboard', compact(
-            'avisos', 
-            'asistenciaHoy', 
-            'docente', 
-            'asignaciones',
-            'bloques', 
-            'diasSemana', 
-            'matrizHorario', 
-            'esquemaActivo',
-            'totalAlumnos',      // <--- Añadido
-            'totalMatriculados', // <--- Añadido
-            'totalPersonal'      // <--- Añadido
+            'avisos', 'totalAlumnos', 'totalDocentes', 'horarios', 'diasSemana', 'dbMetricas'
         ));
     }
 
-    // --- MÉTODOS DE AVISOS (DIRECTIVA) ---
     public function storeAviso(Request $request)
     {
-        /** @var \App\Models\Usuario $user */
         $user = Auth::user();
-        if (!$user->hasAnyRole(['Director', 'Subdirector', 'Coordinador'])) { abort(403); }
+        if (!$user->hasAnyRole(['Director', 'Subdirector'])) { abort(403); }
 
-        $request->validate([
-            'titulo' => 'required|string|max:120', 
-            'mensaje' => 'required|string|max:1000'
+        $request->validate(['titulo' => 'required|string|max:120', 'mensaje' => 'required|string|max:1000']);
+        DB::table('aviso')->insert([
+            'titulo' => $request->titulo, 'mensaje' => $request->mensaje, 'autor_id' => Auth::id(),
+            'activo' => true, 'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        try {
-            DB::table('aviso')->insert([
-                'titulo' => $request->titulo, 
-                'mensaje' => $request->mensaje, 
-                'autor_id' => Auth::id(),
-                'activo' => true, 
-                'created_at' => now(), 
-                'updated_at' => now(),
-            ]);
-            return redirect()->route('dashboard')->with('success', 'Comunicado publicado correctamente.');
-        } catch (\Exception $e) {
-            return redirect()->route('dashboard')->with('error', 'Error al publicar: ' . $e->getMessage());
-        }
+        return redirect()->route('dashboard')->with('success', 'Aviso publicado correctamente.');
     }
 
     public function updateAviso(Request $request, $id)
     {
-        /** @var \App\Models\Usuario $user */
         $user = Auth::user();
-        if (!$user->hasAnyRole(['Director', 'Subdirector', 'Coordinador'])) { abort(403); }
+        if (!$user->hasAnyRole(['Director', 'Subdirector'])) { abort(403); }
 
         $request->validate(['titulo' => 'required|string|max:120', 'mensaje' => 'required|string|max:1000']);
-        Aviso::where('id', $id)->update(['titulo' => $request->titulo, 'mensaje' => $request->mensaje, 'updated_at' => now()]);
-        return redirect()->route('dashboard')->with('success', 'Comunicado actualizado.');
+        DB::table('aviso')->where('id', $id)->update(['titulo' => $request->titulo, 'mensaje' => $request->mensaje, 'updated_at' => now()]);
+
+        return redirect()->route('dashboard')->with('success', 'Aviso actualizado correctamente.');
     }
 
     public function destroyAviso($id)
     {
-        /** @var \App\Models\Usuario $user */
         $user = Auth::user();
-        if (!$user->hasAnyRole(['Director', 'Subdirector', 'Coordinador'])) { abort(403); }
+        if (!$user->hasAnyRole(['Director', 'Subdirector'])) { abort(403); }
 
-        Aviso::where('id', $id)->delete();
-        return redirect()->route('dashboard')->with('success', 'Comunicado eliminado.');
+        DB::table('aviso')->where('id', $id)->delete();
+        return redirect()->route('dashboard')->with('success', 'Aviso eliminado del sistema.');
     }
 }
