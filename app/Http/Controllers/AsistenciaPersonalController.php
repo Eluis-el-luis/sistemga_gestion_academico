@@ -18,7 +18,7 @@ class AsistenciaPersonalController extends Controller
         $personal = \App\Models\Usuario::with(['roles', 'asistencias' => function($query) use ($fechaFiltro) {
             $query->where('fecha', $fechaFiltro);
         }])->whereHas('roles', function($q) {
-            $q->whereIn('name', ['Docente Guía', 'Docente por Asignatura']);
+            $q->whereIn('name', ['Docente Guia', 'Docente por Asignatura']);
         })->get();
 
         return view('academico.asistencia.personal.index', compact('personal', 'fechaFiltro', 'fechaFormateada'));

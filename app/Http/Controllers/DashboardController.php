@@ -16,49 +16,47 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $usuario = Auth::user();
-        
-        // 1. Cargar Avisos Globales
-        $avisos = Aviso::with('autor')->where('activo', true)->latest()->get();
-        
-        // 2. Cargar Asistencia Personal del Día
-        $asistenciaHoy = AsistenciaPersonal::where('usuario_id', $usuario->id)
-                            ->whereDate('fecha', Carbon::today())
-                            ->first();
+        /** @var \App\Models\Usuario $user */
+        $user = Auth::user();
 
-        // --- NUEVO: CONTADORES GLOBALES PARA LAS TARJETAS DEL DASHBOARD ---
-        $totalAlumnos = \App\Models\Alumno::count();
-        $totalMatriculados = \App\Models\Matricula::where('estado', 'activo')->count();
-        $totalPersonal = \App\Models\Docente::count(); // O la tabla general de usuarios/empleados
+        // 1. DATOS GLOBALES (Avisos para todos)
+        $avisos = DB::table('aviso')
+            ->join('usuario', 'aviso.autor_id', '=', 'usuario.id')
+            ->select('aviso.*', 'usuario.nombre_completo as autor_nombre')
+            ->where('aviso.activo', true)
+            ->orderBy('aviso.created_at', 'desc')
+            ->take(5)
+            ->get();
 
-        // --- LÓGICA DEL CALENDARIO INTERACTIVO PARA EL DOCENTE ---
-        /** @var \App\Models\Usuario $usuario */
-        $docente = Docente::where('usuario_id', $usuario->id)->first();
-        
-        $matrizHorario = [];
-        $bloques = collect();
-        $diasSemana = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
-        $esquemaActivo = 'Regular'; 
-        $asignaciones = collect();
+        // 2. INICIALIZAR VARIABLES POR DEFECTO 
+        $totalAlumnos = 0;
+        $totalDocentes = 0;
+        $horarios = collect();
+        $diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+        $dbMetricas = []; // Nueva variable que contendrá TODAS las gráficas
 
-        if ($docente) {
-            $asignaciones = AulaAsignaturaDocente::with(['aula.grado', 'asignatura', 'aula.modalidad', 'horarios.bloqueHorario'])
-                ->where('docente_id', $docente->id)
-                ->get();
+        // 3. CARGA DE DATOS PARA DIRECTIVA Y GESTIÓN
+        if ($user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
+            $totalAlumnos = \App\Models\Alumno::count();
+            $totalDocentes = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count(); 
+            
+            // --- PRIMERA CONSULTA 100% REAL (Mejorada con Eloquent) ---
+            try {
+                // Usamos LIKE para que detecte "Preescolar", "PREESCOLAR", "Educación Preescolar", etc.
+                $preescolar = \App\Models\Matricula::whereHas('aula.modalidad', function($q) {
+                    $q->where('nombre', 'LIKE', '%reescolar%'); 
+                })->count();
 
-            $modalidadesIds = $asignaciones->pluck('aula.modalidad_id')->unique();
+                $primaria = \App\Models\Matricula::whereHas('aula.modalidad', function($q) {
+                    $q->where('nombre', 'LIKE', '%rimaria%');
+                })->count();
 
-            $bloques = BloqueHorario::whereIn('modalidad_id', $modalidadesIds)
-                ->where('tipo_jornada', $esquemaActivo)
-                ->orderBy('hora_inicio')
-                ->get()
-                ->unique('hora_inicio'); 
-
-            foreach ($diasSemana as $dia) {
-                $matrizHorario[$dia] = [];
-                foreach ($bloques as $bloque) {
-                    $matrizHorario[$dia][$bloque->hora_inicio] = null;
-                }
+                $secundaria = \App\Models\Matricula::whereHas('aula.modalidad', function($q) {
+                    $q->where('nombre', 'LIKE', '%ecundaria%');
+                })->count();
+            } catch (\Exception $e) {
+                // Si hay algún problema con las relaciones o tablas vacías, previene el error 500
+                $preescolar = 0; $primaria = 0; $secundaria = 0;
             }
 
             foreach ($asignaciones as $asignacion) {

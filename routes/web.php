@@ -136,6 +136,14 @@ Route::middleware('auth')->group(function () {
         Route::get('disciplina', [\App\Http\Controllers\IncidenciaDisciplinariaController::class, 'index'])->name('disciplina.index');
         Route::post('disciplina', [\App\Http\Controllers\IncidenciaDisciplinariaController::class, 'store'])->name('disciplina.store');
         Route::put('disciplina/{incidencia}', [\App\Http\Controllers\IncidenciaDisciplinariaController::class, 'update'])->name('disciplina.update');
+        // Fase 8: Centro de Reportes
+        Route::get('reportes', [\App\Http\Controllers\ReporteController::class, 'index'])->name('reportes.index');
+        Route::get('reportes/ingreso-notas', [\App\Http\Controllers\ReporteController::class, 'ingresoNotas'])->name('reportes.ingreso-notas');
+        Route::get('reportes/asistencia', [\App\Http\Controllers\ReporteController::class, 'asistencia'])->name('reportes.asistencia');
+        Route::get('reportes/rendimiento', [\App\Http\Controllers\ReporteController::class, 'rendimiento'])->name('reportes.rendimiento');
+        Route::get('reportes/mined', [\App\Http\Controllers\ReporteController::class, 'mined'])->name('reportes.mined');
+        Route::get('reportes/estudiantes', [\App\Http\Controllers\ReporteController::class, 'estudiantes'])->name('reportes.estudiantes');
+        Route::get('reportes/padres', [\App\Http\Controllers\ReporteController::class, 'padres'])->name('reportes.padres');
     });
 });
 
