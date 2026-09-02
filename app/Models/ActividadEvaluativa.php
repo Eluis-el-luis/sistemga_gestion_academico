@@ -15,6 +15,8 @@ class ActividadEvaluativa extends Model
         'aula_asignatura_docente_id',
         'corte_evaluativo_id',
         'nombre',
+        'descripcion',
+        'fecha',
         'tipo', // ej: 'Acumulado', 'Examen'
         'puntaje_maximo'
     ];

@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Nota;
 use App\Models\IndicadorLogro;
 use App\Models\AulaAsignaturaDocente;
-use App\Http\Requests\StoreNotaRequest;
 use App\Services\NotaService;
 use Illuminate\Http\Request; 
 use Illuminate\Support\Facades\DB;
@@ -22,109 +21,176 @@ class NotaController extends Controller
         $this->notaService = $notaService;
     }
 
+    // 1. EL VISOR PRINCIPAL (Se mantiene casi igual, perfecto para navegación)
     public function index(Request $request)
     {
         $usuario = auth()->user();
         
         if ($usuario->hasRole(['Subdirector', 'Director', 'Coordinador', 'Gestor de Usuarios'])) {
             $modoSupervision = true;
-            
-            // 1. Grados ordenados jerárquicamente por modalidad e ID
-            $grados = \App\Models\Grado::with('modalidad')
-                        ->orderBy('modalidad_id', 'asc')
-                        ->orderBy('id', 'asc')
-                        ->get();
-                        
+            $grados = \App\Models\Grado::with('modalidad')->orderBy('modalidad_id', 'asc')->orderBy('id', 'asc')->get();
             $aulas = \App\Models\Aula::with('grado')->get();
             
-            // 2. Lógica de Pre-selección: Si no hay request, tomamos el primer grado
             $gradoSeleccionadoId = $request->filled('grado_id') ? $request->grado_id : ($grados->first()->id ?? null);
+            $aulaSeleccionadaId = $request->filled('aula_id') ? $request->aula_id : ($aulas->where('grado_id', $gradoSeleccionadoId)->first()->id ?? null);
             
-            // 3. Pre-selección de Aula: Si no hay request, tomamos la primera aula (Sección A) del grado seleccionado
-            $aulaSeleccionadaId = $request->filled('aula_id') 
-                ? $request->aula_id 
-                : ($aulas->where('grado_id', $gradoSeleccionadoId)->first()->id ?? null);
-            
-            // 4. Consulta final
-            $asignaciones = collect();
-            if ($aulaSeleccionadaId) {
-                $asignaciones = \App\Models\AulaAsignaturaDocente::with(['aula.grado', 'asignatura', 'docente.usuario'])
-                    ->where('aula_id', $aulaSeleccionadaId)
-                    ->get();
-            }
-        } 
-        else {
+            $asignaciones = $aulaSeleccionadaId 
+                ? AulaAsignaturaDocente::with(['aula.grado', 'asignatura', 'docente.usuario'])->where('aula_id', $aulaSeleccionadaId)->get() 
+                : collect();
+        } else {
             $modoSupervision = false;
-            $grados = collect();
-            $aulas = collect();
-            $gradoSeleccionadoId = null;
-            $aulaSeleccionadaId = null;
+            $grados = collect(); $aulas = collect();
+            $gradoSeleccionadoId = null; $aulaSeleccionadaId = null;
             
             $docente = \App\Models\Docente::where('usuario_id', $usuario->id)->first();
             $asignaciones = $docente 
-                ? \App\Models\AulaAsignaturaDocente::with(['aula.grado', 'asignatura'])->where('docente_id', $docente->id)->get() 
+                ? AulaAsignaturaDocente::with(['aula.grado', 'asignatura'])->where('docente_id', $docente->id)->get() 
                 : collect();
         }
 
         return view('academico.notas.index', compact('asignaciones', 'modoSupervision', 'grados', 'aulas', 'gradoSeleccionadoId', 'aulaSeleccionadaId'));
     }
 
-    public function store(StoreNotaRequest $request)
+    // 2. LA PLANILLA (Ahora carga las Actividades y verifica si está bloqueada)
+    public function create(Request $request, AulaAsignaturaDocente $asignacion)
     {
-        $datos = $request->validated();
-        $aulaAsignatura = AulaAsignaturaDocente::findOrFail($datos['aula_asignatura_docente_id']);
-        $this->authorize('calificar', $aulaAsignatura);
+        $this->authorize('calificar', $asignacion);
 
-        DB::transaction(function () use ($datos) {
-            foreach ($datos['notas'] as $item) {
-                $notaCuantitativa = $item['nota_cuantitativa'] ?? null;
-                $codigoIndicador = $this->notaService->calcularIndicadorLogro($notaCuantitativa);
+        $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('activo', true))->get();
+        $corteSeleccionado = $request->query('corte_evaluativo_id', $cortes->first()->id ?? null);
+
+        // Traemos las actividades que el maestro configuró previamente para este parcial
+        $actividades = \App\Models\ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
+                            ->where('corte_evaluativo_id', $corteSeleccionado)
+                            ->orderBy('fecha', 'asc')
+                            ->get();
+
+        // Verificamos si este parcial ya fue cerrado y bloqueado por el maestro
+        $estaBloqueado = Nota::where('aula_asignatura_docente_id', $asignacion->id)
+                            ->where('corte_evaluativo_id', $corteSeleccionado)
+                            ->where('bloqueado', true)
+                            ->exists();
+
+        $matriculas = \App\Models\Matricula::with(['alumno', 'notas' => function($query) use ($asignacion, $corteSeleccionado) {
+            $query->where('aula_asignatura_docente_id', $asignacion->id)
+                  ->where('corte_evaluativo_id', $corteSeleccionado);
+        }])
+        ->where('aula_id', $asignacion->aula_id)
+        ->where('estado', 'activo')
+        ->get()
+        ->sortBy(fn($m) => $m->alumno->nombre_completo);
+
+        // Cargamos también las notas individuales de las actividades usando DB para cruzar rápido
+        $notasActividades = DB::table('nota_actividad')
+            ->whereIn('matricula_id', $matriculas->pluck('id'))
+            ->whereIn('actividad_evaluativa_id', $actividades->pluck('id'))
+            ->get()
+            ->groupBy('matricula_id');
+
+        $asignacion->load('aula.grado', 'asignatura');
+
+        return view('academico.notas.planilla', compact('asignacion', 'cortes', 'corteSeleccionado', 'matriculas', 'actividades', 'notasActividades', 'estaBloqueado'));
+    }
+
+    // 3. AUTO-SUMA Y VALIDACIÓN ESTRICTA (Reemplaza el store anterior)
+    public function store(Request $request, AulaAsignaturaDocente $asignacion)
+    {
+        $this->authorize('calificar', $asignacion);
+        
+        $corteId = $request->corte_evaluativo_id;
+
+        // BARRERA 1: ¿El parcial está bloqueado?
+        if (Nota::where('aula_asignatura_docente_id', $asignacion->id)->where('corte_evaluativo_id', $corteId)->where('bloqueado', true)->exists()) {
+            return back()->with('error', 'El parcial está cerrado. Solicita autorización para modificar.');
+        }
+
+        $actividades = \App\Models\ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
+                            ->where('corte_evaluativo_id', $corteId)
+                            ->get()->keyBy('id');
+
+        DB::transaction(function () use ($request, $asignacion, $corteId, $actividades) {
+            // El front-end enviará un arreglo: name="notas[matricula_id][actividad_id]"
+            foreach ($request->notas as $matriculaId => $calificaciones) {
                 
-                $indicadorId = null;
-                if ($codigoIndicador) {
-                    $indicadorId = IndicadorLogro::where('codigo', $codigoIndicador)->value('id');
+                $sumaTotalAlumno = 0;
+
+                foreach ($calificaciones as $actividadId => $notaIngresada) {
+                    if (is_null($notaIngresada)) continue;
+
+                    $actividad = $actividades->get($actividadId);
+                    if (!$actividad) continue;
+
+                    // BARRERA 2: Limitar la nota al puntaje máximo de la actividad
+                    $notaFinal = min(abs($notaIngresada), $actividad->puntaje_maximo);
+
+                    // 1. Guardar la nota individual en la nueva tabla
+                    DB::table('nota_actividad')->updateOrInsert(
+                        ['matricula_id' => $matriculaId, 'actividad_evaluativa_id' => $actividadId],
+                        ['nota_obtenida' => $notaFinal, 'updated_at' => now()]
+                    );
+
+                    $sumaTotalAlumno += $notaFinal;
                 }
+
+                // 2. Auto-Suma Global en la tabla 'nota'
+                $codigoIndicador = $this->notaService->calcularIndicadorLogro($sumaTotalAlumno);
+                $indicadorId = $codigoIndicador ? IndicadorLogro::where('codigo', $codigoIndicador)->value('id') : null;
 
                 Nota::updateOrCreate(
                     [
-                        'matricula_id' => $item['matricula_id'],
-                        'aula_asignatura_docente_id' => $datos['aula_asignatura_docente_id'],
-                        'corte_evaluativo_id' => $datos['corte_evaluativo_id'],
+                        'matricula_id' => $matriculaId,
+                        'aula_asignatura_docente_id' => $asignacion->id,
+                        'corte_evaluativo_id' => $corteId,
                     ],
                     [
-                        'nota_cuantitativa' => $notaCuantitativa,
+                        'nota_cuantitativa' => $sumaTotalAlumno,
                         'indicador_logro_id' => $indicadorId,
                     ]
                 );
             }
         });
 
-        return back()->with('success', 'Planilla de calificaciones procesada y guardada exitosamente.');
+        return back()->with('success', 'Calificaciones actualizadas. La auto-suma se ha calculado exitosamente.');
     }
 
-    public function create(Request $request, AulaAsignaturaDocente $asignacion)
+    // 4. NUEVO: CERRAR PARCIAL (Congela las notas)
+    public function cerrarParcial(Request $request, AulaAsignaturaDocente $asignacion)
     {
         $this->authorize('calificar', $asignacion);
+        
+        Nota::where('aula_asignatura_docente_id', $asignacion->id)
+            ->where('corte_evaluativo_id', $request->corte_evaluativo_id)
+            ->update(['bloqueado' => true]);
 
-        $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', function($q) {
-            $q->where('activo', true);
-        })->get();
+        return back()->with('success', 'Calificaciones cerradas de forma permanente. Ya no pueden ser editadas.');
+    }
 
-        $corteSeleccionado = $request->query('corte_evaluativo_id', $cortes->first()->id ?? null);
+    // 5. NUEVO: SOLICITAR DESBLOQUEO (Auditoría)
+    public function solicitarDesbloqueo(Request $request, AulaAsignaturaDocente $asignacion)
+    {
+        $this->authorize('calificar', $asignacion);
+        
+        $request->validate(['motivo' => 'required|string|max:500']);
+        $docenteId = auth()->user()->docente->id ?? null;
 
-        $matriculas = \App\Models\Matricula::with(['alumno', 'notas' => function($query) use ($asignacion, $corteSeleccionado) {
-            $query->where('aula_asignatura_docente_id', $asignacion->id)
-                  ->where('corte_evaluativo_id', $corteSeleccionado);
-        }, 'notas.indicadorLogro'])
-        ->where('aula_id', $asignacion->aula_id)
-        ->where('estado', 'activo')
-        ->get()
-        ->sortBy(function($matricula) {
-            return $matricula->alumno->nombre_completo;
-        });
+        if (!$docenteId) abort(403);
 
-        $asignacion->load('aula.grado', 'asignatura');
+        // Obtenemos una de las notas bloqueadas como referencia para la solicitud
+        $notaReferencia = Nota::where('aula_asignatura_docente_id', $asignacion->id)
+                              ->where('corte_evaluativo_id', $request->corte_evaluativo_id)
+                              ->first();
 
-        return view('academico.notas.planilla', compact('asignacion', 'cortes', 'corteSeleccionado', 'matriculas'));
+        if ($notaReferencia) {
+            DB::table('solicitud_edicion_nota')->insert([
+                'docente_id' => $docenteId,
+                'nota_id' => $notaReferencia->id,
+                'motivo' => $request->motivo,
+                'estado' => 'Pendiente',
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+        }
+
+        return back()->with('success', 'Solicitud enviada. La Subdirectora revisará tu petición pronto.');
     }
 }
