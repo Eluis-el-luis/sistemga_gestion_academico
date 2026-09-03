@@ -31,13 +31,9 @@
                 
                 <!-- BOTONES DE ACCIÓN RÁPIDA -->
                 <div class="flex gap-2 w-full md:w-auto">
-                    <button @click="modalGenerar = true" class="flex-1 md:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                        Generador Masivo
-                    </button>
                     <button @click="modalClonar = true" class="flex-1 md:flex-none px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
                         <svg class="w-4 h-4 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>
-                        Clonar
+                        Clonar Estructura
                     </button>
                 </div>
             </div>
@@ -187,63 +183,6 @@
             </div>
         </div>
 
-        <!-- MODAL: GENERADOR MASIVO -->
-        <div x-show="modalGenerar" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div x-show="modalGenerar" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="modalGenerar = false"></div>
-            <div x-show="modalGenerar" class="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
-                <div class="px-6 py-5 border-b border-slate-100 bg-indigo-50 flex justify-between items-center">
-                    <h3 class="text-lg font-black text-indigo-900 flex items-center gap-2"><svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> Generador Masivo</h3>
-                    <button @click="modalGenerar = false" class="text-indigo-400 hover:text-rose-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
-                </div>
-                <form action="{{ route('academico.bloques.generar-masivo') }}" method="POST" class="p-6">
-                    @csrf
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="col-span-2 md:col-span-1">
-                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Modalidad</label>
-                            <select name="modalidad_id" class="w-full border-slate-200 bg-slate-50 rounded-xl text-sm" required>
-                                @foreach($modalidades as $mod) <option value="{{ $mod->id }}">{{ $mod->nombre }}</option> @endforeach
-                            </select>
-                        </div>
-                        <div class="col-span-2 md:col-span-1">
-                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Turno</label>
-                            <select name="turno" class="w-full border-slate-200 bg-slate-50 rounded-xl text-sm" required>
-                                <option value="Matutino">Matutino</option><option value="Vespertino">Vespertino</option>
-                            </select>
-                        </div>
-                        <div class="col-span-2">
-                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Tipo de Jornada</label>
-                            <select name="tipo_jornada" class="w-full border-slate-200 bg-slate-50 rounded-xl text-sm" required>
-                                <option value="Regular">Regular</option><option value="Viernes">Viernes</option>
-                            </select>
-                        </div>
-                        
-                        <div class="col-span-full border-t border-slate-100 my-1"></div>
-                        
-                        <div class="col-span-2 md:col-span-1">
-                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Hora Inicio Base</label>
-                            <input type="time" name="hora_inicio_base" value="07:00" class="w-full border-slate-200 bg-slate-50 rounded-xl text-sm font-bold" required>
-                        </div>
-                        <div class="col-span-2 md:col-span-1">
-                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Cant. de Bloques</label>
-                            <input type="number" name="cantidad_bloques" value="6" min="1" max="12" class="w-full border-slate-200 bg-slate-50 rounded-xl text-sm font-bold" required>
-                        </div>
-                        <div class="col-span-2 md:col-span-1">
-                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Duración Clase (min)</label>
-                            <input type="number" name="duracion_clase" value="45" min="15" max="90" class="w-full border-slate-200 bg-slate-50 rounded-xl text-sm font-bold" required>
-                        </div>
-                        <div class="col-span-2 md:col-span-1 border border-amber-200 bg-amber-50 rounded-xl p-3">
-                            <label class="block text-[11px] font-black text-amber-700 uppercase tracking-widest mb-1.5">Receso antes del bloque:</label>
-                            <div class="flex gap-2">
-                                <input type="number" name="posicion_receso" placeholder="N°" min="2" max="8" class="w-1/2 border-amber-200 rounded-lg text-sm" title="Ej: 4 para poner receso antes de la 4ta hora">
-                                <input type="number" name="duracion_receso" placeholder="Min" min="10" max="60" class="w-1/2 border-amber-200 rounded-lg text-sm" title="Minutos de receso">
-                            </div>
-                        </div>
-                    </div>
-                    <button type="submit" class="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl shadow-md transition-all">Generar Estructura</button>
-                </form>
-            </div>
-        </div>
-
         <!-- MODAL: CLONACIÓN -->
         <div x-show="modalClonar" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div x-show="modalClonar" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="modalClonar = false"></div>
@@ -264,7 +203,12 @@
                             </select>
                         </div>
                         <select name="origen_turno" class="border-slate-200 bg-slate-50 rounded-xl text-sm" required><option value="Matutino">Matutino</option><option value="Vespertino">Vespertino</option></select>
-                        <select name="origen_jornada" class="border-slate-200 bg-slate-50 rounded-xl text-sm" required><option value="Regular">Regular</option><option value="Viernes">Viernes</option></select>
+                        <select name="origen_jornada" class="border-slate-200 bg-slate-50 rounded-xl text-sm" required>
+                            <option value="Regular">Regular</option>
+                            <option value="Viernes">Viernes</option>
+                            <option value="Corto 40m">Corto 40m</option>
+                            <option value="Especial 30m">Especial 30m</option>
+                        </select>
                     </div>
 
                     <h4 class="text-xs font-black text-rose-600 uppercase tracking-widest mb-3 border-t border-slate-100 pt-4">2. Pegar hacia (Destino)</h4>
@@ -276,7 +220,12 @@
                             </select>
                         </div>
                         <select name="destino_turno" class="border-slate-200 bg-slate-50 rounded-xl text-sm" required><option value="Matutino">Matutino</option><option value="Vespertino">Vespertino</option></select>
-                        <select name="destino_jornada" class="border-slate-200 bg-slate-50 rounded-xl text-sm" required><option value="Regular">Regular</option><option value="Viernes">Viernes</option></select>
+                        <select name="destino_jornada" class="border-slate-200 bg-slate-50 rounded-xl text-sm" required>
+                            <option value="Regular">Regular</option>
+                            <option value="Viernes">Viernes</option>
+                            <option value="Corto 40m">Corto 40m</option>
+                            <option value="Especial 30m">Especial 30m</option>
+                        </select>
                     </div>
                     
                     <button type="submit" class="w-full mt-4 bg-slate-800 hover:bg-slate-700 text-white font-black py-3 rounded-xl shadow-md transition-all">Clonar Bloques</button>
@@ -290,7 +239,6 @@
     <script>
         document.addEventListener('alpine:init', () => {
             Alpine.data('gestorBloques', () => ({
-                modalGenerar: false,
                 modalClonar: false,
                 todosBloques: @json($bloques),
                 form: {
