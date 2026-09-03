@@ -70,11 +70,18 @@ Route::middleware('auth')->group(function () {
         
         Route::resource('malla', \App\Http\Controllers\MallaCurricularController::class)
         ->only(['index', 'store', 'destroy']);
+
+        // Rutas adicionales para gestión avanzada de la malla
+        Route::put('malla/item/{id}', [\App\Http\Controllers\MallaCurricularController::class, 'update'])->name('malla.item.update');
+        Route::post('malla/clonar', [\App\Http\Controllers\MallaCurricularController::class, 'clonarMalla'])->name('malla.clonar');
         
         // Bloques de Modalidades (Antes Horario General)
         Route::resource('bloques', \App\Http\Controllers\BloqueHorarioController::class)
             ->only(['index', 'store', 'destroy']);
-
+        Route::post('bloques/clonar', [\App\Http\Controllers\BloqueHorarioController::class, 'clonar'])->name('bloques.clonar');
+        Route::post('bloques/generar-masivo', [\App\Http\Controllers\BloqueHorarioController::class, 'generarMasivo'])->name('bloques.generar-masivo');
+        Route::delete('bloques/jornada/eliminar', [\App\Http\Controllers\BloqueHorarioController::class, 'destroyJornada'])->name('bloques.jornada.destroy');
+        
         // --- VISOR DE HORARIOS (Solo Lectura) ---
         Route::prefix('visor-horarios')->name('visor.')->group(function () {
             Route::get('/', [\App\Http\Controllers\VisorHorarioController::class, 'index'])->name('index');
