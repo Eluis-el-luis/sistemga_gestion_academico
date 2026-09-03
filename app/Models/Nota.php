@@ -23,4 +23,9 @@ class Nota extends Model
     {
         return $this->belongsTo(IndicadorLogro::class, 'indicador_logro_id');
     }
+
+    public function corteEvaluativo()
+    {
+        return $this->belongsTo(CorteEvaluativo::class, 'corte_evaluativo_id');
+    }
 }

@@ -1,27 +1,25 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex justify-between items-center">
-            <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight flex items-center gap-2">
-                <svg class="w-7 h-7 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012-2m-6 9l2 2 4-4"></path></svg>
-                {{ __('Control de Ingreso de Notas') }}
-            </h2>
+            <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">Control de Notas</h2>
             <a href="{{ route('academico.reportes.index') }}" class="text-stone-500 hover:text-stone-700 font-bold text-sm">← Volver</a>
         </div>
     </x-slot>
 
     <div class="pb-12 pt-6 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-        <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6">
-            <form method="GET" class="flex items-end gap-4">
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-4">
+            <div class="flex items-end gap-4">
                 <div>
-                    <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Año Escolar</label>
-                    <select name="anio_escolar_id" onchange="this.form.submit()" class="border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
-                        @foreach($anios as $an)
-                            <option value="{{ $an->id }}" @selected($an->id == ($anio->id ?? null))>{{ $an->nombre }}</option>
-                        @endforeach
+                    <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Estado</label>
+                    <select name="tipo" onchange="location.href='{{ route('academico.reportes.control-notas') }}?tipo='+this.value" class="border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
+                        <option value="">Todos</option>
+                        <option value="pendientes" @selected(request('tipo') === 'pendientes')>Notas Pendientes</option>
+                        <option value="ingresadas" @selected(request('tipo') === 'ingresadas')>Notas Ingresadas</option>
                     </select>
                 </div>
-                <button type="button" onclick="window.print()" class="ml-auto bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black px-4 py-2 rounded-xl shadow-md text-sm">Imprimir</button>
-            </form>
+            </div>
+            @include('academico.reportes.partials.filtros-notas', ['ruta' => 'academico.reportes.control-notas'])
+            <button type="button" onclick="window.print()" class="bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black px-4 py-2 rounded-xl shadow-md text-sm">Imprimir</button>
         </div>
 
         <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
@@ -55,7 +53,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="7" class="px-6 py-12 text-center text-stone-500 font-bold">No hay asignaciones para el año seleccionado.</td></tr>
+                            <tr><td colspan="7" class="px-6 py-12 text-center text-stone-500 font-bold">No hay resultados para los filtros seleccionados.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
