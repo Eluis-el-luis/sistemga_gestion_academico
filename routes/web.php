@@ -41,6 +41,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/asistencia-personal/marcar', [\App\Http\Controllers\AsistenciaPersonalController::class, 'marcarLlegada'])->name('asistencia.personal.marcar');
     
     Route::prefix('academico')->name('academico.')->group(function () {
+
+        // Catálogo de Asignaturas
+        Route::resource('asignaturas', \App\Http\Controllers\AsignaturaController::class)->except(['create', 'show', 'edit']);
         
         Route::get('asistencia/personal', [\App\Http\Controllers\AsistenciaPersonalController::class, 'index'])->name('asistencia.personal.index');
         Route::resource('alumnos', AlumnoController::class);
@@ -89,7 +92,12 @@ Route::middleware('auth')->group(function () {
         // Fase 5: Calificaciones
         Route::get('notas', [\App\Http\Controllers\NotaController::class, 'index'])->name('notas.index');
         Route::get('notas/planilla/{asignacion}', [\App\Http\Controllers\NotaController::class, 'create'])->name('notas.create');
-        Route::post('notas', [\App\Http\Controllers\NotaController::class, 'store'])->name('notas.store');
+        Route::post('notas/{asignacion}', [\App\Http\Controllers\NotaController::class, 'store'])->name('notas.store');
+        
+        // --- NUEVAS RUTAS DE BLOQUEO Y AUDITORÍA ---
+        Route::post('notas/{asignacion}/cerrar', [\App\Http\Controllers\NotaController::class, 'cerrarParcial'])->name('notas.cerrar');
+        Route::post('notas/{asignacion}/solicitar-desbloqueo', [\App\Http\Controllers\NotaController::class, 'solicitarDesbloqueo'])->name('notas.solicitar-desbloqueo');
+        
         Route::get('cortes-evaluativos', [\App\Http\Controllers\CorteEvaluativoController::class, 'index'])->name('cortes.index');
         Route::put('cortes-evaluativos/{corte}', [\App\Http\Controllers\CorteEvaluativoController::class, 'update'])->name('cortes.update');
     
@@ -124,6 +132,10 @@ Route::middleware('auth')->group(function () {
         Route::post('apoyo-padres', [\App\Http\Controllers\ApoyoPadresController::class, 'store'])->name('apoyo-padres.store');
         Route::delete('apoyo-padres/{apoyo}', [\App\Http\Controllers\ApoyoPadresController::class, 'destroy'])->name('apoyo-padres.destroy');
 
+        // Fase 8: Control Disciplinario
+        Route::get('disciplina', [\App\Http\Controllers\IncidenciaDisciplinariaController::class, 'index'])->name('disciplina.index');
+        Route::post('disciplina', [\App\Http\Controllers\IncidenciaDisciplinariaController::class, 'store'])->name('disciplina.store');
+        Route::put('disciplina/{incidencia}', [\App\Http\Controllers\IncidenciaDisciplinariaController::class, 'update'])->name('disciplina.update');
         // Fase 8: Centro de Reportes
         Route::get('reportes', [\App\Http\Controllers\ReporteController::class, 'index'])->name('reportes.index');
 
