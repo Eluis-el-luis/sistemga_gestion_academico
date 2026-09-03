@@ -29,47 +29,15 @@ class DashboardController extends Controller
         $diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
         $dbMetricas = []; // Nueva variable que contendrá TODAS las gráficas
 
-        // 3. CARGA DE DATOS PARA DIRECTIVA Y GESTIÓN
+// 3. CARGA DE DATOS PARA DIRECTIVA Y GESTIÓN
         if ($user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
             // "Alumnos Activos": matrículas en estado activo del ciclo vigente
             $totalMatriculados = \App\Models\Matricula::where('estado', 'activo')->count();
             // "Docentes": usuarios con rol de docencia
-            $totalPersonal = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count(); 
-            
-            // --- PRIMERA CONSULTA 100% REAL (Mejorada con Eloquent) ---
-            try {
-                // Usamos LIKE para que detecte "Preescolar", "PREESCOLAR", "Educación Preescolar", etc.
-                $preescolar = \App\Models\Matricula::whereHas('aula.modalidad', function($q) {
-                    $q->where('nombre', 'LIKE', '%reescolar%'); 
-                })->count();
+            $totalPersonal = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count();
 
-                $primaria = \App\Models\Matricula::whereHas('aula.modalidad', function($q) {
-                    $q->where('nombre', 'LIKE', '%rimaria%');
-                })->count();
-
-                $secundaria = \App\Models\Matricula::whereHas('aula.modalidad', function($q) {
-                    $q->where('nombre', 'LIKE', '%ecundaria%');
-                })->count();
-            } catch (\Exception $e) {
-                // Si hay algún problema con las relaciones o tablas vacías, previene el error 500
-                $preescolar = 0; $primaria = 0; $secundaria = 0;
-            }
-
-            // --- ARMAMOS EL PAQUETE DE GRÁFICAS PARA ENVIAR A JAVASCRIPT ---
-            $dbMetricas = [
-                'matriculados'          => ['titulo' => 'Alumnos Matriculados Activos (Dato Real)', 'datos' => [$preescolar, $primaria, $secundaria]],
-                'asistencia_alumnos'    => ['titulo' => 'Asistencia de Alumnos (%)', 'datos' => [0, 0, 0]],
-                'asistencia_docentes'   => ['titulo' => 'Asistencia de Docentes (%)', 'datos' => [0, 0, 0]],
-                'rendimiento_modalidad' => ['titulo' => 'Rendimiento Académico General (%)', 'datos' => [0, 0, 0]],
-                'apoyo_padres'          => ['titulo' => 'Participación de Padres (%)', 'datos' => [0, 0, 0]],
-                'aprobados'             => ['titulo' => 'Alumnos Aprobados Limpios (%)', 'datos' => [0, 0, 0]],
-                'reprobados_leves'      => ['titulo' => 'Reprobados (1 a 2 Clases) (%)', 'datos' => [0, 0, 0]],
-                'reprobados_graves'     => ['titulo' => 'Reprobados Críticos (3+ Clases) (%)', 'datos' => [0, 0, 0]],
-                'promedio_notas'        => ['titulo' => 'Promedio de Calificaciones (Escala 0-100)', 'datos' => [0, 0, 0]],
-                'avances_silabo'        => ['titulo' => 'Avance Curricular del Maestro (%)', 'datos' => [0, 0, 0]],
-                'retencion'             => ['titulo' => 'Retención Estudiantil (%)', 'datos' => [0, 0, 0]],
-                'puntualidad'           => ['titulo' => 'Puntualidad en Horario de Entrada (%)', 'datos' => [0, 0, 0]]
-            ];
+            // --- MÉTRICAS PARA GRÁFICAS (datos reales por modalidad) ---
+            $dbMetricas = $this->calcularMetricas();
         }
 
         // 4. CARGA DE DATOS PARA DOCENTE POR ASIGNATURA (Horarios)
@@ -92,6 +60,117 @@ class DashboardController extends Controller
         return view('dashboard', compact(
             'avisos', 'totalMatriculados', 'totalPersonal', 'horarios', 'diasSemana', 'dbMetricas'
         ));
+    }
+
+    /**
+     * Calcula las métricas para las gráficas del panel directivo, segmentadas
+     * por modalidad (Preescolar, Primaria, Secundaria).
+     */
+    protected function calcularMetricas(): array
+    {
+        $modalidades = \App\Models\Modalidad::orderBy('id')->get();
+
+        $matriculados = [];
+        $asistenciaAlumnos = [];
+        $asistenciaDocentes = [];
+        $rendimiento = [];
+        $apoyoPadres = [];
+        $aprobados = [];
+        $reprobadosLeves = [];
+        $reprobadosGraves = [];
+        $promedioNotas = [];
+        $avances = [];
+        $retencion = [];
+        $puntualidad = [];
+
+        foreach ($modalidades as $modalidad) {
+            $aulaIds = \App\Models\Aula::where('modalidad_id', $modalidad->id)->pluck('id');
+
+            // Matriculados activos
+            $matriculaQuery = \App\Models\Matricula::whereIn('aula_id', $aulaIds);
+            $activos = (clone $matriculaQuery)->where('estado', 'activo')->count();
+            $retirados = (clone $matriculaQuery)->where('estado', 'retirado')->count();
+            $matriculados[] = $activos;
+
+            $matriculaIds = (clone $matriculaQuery)->where('estado', 'activo')->pluck('id');
+
+            // Asistencia de alumnos (% presentes)
+            $asistAula = \App\Models\AsistenciaAula::whereIn('matricula_id', $matriculaIds)->get();
+            $totalRegAula = $asistAula->count();
+            $presentesAula = $asistAula->whereIn('estado_asistencia', ['Presente', 'Actividad Institucional'])->count();
+            $asistenciaAlumnos[] = $totalRegAula > 0 ? round(($presentesAula / $totalRegAula) * 100, 1) : 0;
+
+            // Puntualidad (% Presente sin retardo) sobre asistencia personal del día
+            // Se calcula globalmente al final; aquí dejamos acumuladores por modalidad no aplican.
+
+            // Rendimiento académico (% aprobados con promedio >= 60)
+            $notasModalidad = \App\Models\Nota::whereIn('matricula_id', $matriculaIds)->get();
+            $aprob = $notasModalidad->where('nota_cuantitativa', '>=', 60)->count();
+            $totalNotas = $notasModalidad->count();
+            $rendimiento[] = $totalNotas > 0 ? round(($aprob / $totalNotas) * 100, 1) : 0;
+
+            // Promedio de calificaciones (escala 0-100)
+            $promedioNotas[] = $totalNotas > 0 ? round((float) $notasModalidad->avg('nota_cuantitativa'), 2) : 0;
+
+            // Apoyo de padres (% de padres que apoyan)
+            $apoyo = \App\Models\ApoyoPadres::whereIn('aula_id', $aulaIds)->get();
+            $totApoyo = $apoyo->sum('total_padres');
+            $cantApoyo = $apoyo->sum('cantidad_apoyan');
+            $apoyoPadres[] = $totApoyo > 0 ? round(($cantApoyo / $totApoyo) * 100, 1) : 0;
+
+            // Aprobados limpios / reprobados por alumno (conteo de asignaturas reprobadas)
+            $alumnosNotas = \App\Models\Nota::whereIn('matricula_id', $matriculaIds)
+                ->get()
+                ->groupBy('matricula_id');
+            $limpios = 0; $leves = 0; $graves = 0; $totalAlumnosEval = $alumnosNotas->count();
+            foreach ($alumnosNotas as $notasAlumno) {
+                $reprobadas = $notasAlumno->where('nota_cuantitativa', '<', 60)->count();
+                if ($reprobadas === 0) $limpios++;
+                elseif ($reprobadas <= 2) $leves++;
+                else $graves++;
+            }
+            $aprobados[] = $totalAlumnosEval > 0 ? round(($limpios / $totalAlumnosEval) * 100, 1) : 0;
+            $reprobadosLeves[] = $totalAlumnosEval > 0 ? round(($leves / $totalAlumnosEval) * 100, 1) : 0;
+            $reprobadosGraves[] = $totalAlumnosEval > 0 ? round(($graves / $totalAlumnosEval) * 100, 1) : 0;
+
+            // Avance curricular (promedio de porcentaje de avance)
+            $asignacionIds = \App\Models\AulaAsignaturaDocente::whereIn('aula_id', $aulaIds)->pluck('id');
+            $avancesMod = \App\Models\AvanceContenido::whereIn('aula_asignatura_docente_id', $asignacionIds)->get();
+            $avances[] = $avancesMod->count() > 0 ? round((float) $avancesMod->avg('porcentaje_avance'), 1) : 0;
+
+            // Retención = activos / (activos + retirados)
+            $retencion[] = ($activos + $retirados) > 0 ? round(($activos / ($activos + $retirados)) * 100, 1) : 0;
+        }
+
+        // Puntualidad y asistencia de docentes: globales (AsistenciaPersonal)
+        $docentesIds = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->pluck('id');
+        $asisPersonal = \App\Models\AsistenciaPersonal::whereIn('usuario_id', $docentesIds)->get();
+        $totPersonal = $asisPersonal->count();
+        $presentesPersonal = $asisPersonal->where('estado', 'Presente')->count();
+        $retardos = $asisPersonal->where('estado', 'Retardo')->count();
+        $asistenciaDocentes[] = $totPersonal > 0 ? round(($presentesPersonal / $totPersonal) * 100, 1) : 0;
+        $puntualidad[] = $totPersonal > 0 ? round((($presentesPersonal) / $totPersonal) * 100, 1) : 0;
+
+        // Para puntualidad distribuimos el mismo valor (no hay segmentación por modalidad en AsistenciaPersonal)
+        $puntualidad = array_fill(0, count($modalidades), count($puntualidad) ? $puntualidad[0] : 0);
+
+        // asistencia_docentes también puede repetirse por modalidad (sin segmentación)
+        $asistenciaDocentesArr = array_fill(0, count($modalidades), $asistenciaDocentes[0] ?? 0);
+
+        return [
+            'matriculados'          => ['titulo' => 'Alumnos Matriculados Activos', 'datos' => $matriculados],
+            'asistencia_alumnos'    => ['titulo' => 'Asistencia de Alumnos (%)', 'datos' => $asistenciaAlumnos],
+            'asistencia_docentes'   => ['titulo' => 'Asistencia de Docentes (%)', 'datos' => $asistenciaDocentesArr],
+            'rendimiento_modalidad' => ['titulo' => 'Rendimiento Académico General (%)', 'datos' => $rendimiento],
+            'apoyo_padres'          => ['titulo' => 'Participación de Padres (%)', 'datos' => $apoyoPadres],
+            'aprobados'             => ['titulo' => 'Alumnos Aprobados Limpios (%)', 'datos' => $aprobados],
+            'reprobados_leves'      => ['titulo' => 'Reprobados (1 a 2 Clases) (%)', 'datos' => $reprobadosLeves],
+            'reprobados_graves'     => ['titulo' => 'Reprobados Críticos (3+ Clases) (%)', 'datos' => $reprobadosGraves],
+            'promedio_notas'        => ['titulo' => 'Promedio de Calificaciones (Escala 0-100)', 'datos' => $promedioNotas],
+            'avances_silabo'        => ['titulo' => 'Avance Curricular del Maestro (%)', 'datos' => $avances],
+            'retencion'             => ['titulo' => 'Retención Estudiantil (%)', 'datos' => $retencion],
+            'puntualidad'           => ['titulo' => 'Puntualidad en Horario de Entrada (%)', 'datos' => $puntualidad],
+        ];
     }
 
     public function storeAviso(Request $request)

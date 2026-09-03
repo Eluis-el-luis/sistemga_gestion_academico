@@ -73,6 +73,13 @@ class BloqueHorarioController extends Controller
     public function destroy(BloqueHorario $bloque)
     {
         $this->authorize('horarios.gestionar');
+
+        // Protección: no permitir borrar si hay clases programadas que usan este bloque
+        $enUso = \App\Models\Horario::where('bloque_horario_id', $bloque->id)->exists();
+        if ($enUso) {
+            return back()->with('error', 'No se puede eliminar este bloque porque tiene clases programadas. Elimine primero esas clases del horario.');
+        }
+
         $bloque->delete();
         return back()->with('success', 'Bloque eliminado del horario oficial.');
     }

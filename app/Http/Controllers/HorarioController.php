@@ -74,6 +74,20 @@ class HorarioController extends Controller
         // 1. Obtener la asignación solicitada para saber quién es el maestro
         $asignacion = AulaAsignaturaDocente::with('aula.grado')->findOrFail($request->aula_asignatura_docente_id);
 
+        // 1.5 Escudo de Pertinencia: la asignación debe pertenecer a ESTA aula
+        if ($asignacion->aula_id !== $aula->id) {
+            return back()->with('error', 'La materia seleccionada no pertenece a esta aula.');
+        }
+
+        // 1.6 Escudo de Bloque: el bloque debe pertenecer a la modalidad y turno del aula
+        $bloque = BloqueHorario::findOrFail($request->bloque_horario_id);
+        if ($bloque->modalidad_id !== $aula->modalidad_id || $bloque->turno !== $aula->turno) {
+            return back()->with('error', 'El bloque de tiempo no pertenece a la modalidad o turno de esta aula.');
+        }
+        if ($bloque->es_recreo) {
+            return back()->with('error', 'No se puede asignar una materia en un bloque de recreo.');
+        }
+
         // 2. Escudo de Integridad: ¿Tiene profesor asignado?
         if (!$asignacion->docente_id) {
             return back()->with('error', 'No puedes asignar un horario a una materia que aún no tiene profesor titular.');
@@ -108,7 +122,7 @@ class HorarioController extends Controller
         }
 
         // 5. Vía Libre: Guardar
-        Horario::create($request->all());
+        Horario::create($request->only(['aula_asignatura_docente_id', 'dia_semana', 'bloque_horario_id']));
 
         return back()->with('success', 'Clase asignada al horario correctamente.');
     }
