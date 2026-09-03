@@ -87,9 +87,16 @@ class ReporteTest extends TestCase
     public function testdirector_puede_ver_todos_los_reportes(): void
     {
         $rutas = [
-            'academico.reportes.ingreso-notas',
-            'academico.reportes.asistencia',
-            'academico.reportes.rendimiento',
+            'academico.reportes.control-notas',
+            'academico.reportes.notas-globales',
+            'academico.reportes.notas-pendientes',
+            'academico.reportes.asistencia-global',
+            'academico.reportes.estadisticas-asistencia',
+            'academico.reportes.asistencia-seccion-dia',
+            'academico.reportes.asistencia-seccion-rango',
+            'academico.reportes.asistencia-estudiante',
+            'academico.reportes.notas-por-asignatura',
+            'academico.reportes.historial-estudiante',
             'academico.reportes.mined',
             'academico.reportes.estudiantes',
             'academico.reportes.padres',

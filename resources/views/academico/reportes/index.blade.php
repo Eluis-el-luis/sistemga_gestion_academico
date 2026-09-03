@@ -53,20 +53,28 @@
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             @php
                 $reportes = [
-                    ['ruta' => 'reportes.ingreso-notas', 'icono' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012-2m-6 9l2 2 4-4', 'titulo' => 'Control de Ingreso de Notas', 'desc' => 'Monitoreo del registro de calificaciones: profesores/asignaturas con notas pendientes.'],
-                    ['ruta' => 'reportes.asistencia', 'icono' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012-2', 'titulo' => 'Asistencia', 'desc' => 'Control diario por turno y grado/sección, estadísticas de presencia y ausencias.'],
-                    ['ruta' => 'reportes.rendimiento', 'icono' => 'M16 4v12l-4-2-4 2V4M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z', 'titulo' => 'Rendimiento Académico', 'desc' => 'Calificaciones detalladas por sección, asignatura y estudiante.'],
-                    ['ruta' => 'reportes.mined', 'icono' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', 'titulo' => 'Reportes MINED', 'desc' => 'Reportes estadísticos requeridos por el Ministerio de Educación.'],
-                    ['ruta' => 'reportes.estudiantes', 'icono' => 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', 'titulo' => 'Estudiantes', 'desc' => 'Matrícula, retiros y expedientes incompletos de la población estudiantil.'],
-                    ['ruta' => 'reportes.padres', 'icono' => 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0', 'titulo' => 'Responsables y Padres', 'desc' => 'Contacto y adopción digital de los responsables de los estudiantes.'],
+                    // Control de ingreso de notas
+                    ['ruta' => 'reportes.control-notas', 'titulo' => 'Control de Notas', 'desc' => 'Notas ingresadas o pendientes por asignatura, docente o grado.'],
+                    ['ruta' => 'reportes.notas-globales', 'titulo' => 'Notas Globales', 'desc' => 'Listado global de notas con filtros por asignatura, docente, grado y corte.'],
+                    ['ruta' => 'reportes.notas-pendientes', 'titulo' => 'Notas Pendientes', 'desc' => 'Estudiantes con notas pendientes por periodo evaluativo y docente.'],
+                    // Asistencia
+                    ['ruta' => 'reportes.asistencia-global', 'titulo' => 'Asistencia Global', 'desc' => 'Asistencia diaria por turno, grado y sección.'],
+                    ['ruta' => 'reportes.estadisticas-asistencia', 'titulo' => 'Estadísticas de Asistencia', 'desc' => 'Presencias y ausencias agregadas por rango de fechas.'],
+                    ['ruta' => 'reportes.asistencia-seccion-dia', 'titulo' => 'Asistencia por Sección (Día)', 'desc' => 'Asistencia de una sección específica en un día.'],
+                    ['ruta' => 'reportes.asistencia-seccion-rango', 'titulo' => 'Asistencia por Sección (Rango)', 'desc' => 'Asistencia de una sección en un rango de fechas.'],
+                    ['ruta' => 'reportes.asistencia-estudiante', 'titulo' => 'Asistencia por Estudiante', 'desc' => 'Estadísticas de asistencia individual por estudiante.'],
+                    // Rendimiento
+                    ['ruta' => 'reportes.notas-por-asignatura', 'titulo' => 'Notas por Asignatura', 'desc' => 'Rendimiento por asignatura, aula y docente.'],
+                    ['ruta' => 'reportes.historial-estudiante', 'titulo' => 'Historial por Estudiante', 'desc' => 'Historial completo de notas de un estudiante.'],
+                    // Otros
+                    ['ruta' => 'reportes.mined', 'titulo' => 'Reportes MINED', 'desc' => 'Reportes estadísticos del Ministerio de Educación.'],
+                    ['ruta' => 'reportes.estudiantes', 'titulo' => 'Estudiantes', 'desc' => 'Matrícula, retiros y expedientes incompletos.'],
+                    ['ruta' => 'reportes.padres', 'titulo' => 'Responsables y Padres', 'desc' => 'Contacto y adopción digital de responsables.'],
                 ];
             @endphp
 
             @foreach($reportes as $rep)
-                <a href="{{ route('academico.'.$rep['ruta'], ['anio_escolar_id' => $anio->id ?? null]) }}" class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 hover:border-[#e6ac27]/40 hover:shadow-md transition-all group">
-                    <div class="w-12 h-12 rounded-2xl bg-[#FFFDF5] text-[#e6ac27] flex items-center justify-center border border-[#e6ac27]/30 mb-4 group-hover:scale-105 transition-transform">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $rep['icono'] }}"></path></svg>
-                    </div>
+                <a href="{{ route('academico.'.$rep['ruta']) }}" class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 hover:border-[#e6ac27]/40 hover:shadow-md transition-all group">
                     <h3 class="font-black text-[#3d2c1d] text-lg">{{ $rep['titulo'] }}</h3>
                     <p class="text-sm text-slate-500 mt-2 leading-relaxed">{{ $rep['desc'] }}</p>
                     <span class="inline-flex items-center gap-1 text-sm font-bold text-[#e6ac27] mt-4 group-hover:gap-2 transition-all">
