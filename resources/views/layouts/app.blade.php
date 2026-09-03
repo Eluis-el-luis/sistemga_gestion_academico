@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" x-data="{ darkMode: localStorage.getItem('darkMode') === 'true' }" x-init="$watch('darkMode', val => localStorage.setItem('darkMode', val))" x-bind:class="{ 'dark': darkMode }">    <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -20,14 +19,14 @@
         $mostrarSidebar = auth()->check() && auth()->user()->hasAnyRole(['Director', 'Subdirector']);
     @endphp
 
-    <body class="font-sans antialiased text-[#3d2c1d] bg-slate-50" 
-          x-data="{ 
-              sidebarOpen: localStorage.getItem('sidebarOpen') !== null ? localStorage.getItem('sidebarOpen') === 'true' : window.innerWidth >= 1024,
-              showTopBtnGlobal: false 
-          }" 
-          x-init="$watch('sidebarOpen', val => localStorage.setItem('sidebarOpen', val))"
-          @resize.window="if(window.innerWidth < 1024) sidebarOpen = false" 
-          @scroll.window="showTopBtnGlobal = (window.pageYOffset > 150)">
+    <body class="font-sans antialiased text-[#3d2c1d] bg-slate-50 dark:bg-slate-900 dark:text-slate-200 transition-colors duration-300" 
+      x-data="{ 
+          sidebarOpen: localStorage.getItem('sidebarOpen') !== null ? localStorage.getItem('sidebarOpen') === 'true' : window.innerWidth >= 1024,
+          showTopBtnGlobal: false 
+      }" 
+      x-init="$watch('sidebarOpen', val => localStorage.setItem('sidebarOpen', val))"
+      @resize.window="if(window.innerWidth < 1024) sidebarOpen = false" 
+      @scroll.window="showTopBtnGlobal = (window.pageYOffset > 150)">
         
         <!-- SIDEBAR (Exclusivo para Directora y Subdirectora) -->
         @if($mostrarSidebar)
@@ -39,8 +38,7 @@
              @if($mostrarSidebar) :class="sidebarOpen ? 'lg:pl-64' : 'lg:pl-20'" @endif>
             
             <!-- TOPBAR GLOBAL -->
-            <nav class="sticky top-0 z-30 bg-white border-b border-slate-200/60 shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 transition-all">
-                
+            <nav class="sticky top-0 z-30 bg-white dark:bg-slate-800 border-b border-slate-200/60 dark:border-slate-700 shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 transition-colors duration-300">                
                 <div class="flex items-center gap-4 lg:gap-6">
                     <!-- Botón Hamburguesa solo si tiene sidebar -->
                     @if($mostrarSidebar)
@@ -60,6 +58,23 @@
 
                 <!-- Menú de Usuario -->
                 <div class="flex items-center">
+                    
+                    <!-- Botón Toggle Modo Oscuro -->
+                    <button @click="darkMode = !darkMode" 
+                            class="p-2 mr-3 text-slate-400 hover:text-[#e6ac27] transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none" 
+                            title="Alternar Modo Oscuro">
+                        
+                        <!-- Ícono de Luna (Modo Claro) -->
+                        <svg x-show="!darkMode" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                        </svg>
+
+                        <!-- Ícono de Sol (Modo Oscuro) -->
+                        <svg x-show="darkMode" style="display: none;" class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                    </button>
+
                     <x-dropdown align="right" width="48">
                         <x-slot name="trigger">
                             @php
