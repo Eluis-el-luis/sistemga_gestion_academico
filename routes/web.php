@@ -97,12 +97,18 @@ Route::middleware('auth')->group(function () {
         // --- NUEVAS RUTAS DE BLOQUEO Y AUDITORÍA ---
         Route::post('notas/{asignacion}/cerrar', [\App\Http\Controllers\NotaController::class, 'cerrarParcial'])->name('notas.cerrar');
         Route::post('notas/{asignacion}/solicitar-desbloqueo', [\App\Http\Controllers\NotaController::class, 'solicitarDesbloqueo'])->name('notas.solicitar-desbloqueo');
+
+        // Resolución de solicitudes de edición (Dirección / Subdirección)
+        Route::get('notas/solicitudes', [\App\Http\Controllers\SolicitudEdicionNotaController::class, 'index'])->name('notas.solicitudes.index');
+        Route::patch('notas/solicitudes/{solicitud}/aprobar', [\App\Http\Controllers\SolicitudEdicionNotaController::class, 'aprobar'])->name('notas.solicitudes.aprobar');
+        Route::patch('notas/solicitudes/{solicitud}/rechazar', [\App\Http\Controllers\SolicitudEdicionNotaController::class, 'rechazar'])->name('notas.solicitudes.rechazar');
         
         Route::get('cortes-evaluativos', [\App\Http\Controllers\CorteEvaluativoController::class, 'index'])->name('cortes.index');
         Route::put('cortes-evaluativos/{corte}', [\App\Http\Controllers\CorteEvaluativoController::class, 'update'])->name('cortes.update');
     
         Route::get('notas/actividades/{asignacion}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'index'])->name('notas.actividades.index');
         Route::post('notas/actividades/{asignacion}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'store'])->name('notas.actividades.store');
+        Route::put('notas/actividades/{asignacion}/{actividad}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'update'])->name('notas.actividades.update');
         Route::delete('notas/actividades/{asignacion}/{actividad}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'destroy'])->name('notas.actividades.destroy');
 
         // Fase 6: Asistencia (Docente Guía)

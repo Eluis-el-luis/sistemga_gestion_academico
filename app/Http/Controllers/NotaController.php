@@ -181,16 +181,18 @@ class NotaController extends Controller
                               ->first();
 
         if ($notaReferencia) {
-            DB::table('solicitud_edicion_nota')->insert([
-                'docente_id' => $docenteId,
-                'nota_id' => $notaReferencia->id,
-                'motivo' => $request->motivo,
-                'estado' => 'Pendiente',
-                'created_at' => now(),
-                'updated_at' => now()
-            ]);
+            \App\Models\SolicitudEdicionNota::updateOrCreate(
+                [
+                    'docente_id' => $docenteId,
+                    'nota_id' => $notaReferencia->id,
+                    'estado' => 'Pendiente',
+                ],
+                [
+                    'motivo' => $request->motivo,
+                ]
+            );
         }
 
-        return back()->with('success', 'Solicitud enviada. La Subdirectora revisará tu petición pronto.');
+        return back()->with('success', 'Solicitud enviada. La Subdirección revisará tu petición pronto.');
     }
 }

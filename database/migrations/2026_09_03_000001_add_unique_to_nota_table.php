@@ -6,20 +6,20 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::table('nota', function (Blueprint $table) {
-            $table->boolean('bloqueado')->default(false)->after('nota_cuantitativa');
+            $table->unique(
+                ['matricula_id', 'aula_asignatura_docente_id', 'corte_evaluativo_id'],
+                'nota_matricula_asignacion_corte_unique'
+            );
         });
     }
 
     public function down(): void
     {
         Schema::table('nota', function (Blueprint $table) {
-            $table->dropColumn('bloqueado');
+            $table->dropUnique('nota_matricula_asignacion_corte_unique');
         });
     }
 };

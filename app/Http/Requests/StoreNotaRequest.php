@@ -8,20 +8,17 @@ class StoreNotaRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true; // La autorización real la haremos en el controlador vía Policy
+        return true; // La autorización real se hace en el controlador vía Policy
     }
 
     public function rules(): array
     {
         return [
-            'aula_asignatura_docente_id' => 'required|exists:aula_asignatura_docente,id',
             'corte_evaluativo_id' => 'required|exists:corte_evaluativo,id',
-            
-            // Validamos que envíen el arreglo (la matriz) de estudiantes
+            // Matriz: notas[matricula_id][actividad_evaluativa_id] = puntaje
             'notas' => 'required|array',
-            'notas.*.matricula_id' => 'required|exists:matricula,id',
-            
-            'notas.*.nota_cuantitativa' => 'nullable|numeric|between:0,100', 
+            'notas.*' => 'array',
+            'notas.*.*' => 'nullable|numeric|min:0',
         ];
     }
 }
