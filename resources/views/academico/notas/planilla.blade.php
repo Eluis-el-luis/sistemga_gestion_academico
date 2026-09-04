@@ -113,7 +113,8 @@
                                 <tbody class="divide-y divide-slate-100">
                                     @foreach($matriculas as $index => $matricula)
                                         @php
-                                            $totalInicial = $matricula->notas->firstWhere('corte_evaluativo_id', $corteSeleccionado)->nota_cuantitativa ?? 0;
+                                            $notaCorte = $matricula->notas->firstWhere('corte_evaluativo_id', $corteSeleccionado);
+                                            $totalInicial = $notaCorte ? ($notaCorte->nota_cuantitativa ?? 0) : 0;
                                         @endphp
                                         
                                         <!-- ALPINE.JS: Cada fila maneja su propia auto-suma en tiempo real -->
@@ -141,9 +142,10 @@
                                             
                                             @foreach($actividades as $actividad)
                                                 @php
-                                                    $notaExistente = isset($notasActividades[$matricula->id]) 
-                                                        ? $notasActividades[$matricula->id]->firstWhere('actividad_evaluativa_id', $actividad->id)->nota_obtenida ?? '' 
-                                                        : '';
+                                                    $na = isset($notasActividades[$matricula->id])
+                                                        ? $notasActividades[$matricula->id]->firstWhere('actividad_evaluativa_id', $actividad->id)
+                                                        : null;
+                                                    $notaExistente = $na ? ($na->nota_obtenida ?? '') : '';
                                                 @endphp
                                                 <td class="px-2 py-3 text-center">
                                                     <input type="number" 

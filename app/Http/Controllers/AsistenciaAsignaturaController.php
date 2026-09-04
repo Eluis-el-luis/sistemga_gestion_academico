@@ -46,8 +46,10 @@ class AsistenciaAsignaturaController extends Controller
 
         
 
-        // 4. Bloques horarios de esta modalidad (excluyendo recreos) para que el maestro elija la hora
+        // 4. Bloques horarios de esta modalidad/turno/jornada (excluyendo recreos) para que el maestro elija la hora
         $bloques = BloqueHorario::where('modalidad_id', $asignacion->aula->modalidad_id)
+            ->where('turno', $asignacion->aula->turno)
+            ->where('tipo_jornada', 'Regular')
             ->where('es_recreo', false)
             ->orderBy('hora_inicio')
             ->get();
@@ -73,6 +75,24 @@ class AsistenciaAsignaturaController extends Controller
             'observacion' => 'nullable|string|max:255',
         ]);
 
+        // Validar que la matrícula pertenezca al aula de esta asignación
+        $perteneceAula = Matricula::where('id', $request->matricula_id)
+            ->where('aula_id', $asignacion->aula_id)
+            ->where('estado', 'activo')
+            ->exists();
+        if (!$perteneceAula) {
+            return back()->with('error', 'El estudiante no pertenece a esta aula o no está activo.');
+        }
+
+        // Validar que el bloque corresponda a modalidad, turno y jornada del aula
+        $bloque = BloqueHorario::findOrFail($request->bloque_horario_id);
+        if ($bloque->modalidad_id !== $asignacion->aula->modalidad_id
+            || $bloque->turno !== $asignacion->aula->turno
+            || $bloque->tipo_jornada !== 'Regular'
+            || $bloque->es_recreo) {
+            return back()->with('error', 'El bloque de tiempo seleccionado no corresponde a esta asignatura.');
+        }
+
         // Guardamos o actualizamos (Evita que el maestro registre dos fugas para el mismo niño en el mismo bloque)
         AsistenciaAsignatura::updateOrCreate(
             [
@@ -96,6 +116,12 @@ class AsistenciaAsignaturaController extends Controller
     public function destroy(AulaAsignaturaDocente $asignacion, AsistenciaAsignatura $incidencia)
     {
         $this->authorize('gestionarAsistencia', $asignacion);
+
+        // Verificar que la incidencia pertenezca a ESTA asignación
+        if ($incidencia->asignatura_id !== $asignacion->asignatura_id) {
+            return back()->with('error', 'La incidencia no pertenece a esta asignatura.');
+        }
+
         $incidencia->delete();
         return back()->with('success', 'Incidencia eliminada. El estudiante vuelve a contar como presente en este bloque.');
     }

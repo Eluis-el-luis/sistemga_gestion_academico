@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Nota;
 use App\Models\IndicadorLogro;
 use App\Models\AulaAsignaturaDocente;
+use App\Models\NotaActividad;
 use App\Services\NotaService;
 use Illuminate\Http\Request; 
 use Illuminate\Support\Facades\DB;
@@ -123,30 +124,17 @@ class NotaController extends Controller
                     // BARRERA 2: Limitar la nota al puntaje máximo de la actividad
                     $notaFinal = min(abs($notaIngresada), $actividad->puntaje_maximo);
 
-                    // 1. Guardar la nota individual en la nueva tabla
-                    DB::table('nota_actividad')->updateOrInsert(
+                    // 1. Guardar la nota individual usando el modelo Eloquent
+                    NotaActividad::updateOrCreate(
                         ['matricula_id' => $matriculaId, 'actividad_evaluativa_id' => $actividadId],
-                        ['nota_obtenida' => $notaFinal, 'updated_at' => now()]
+                        ['nota_obtenida' => $notaFinal]
                     );
 
                     $sumaTotalAlumno += $notaFinal;
                 }
 
-                // 2. Auto-Suma Global en la tabla 'nota'
-                $codigoIndicador = $this->notaService->calcularIndicadorLogro($sumaTotalAlumno);
-                $indicadorId = $codigoIndicador ? IndicadorLogro::where('codigo', $codigoIndicador)->value('id') : null;
-
-                Nota::updateOrCreate(
-                    [
-                        'matricula_id' => $matriculaId,
-                        'aula_asignatura_docente_id' => $asignacion->id,
-                        'corte_evaluativo_id' => $corteId,
-                    ],
-                    [
-                        'nota_cuantitativa' => $sumaTotalAlumno,
-                        'indicador_logro_id' => $indicadorId,
-                    ]
-                );
+                // 2. Auto-Suma Global en la tabla 'nota' (centralizado en el Service)
+                $this->notaService->registrarNotaFinal($matriculaId, $asignacion->id, $corteId, $sumaTotalAlumno);
             }
         });
 

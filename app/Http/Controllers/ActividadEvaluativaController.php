@@ -134,7 +134,7 @@ class ActividadEvaluativaController extends Controller
         $asignacionId = $asignacion->id;
 
         // Borramos las notas individuales de esta actividad
-        DB::table('nota_actividad')->where('actividad_evaluativa_id', $actividad->id)->delete();
+        \App\Models\NotaActividad::where('actividad_evaluativa_id', $actividad->id)->delete();
         $actividad->delete();
 
         // Recalculamos la nota final de cada matrícula del parcial
@@ -148,7 +148,6 @@ class ActividadEvaluativaController extends Controller
      */
     protected function recalcularNotasParcial(int $asignacionId, int $corteId): void
     {
-        $notaService = app(\App\Services\NotaService::class);
         $actividades = ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacionId)
             ->where('corte_evaluativo_id', $corteId)
             ->pluck('id');
@@ -158,25 +157,11 @@ class ActividadEvaluativaController extends Controller
             ->pluck('id');
 
         foreach ($matriculas as $matriculaId) {
-            $suma = DB::table('nota_actividad')
-                ->where('matricula_id', $matriculaId)
+            $suma = \App\Models\NotaActividad::where('matricula_id', $matriculaId)
                 ->whereIn('actividad_evaluativa_id', $actividades)
                 ->sum('nota_obtenida');
 
-            $codigoIndicador = $notaService->calcularIndicadorLogro((int) round((float) $suma));
-            $indicadorId = $codigoIndicador ? \App\Models\IndicadorLogro::where('codigo', $codigoIndicador)->value('id') : null;
-
-            \App\Models\Nota::updateOrCreate(
-                [
-                    'matricula_id' => $matriculaId,
-                    'aula_asignatura_docente_id' => $asignacionId,
-                    'corte_evaluativo_id' => $corteId,
-                ],
-                [
-                    'nota_cuantitativa' => $suma,
-                    'indicador_logro_id' => $indicadorId,
-                ]
-            );
+            app(\App\Services\NotaService::class)->registrarNotaFinal($matriculaId, $asignacionId, $corteId, (float) $suma);
         }
     }
 }

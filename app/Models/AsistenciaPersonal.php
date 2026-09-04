@@ -15,6 +15,7 @@ class AsistenciaPersonal extends Model
         'usuario_id',
         'fecha',
         'hora_entrada',
+        'turno',
         'estado',
         'observaciones'
     ];

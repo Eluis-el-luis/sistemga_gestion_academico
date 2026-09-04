@@ -9,57 +9,68 @@
                     Horario: <span class="text-[#e6ac27]">{{ $aula->grado->nombre }} - {{ $aula->nombre }}</span>
                 </h2>
             </div>
-            
-            <span class="inline-flex items-center px-4 py-2 bg-slate-100 border border-slate-200 rounded-xl font-black text-xs uppercase tracking-widest text-slate-600 shadow-sm">
-                Turno: {{ ucfirst($aula->turno) }}
-            </span>
+            <div class="flex items-center gap-3">
+                <span class="inline-flex items-center px-4 py-2 bg-slate-100 border border-slate-200 rounded-xl font-black text-xs uppercase tracking-widest text-slate-600 shadow-sm">
+                    Turno: {{ ucfirst($aula->turno) }}
+                </span>
+                <button onclick="window.print()" class="inline-flex items-center gap-2 px-4 py-2 bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-md transition-all print:hidden">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H8v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    Imprimir / PDF
+                </button>
+            </div>
         </div>
     </x-slot>
 
     <div class="pb-12 pt-6 max-w-full mx-auto sm:px-6 lg:px-8">
-        <div class="bg-white shadow-sm rounded-3xl p-6 border border-slate-200 overflow-x-auto">
-            <div class="min-w-[900px]">
-                <div class="grid grid-cols-5 gap-5 h-full">
-                    @foreach(['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'] as $dia)
-                        <div class="bg-slate-50 rounded-2xl border border-slate-200 flex flex-col">
-                            <div class="bg-[#FFFDF5] py-4 text-center border-b border-[#e6ac27]/20 rounded-t-2xl">
-                                <h4 class="font-black text-[#3d2c1d] uppercase text-sm tracking-widest">{{ $dia }}</h4>
-                            </div>
-                            
-                            <div class="p-4 flex-grow flex flex-col gap-4 min-h-[450px]">
-                                @forelse($calendario[$dia] ?? [] as $bloqueClase)
-                                    <div class="bg-white border {{ $bloqueClase->bloque->es_recreo ? 'border-amber-200 bg-amber-50/50' : 'border-slate-200 shadow-sm' }} rounded-xl p-4 text-center hover:border-[#e6ac27] transition-colors">
-                                        <p class="text-[10px] font-black {{ $bloqueClase->bloque->es_recreo ? 'text-amber-500' : 'text-[#e6ac27]' }} uppercase mb-1.5 tracking-widest">
-                                            {{ $bloqueClase->bloque->nombre }}
-                                        </p>
-                                        <p class="text-xs font-bold text-slate-500 mb-3 font-mono">
-                                            {{ \Carbon\Carbon::parse($bloqueClase->bloque->hora_inicio)->format('h:i') }} - {{ \Carbon\Carbon::parse($bloqueClase->bloque->hora_fin)->format('h:i A') }}
-                                        </p>
-                                        @if(!$bloqueClase->bloque->es_recreo)
-                                            <div class="bg-slate-50 rounded-lg py-2 px-2 border border-slate-100">
-                                                <p class="font-black text-sm text-[#3d2c1d] leading-tight mb-1">
-                                                    {{ $bloqueClase->aulaAsignaturaDocente->asignatura->nombre ?? 'Materia' }}
-                                                </p>
-                                                <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest">
-                                                    Prof. {{ explode(' ', trim($bloqueClase->aulaAsignaturaDocente->docente->usuario->nombre_completo ?? ''))[0] ?? 'D' }}
-                                                </p>
-                                            </div>
-                                        @else
-                                            <div class="py-2">
-                                                <p class="font-black text-sm text-amber-700 leading-tight uppercase tracking-widest">Receso</p>
-                                            </div>
-                                        @endif
-                                    </div>
-                                @empty
-                                    <div class="flex-grow flex flex-col items-center justify-center text-center py-12 opacity-50">
-                                        <svg class="w-8 h-8 text-slate-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                        <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">Día Libre</p>
-                                    </div>
-                                @endforelse
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
+        <div class="bg-white shadow-sm rounded-3xl border border-slate-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full border-collapse text-sm">
+                    <thead>
+                        <tr class="bg-[#FFFDF5]">
+                            <th class="border border-slate-300 px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest text-slate-600">Hora</th>
+                            @foreach($dias as $dia)
+                                <th class="border border-slate-300 px-4 py-3 text-center text-[11px] font-black uppercase tracking-widest text-[#3d2c1d]">{{ $dia }}</th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($matriz as $fila)
+                            @php $bloque = $fila['bloque']; @endphp
+                            <tr class="{{ $bloque->es_recreo ? 'bg-amber-50/60' : '' }}">
+                                <td class="border border-slate-300 px-4 py-3 whitespace-nowrap">
+                                    <span class="block font-black text-xs {{ $bloque->es_recreo ? 'text-amber-700' : 'text-[#3d2c1d]' }}">{{ $bloque->nombre }}</span>
+                                    <span class="block text-[10px] font-bold text-slate-400 mt-0.5">
+                                        {{ \Carbon\Carbon::parse($bloque->hora_inicio)->format('h:i A') }} - {{ \Carbon\Carbon::parse($bloque->hora_fin)->format('h:i A') }}
+                                    </span>
+                                </td>
+
+                                @foreach($dias as $dia)
+                                    @php $horario = $fila['dias'][$dia] ?? null; @endphp
+                                    @if($bloque->es_recreo)
+                                        <td class="border border-slate-300 px-4 py-3 text-center">
+                                            <span class="text-[10px] font-black uppercase tracking-widest text-amber-600">Receso</span>
+                                        </td>
+                                    @elseif($horario)
+                                        <td class="border border-slate-300 px-4 py-3 text-center">
+                                            <span class="block font-black text-[#3d2c1d] text-xs">{{ $horario->aulaAsignaturaDocente->asignatura->nombre ?? '—' }}</span>
+                                            <span class="block text-[10px] font-bold text-slate-400 mt-0.5">
+                                                Prof. {{ $horario->aulaAsignaturaDocente->docente ? \Str::words($horario->aulaAsignaturaDocente->docente->usuario->nombre_completo, 2, '') : '—' }}
+                                            </span>
+                                        </td>
+                                    @else
+                                        <td class="border border-slate-300 px-4 py-3 text-center text-slate-300 font-bold text-xs">—</td>
+                                    @endif
+                                @endforeach
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="border border-slate-300 px-4 py-12 text-center text-stone-500 font-bold">
+                                    No hay bloques de horario definidos para este aula.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
