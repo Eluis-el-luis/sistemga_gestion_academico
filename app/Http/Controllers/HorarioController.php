@@ -67,7 +67,7 @@ class HorarioController extends Controller
 
         $request->validate([
             'aula_asignatura_docente_id' => 'required|exists:aula_asignatura_docente,id',
-            'dia_semana' => 'required|in:Lunes,Martes,Miércoles,Jueves,Viernes',
+            'dia_semana' => 'required|in:Lunes,Martes,Miercoles,Jueves,Viernes',
             'bloque_horario_id' => 'required|exists:bloque_horario,id',
         ]);
 
