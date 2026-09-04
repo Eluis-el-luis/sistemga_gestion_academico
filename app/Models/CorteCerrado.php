@@ -2,26 +2,26 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class ActividadEvaluativa extends Model
+class CorteCerrado extends Model
 {
-    use HasFactory;
-
-    protected $table = 'actividad_evaluativa'; 
+    protected $table = 'corte_cerrado';
 
     protected $fillable = [
         'aula_asignatura_docente_id',
         'corte_evaluativo_id',
-        'nombre',
-        'descripcion',
-        'fecha',
-        'tipo', // ej: 'Acumulado', 'Examen'
-        'puntaje_maximo'
+        'bloqueado',
+        'cerrado_por',
+        'fecha_cierre',
     ];
 
-    public function asignaturaAula()
+    protected $casts = [
+        'bloqueado' => 'boolean',
+        'fecha_cierre' => 'datetime',
+    ];
+
+    public function aulaAsignaturaDocente()
     {
         return $this->belongsTo(AulaAsignaturaDocente::class, 'aula_asignatura_docente_id');
     }
@@ -29,5 +29,10 @@ class ActividadEvaluativa extends Model
     public function corteEvaluativo()
     {
         return $this->belongsTo(CorteEvaluativo::class, 'corte_evaluativo_id');
+    }
+
+    public function cerradoPor()
+    {
+        return $this->belongsTo(Usuario::class, 'cerrado_por');
     }
 }

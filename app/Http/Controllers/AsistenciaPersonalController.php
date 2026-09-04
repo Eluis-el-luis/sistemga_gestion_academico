@@ -84,6 +84,7 @@ class AsistenciaPersonalController extends Controller
             'usuario_id' => $usuarioId,
             'fecha' => $fechaHoy,
             'hora_entrada' => $horaActual,
+            'turno' => $ahora->format('H') < 12 ? 'Matutino' : 'Vespertino',
             'estado' => $estado,
             'observaciones' => $request->observaciones ?? null,
         ]);

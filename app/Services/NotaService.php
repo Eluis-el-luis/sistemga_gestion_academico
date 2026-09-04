@@ -2,8 +2,36 @@
 
 namespace App\Services;
 
+use App\Models\Nota;
+use App\Models\IndicadorLogro;
+
 class NotaService
 {
+    /**
+     * Registra/actualiza la nota final de un parcial para una matrícula,
+     * calculando el indicador de logro cualitativo a partir de la suma cuantitativa.
+     * Centraliza la auto-suma usada por NotaController y el recálculo de actividades.
+     */
+    public function registrarNotaFinal(int $matriculaId, int $asignacionId, int $corteId, float $suma): ?Nota
+    {
+        $suma = max(0, min(100, round($suma, 2)));
+
+        $codigo = $this->calcularIndicadorLogro((int) round($suma));
+        $indicadorId = $codigo ? IndicadorLogro::where('codigo', $codigo)->value('id') : null;
+
+        return Nota::updateOrCreate(
+            [
+                'matricula_id' => $matriculaId,
+                'aula_asignatura_docente_id' => $asignacionId,
+                'corte_evaluativo_id' => $corteId,
+            ],
+            [
+                'nota_cuantitativa' => $suma,
+                'indicador_logro_id' => $indicadorId,
+            ]
+        );
+    }
+
     /**
      * Convierte la nota cuantitativa (0-100) en el Indicador de Logro Cualitativo (MINED)
      * Basado en los rangos oficiales del MINED.

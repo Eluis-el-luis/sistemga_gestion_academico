@@ -18,49 +18,62 @@ class HorarioController extends Controller
         $this->authorize('horarios.ver');
 
         $aula->load(['grado', 'modalidad']);
-        
+
         $asignaciones = AulaAsignaturaDocente::with(['asignatura', 'docente.usuario'])
                             ->where('aula_id', $aula->id)
                             ->get();
 
-        // 1. Buscamos los bloques oficiales que corresponden a ESTA aula:
-        //    misma modalidad (sector), mismo turno y jornada regular por defecto.
+        // 1. Bloques oficiales de ESTA aula (modalidad + turno + jornada Regular).
         $bloquesOficiales = BloqueHorario::where('modalidad_id', $aula->modalidad_id)
                                 ->where('turno', $aula->turno)
                                 ->where('tipo_jornada', 'Regular')
                                 ->orderBy('hora_inicio')
                                 ->get();
 
-        // 2. Traemos los horarios
-        $horarios = Horario::with(['aulaAsignaturaDocente.asignatura', 'bloque'])
+        // 2. Horarios (materias) ya programados para este aula.
+        $horarios = Horario::with(['aulaAsignaturaDocente.asignatura', 'aulaAsignaturaDocente.docente.usuario', 'bloque'])
                     ->whereIn('aula_asignatura_docente_id', $asignaciones->pluck('id'))
                     ->get();
 
-        // 3. --- NUEVA MAGIA: Cálculo de la Bolsa de Horas ---
-        // Contamos cuántas veces aparece cada asignación en el horario actual
+        // 3. Bolsa de horas por asignación.
         $conteoHoras = $horarios->countBy('aula_asignatura_docente_id');
-
-        // A cada asignación le inyectamos las horas que ha consumido y las restantes
         foreach ($asignaciones as $asignacion) {
             $asignacion->horas_programadas = $conteoHoras->get($asignacion->id, 0);
             $asignacion->horas_restantes = $asignacion->horas_semanales - $asignacion->horas_programadas;
         }
-        // ----------------------------------------------------
 
-        // Ordenamos los horarios por hora de inicio
-        $horarios = $horarios->sortBy(function($horario) {
-            return $horario->bloque->hora_inicio ?? '00:00:00';
-        });
+        // 4. Construir la matriz: filas = bloques oficiales (incluye recreos),
+        //    columnas = días. Cada celda es la materia asignada o null.
+        $dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+        $diasBD = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
 
-        $calendario = [
-            'Lunes' => $horarios->where('dia_semana', 'Lunes'),
-            'Martes' => $horarios->where('dia_semana', 'Martes'),
-            'Miércoles' => $horarios->where('dia_semana', 'Miercoles'),
-            'Jueves' => $horarios->where('dia_semana', 'Jueves'),
-            'Viernes' => $horarios->where('dia_semana', 'Viernes'),
-        ];
+        // Índice rápido: [bloque_id][dia_bd] => Horario
+        $horariosIndex = [];
+        foreach ($horarios as $h) {
+            $horariosIndex[$h->bloque_horario_id][$h->dia_semana] = $h;
+        }
 
-        return view('academico.aulas.horarios.index', compact('aula', 'asignaciones', 'calendario', 'bloquesOficiales'));
+        // Estructura para la vista: lista de bloques con sus celdas por día
+        $matriz = [];
+        foreach ($bloquesOficiales as $bloque) {
+            $fila = [
+                'bloque' => $bloque,
+                'dias' => [],
+            ];
+            foreach ($dias as $i => $dia) {
+                $diaBD = $diasBD[$i];
+                if ($bloque->es_recreo) {
+                    // El recreo es fijo, sin materia
+                    $fila['dias'][$dia] = null;
+                } else {
+                    $horario = $horariosIndex[$bloque->id][$diaBD] ?? null;
+                    $fila['dias'][$dia] = $horario;
+                }
+            }
+            $matriz[] = $fila;
+        }
+
+        return view('academico.aulas.horarios.index', compact('aula', 'asignaciones', 'bloquesOficiales', 'matriz', 'dias'));
     }
 
     public function store(Request $request, Aula $aula)

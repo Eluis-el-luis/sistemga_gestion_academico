@@ -39,31 +39,41 @@ class VisorHorarioController extends Controller
     /**
      * Horario específico de un Docente
      */
-    public function horarioDocente(Docente $docente)
+public function horarioDocente(Docente $docente)
     {
         $docente->load('usuario');
 
-        // Buscamos TODOS los horarios donde este docente imparte clase
         $horarios = Horario::with(['bloque', 'aulaAsignaturaDocente.asignatura', 'aulaAsignaturaDocente.aula.grado'])
             ->whereHas('aulaAsignaturaDocente', function ($query) use ($docente) {
                 $query->where('docente_id', $docente->id);
             })
-            ->get()
-            // Ordenamos estrictamente por la hora de inicio (ya que puede mezclar primaria y secundaria)
-            ->sortBy(function ($horario) {
-                return $horario->bloque->hora_inicio ?? '00:00:00';
-            });
+            ->get();
 
-        // Agrupamos por días
-        $calendario = [
-            'Lunes'     => $horarios->where('dia_semana', 'Lunes'),
-            'Martes'    => $horarios->where('dia_semana', 'Martes'),
-            'Miércoles' => $horarios->where('dia_semana', 'Miercoles'),
-            'Jueves'    => $horarios->where('dia_semana', 'Jueves'),
-            'Viernes'   => $horarios->where('dia_semana', 'Viernes'),
-        ];
+        // Bloques únicos que el docente tiene (ordenados por hora de inicio)
+        $bloques = $horarios->map->bloque
+            ->filter()
+            ->unique('id')
+            ->sortBy('hora_inicio');
 
-        return view('academico.visor.horario_docente', compact('docente', 'calendario'));
+        $dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+        $diasBD = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
+
+        $horariosIndex = [];
+        foreach ($horarios as $h) {
+            $horariosIndex[$h->bloque_horario_id][$h->dia_semana] = $h;
+        }
+
+        $matriz = [];
+        foreach ($bloques as $bloque) {
+            $fila = ['bloque' => $bloque, 'dias' => []];
+            foreach ($dias as $i => $dia) {
+                $diaBD = $diasBD[$i];
+                $fila['dias'][$dia] = $horariosIndex[$bloque->id][$diaBD] ?? null;
+            }
+            $matriz[] = $fila;
+        }
+
+        return view('academico.visor.horario_docente', compact('docente', 'matriz', 'dias'));
     }
 
     /**
@@ -82,27 +92,45 @@ class VisorHorarioController extends Controller
     /**
      * Horario específico de un Aula
      */
-    public function horarioAula(Aula $aula)
+public function horarioAula(Aula $aula)
     {
         $aula->load(['grado', 'modalidad', 'docenteGuia.usuario']);
 
+        $asignaciones = \App\Models\AulaAsignaturaDocente::where('aula_id', $aula->id)->pluck('id');
+
         $horarios = Horario::with(['bloque', 'aulaAsignaturaDocente.asignatura', 'aulaAsignaturaDocente.docente.usuario'])
-            ->whereHas('aulaAsignaturaDocente', function ($query) use ($aula) {
-                $query->where('aula_id', $aula->id);
-            })
-            ->get()
-            ->sortBy(function ($horario) {
-                return $horario->bloque->hora_inicio ?? '00:00:00';
-            });
+            ->whereIn('aula_asignatura_docente_id', $asignaciones)
+            ->get();
 
-        $calendario = [
-            'Lunes'     => $horarios->where('dia_semana', 'Lunes'),
-            'Martes'    => $horarios->where('dia_semana', 'Martes'),
-            'Miércoles' => $horarios->where('dia_semana', 'Miercoles'),
-            'Jueves'    => $horarios->where('dia_semana', 'Jueves'),
-            'Viernes'   => $horarios->where('dia_semana', 'Viernes'),
-        ];
+        // Bloques oficiales de la modalidad + turno + jornada Regular (incluye recreos)
+        $bloques = \App\Models\BloqueHorario::where('modalidad_id', $aula->modalidad_id)
+            ->where('turno', $aula->turno)
+            ->where('tipo_jornada', 'Regular')
+            ->orderBy('hora_inicio')
+            ->get();
 
-        return view('academico.visor.horario_aula', compact('aula', 'calendario'));
+        $dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+        $diasBD = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
+
+        $horariosIndex = [];
+        foreach ($horarios as $h) {
+            $horariosIndex[$h->bloque_horario_id][$h->dia_semana] = $h;
+        }
+
+        $matriz = [];
+        foreach ($bloques as $bloque) {
+            $fila = ['bloque' => $bloque, 'dias' => []];
+            foreach ($dias as $i => $dia) {
+                $diaBD = $diasBD[$i];
+                if ($bloque->es_recreo) {
+                    $fila['dias'][$dia] = null;
+                } else {
+                    $fila['dias'][$dia] = $horariosIndex[$bloque->id][$diaBD] ?? null;
+                }
+            }
+            $matriz[] = $fila;
+        }
+
+        return view('academico.visor.horario_aula', compact('aula', 'matriz', 'dias'));
     }
 }
