@@ -13,29 +13,40 @@ class ActividadEvaluativaController extends Controller
 {
     use AuthorizesRequests;
 
-    public function index(Request $request, AulaAsignaturaDocente $asignacion)
-    {
-        $cortes = CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('activo', true))->get();
-        $corteSeleccionado = $request->query('corte_evaluativo_id', $cortes->first()->id ?? null);
-        $corte = $cortes->firstWhere('id', $corteSeleccionado);
+    public function index(Request $request, \App\Models\AulaAsignaturaDocente $asignacion)
+{
+    // 1. Determinar si el usuario en sesión es supervisor (Directiva)
+    /** @var \App\Models\Usuario $user */
+    $user = auth()->user();
+    $modoSupervision = $user->hasAnyRole(['Director', 'Subdirector']);
 
-        $actividades = ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
-            ->where('corte_evaluativo_id', $corteSeleccionado)
-            ->get();
+    // 2. Obtener los cortes evaluativos del año activo
+    $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('activo', true))->get();
+    
+    // IMPORTANTE: La vista manda el filtro como 'corte_id' en el select
+    $corteSeleccionado = $request->query('corte_id', $cortes->first()->id ?? null);
+    $corteActivo = $cortes->firstWhere('id', $corteSeleccionado);
 
-        // Matemáticas para las barras de progreso
-        $sumaAcumulado = $actividades->where('tipo', 'acumulado')->sum('puntaje_maximo');
-        $porcentajeAcumulado = ($corte && $corte->peso_acumulado > 0) ? ($sumaAcumulado / $corte->peso_acumulado) * 100 : 0;
+    // 3. Traer las actividades correspondientes
+    $actividades = \App\Models\ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
+        ->where('corte_evaluativo_id', $corteSeleccionado)
+        ->get();
 
-        $sumaExamen = $actividades->where('tipo', 'examen')->sum('puntaje_maximo');
-        $porcentajeExamen = ($corte && $corte->peso_examen > 0) ? ($sumaExamen / $corte->peso_examen) * 100 : 0;
+    // 4. Matemáticas para las barras de progreso
+    $sumaAcumulados = $actividades->where('tipo', 'acumulado')->sum('puntaje_maximo');
+    $sumaExamen = $actividades->where('tipo', 'examen')->sum('puntaje_maximo');
 
-        return view('academico.notas.index', compact(
-            'asignacion', 'cortes', 'corteSeleccionado', 'corte', 'actividades',
-            'sumaAcumulado', 'porcentajeAcumulado', 'sumaExamen', 'porcentajeExamen'
-        ));
-    }
-
+    return view('academico.notas.actividades', compact(
+        'asignacion', 
+        'modoSupervision', 
+        'cortes', 
+        'corteSeleccionado', 
+        'corteActivo', 
+        'actividades',
+        'sumaAcumulados', 
+        'sumaExamen'
+    ));
+}
     public function store(Request $request, AulaAsignaturaDocente $asignacion)
     {
         $request->validate([

@@ -1,5 +1,9 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" x-data="{ darkMode: localStorage.getItem('darkMode') === 'true' }" x-init="$watch('darkMode', val => localStorage.setItem('darkMode', val))" x-bind:class="{ 'dark': darkMode }">    <head>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" 
+      x-data="{ darkMode: localStorage.getItem('darkMode') === 'true' }" 
+      x-init="$watch('darkMode', val => localStorage.setItem('darkMode', val))" 
+      x-bind:class="{ 'dark': darkMode }">
+    <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -15,8 +19,8 @@
     </head>
     
     @php
-        // Validación estricta: Solo Director y Subdirector activan el menú lateral
-        $mostrarSidebar = auth()->check() && auth()->user()->hasAnyRole(['Director', 'Subdirector']);
+        // Validación: Administradores y Coordinadores activan el menú lateral
+        $mostrarSidebar = auth()->check() && auth()->user()->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Coordinador']);
     @endphp
 
     <body class="font-sans antialiased text-[#3d2c1d] bg-slate-50 dark:bg-slate-900 dark:text-slate-200 transition-colors duration-300" 
@@ -28,7 +32,7 @@
       @resize.window="if(window.innerWidth < 1024) sidebarOpen = false" 
       @scroll.window="showTopBtnGlobal = (window.pageYOffset > 150)">
         
-        <!-- SIDEBAR (Exclusivo para Directora y Subdirectora) -->
+        <!-- SIDEBAR -->
         @if($mostrarSidebar)
             @include('layouts.navigation')
         @endif
@@ -40,48 +44,49 @@
             <!-- TOPBAR GLOBAL -->
             <nav class="sticky top-0 z-30 bg-white dark:bg-slate-800 border-b border-slate-200/60 dark:border-slate-700 shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 transition-colors duration-300">                
                 <div class="flex items-center gap-4 lg:gap-6">
-                    <!-- Botón Hamburguesa solo si tiene sidebar -->
+                    <!-- Botón Hamburguesa -->
                     @if($mostrarSidebar)
-                        <button @click="sidebarOpen = !sidebarOpen" class="text-slate-500 hover:text-[#e6ac27] bg-slate-50 hover:bg-amber-50 p-2 rounded-lg transition-colors focus:outline-none">
+                        <button @click="sidebarOpen = !sidebarOpen" class="text-slate-500 hover:text-[#e6ac27] bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-700 hover:bg-amber-50 p-2 rounded-lg transition-colors focus:outline-none">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                         </button>
+                    @else
+                        <div class="w-6"></div>
                     @endif
 
                     <!-- LOGO INSTITUCIONAL -->
                     <a href="{{ route('dashboard') }}" class="flex items-center gap-3 group">
                         <x-application-logo class="block h-10 w-auto object-contain shrink-0 group-hover:scale-105 transition-transform drop-shadow-sm" />
-                        <span class="font-black text-[#3d2c1d] text-xl tracking-tight group-hover:text-[#e6ac27] transition-colors hidden sm:block">
+                        <span class="font-black text-[#3d2c1d] dark:text-white text-xl tracking-tight group-hover:text-[#e6ac27] transition-colors hidden sm:block">
                             Colegio Cristiano En Nicaragua 
                         </span>
                     </a>
                 </div>
 
-                <!-- Menú de Usuario -->
+                <!-- Menú de Usuario y Modo Oscuro -->
                 <div class="flex items-center">
                     
                     <!-- Botón Toggle Modo Oscuro -->
                     <button @click="darkMode = !darkMode" 
-                            class="p-2 mr-3 text-slate-400 hover:text-[#e6ac27] transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none" 
+                            class="p-2 mr-3 text-slate-400 hover:text-[#e6ac27] transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none" 
                             title="Alternar Modo Oscuro">
-                        
-                        <!-- Ícono de Luna (Modo Claro) -->
+                        <!-- Ícono Luna -->
                         <svg x-show="!darkMode" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
                         </svg>
-
-                        <!-- Ícono de Sol (Modo Oscuro) -->
+                        <!-- Ícono Sol -->
                         <svg x-show="darkMode" style="display: none;" class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
                         </svg>
                     </button>
 
+                    <!-- Dropdown Perfil -->
                     <x-dropdown align="right" width="48">
                         <x-slot name="trigger">
                             @php
                                 $nombreCorto = explode(' ', Auth::user()->nombre_completo ?? Auth::user()->name ?? 'Usuario')[0];
                                 $inicial = substr($nombreCorto, 0, 1);
                             @endphp
-                            <button class="inline-flex items-center p-1.5 pr-3 border border-[#e6ac27]/30 text-sm font-bold rounded-full text-amber-900 bg-amber-50 hover:bg-amber-100 transition shadow-sm gap-2">
+                            <button class="inline-flex items-center p-1.5 pr-3 border border-[#e6ac27]/30 text-sm font-bold rounded-full text-amber-900 dark:text-amber-100 bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition shadow-sm gap-2">
                                 <div class="w-7 h-7 rounded-full bg-[#e6ac27] text-white flex items-center justify-center text-xs">
                                     {{ $inicial }}
                                 </div>
@@ -90,17 +95,17 @@
                             </button>
                         </x-slot>
                         <x-slot name="content">
-                            <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
-                                <p class="text-sm font-black text-slate-800">{{ Auth::user()->nombre_completo ?? Auth::user()->name }}</p>
-                                <p class="text-xs text-slate-500 font-medium truncate">{{ Auth::user()->email }}</p>
+                            <div class="px-4 py-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800">
+                                <p class="text-sm font-black text-slate-800 dark:text-slate-200">{{ Auth::user()->nombre_completo ?? Auth::user()->name }}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{{ Auth::user()->email }}</p>
                             </div>
-                            <x-dropdown-link :href="route('profile.edit')" class="hover:bg-amber-50 hover:text-amber-900 font-bold flex items-center gap-2 mt-1">
+                            <x-dropdown-link :href="route('profile.edit')" class="hover:bg-amber-50 dark:hover:bg-slate-700 hover:text-amber-900 font-bold flex items-center gap-2 mt-1">
                                 <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                                 {{ __('Mi Perfil') }}
                             </x-dropdown-link>
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
-                                <x-dropdown-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();" class="text-red-600 font-bold hover:bg-red-50 flex items-center gap-2 mt-1 border-t border-slate-100 pt-2">
+                                <x-dropdown-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();" class="text-red-600 font-bold hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 mt-1 border-t border-slate-100 dark:border-slate-700 pt-2">
                                     <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                                     {{ __('Cerrar Sesión') }}
                                 </x-dropdown-link>
@@ -127,5 +132,9 @@
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
             </button>
         </div>
+
+        <!-- Inyección del Motor Universal de Alertas -->
+        <x-ui.alerts />
+        
     </body>
 </html>

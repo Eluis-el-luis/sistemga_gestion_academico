@@ -1,59 +1,46 @@
-<div class="space-y-6">
+<div class="space-y-8 animate-fade-in">
 
-    <!-- BARRA DE HERRAMIENTAS RÁPIDAS -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <!-- BARRA DE HERRAMIENTAS RÁPIDAS (2 Columnas) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <!-- Configurar Notas -->
-        <a href="{{ route('academico.notas.index') }}" class="flex items-center gap-4 p-4 rounded-3xl border border-slate-200 bg-white hover:border-[#e6ac27] hover:shadow-md transition-all group">
-            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
+        <a href="{{ route('academico.notas.index') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] hover:shadow-md transition-all flex items-center gap-4 cursor-pointer transform hover:-translate-y-0.5">
+            <div class="w-12 h-12 rounded-xl bg-amber-50 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
             </div>
             <div>
-                <h4 class="font-black text-[#3d2c1d]">Configurar Notas</h4>
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Acumulados y Exámenes</p>
+                <span class="block font-black text-base text-[#3d2c1d] group-hover:text-[#e6ac27] transition-colors">Configurar Notas</span>
+                <span class="block text-xs font-medium text-slate-500 mt-0.5">Acumulados y exámenes</span>
             </div>
         </a>
         
         <!-- Historial de Asistencia -->
-        <a href="{{ route('academico.asistencia.personal.index') }}" class="flex items-center gap-4 p-4 rounded-3xl border border-slate-200 bg-white hover:border-emerald-500 hover:shadow-md transition-all group">
-            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+        <a href="{{ route('academico.asistencia.personal.index') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] hover:shadow-md transition-all flex items-center gap-4 cursor-pointer transform hover:-translate-y-0.5">
+            <div class="w-12 h-12 rounded-xl bg-amber-50 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
             <div>
-                <h4 class="font-black text-[#3d2c1d]">Mi Asistencia</h4>
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Historial y reportes</p>
-            </div>
-        </a>
-
-        <!-- Mis Aulas (Visor) -->
-        <a href="{{ route('academico.visor.aulas') }}" class="flex items-center gap-4 p-4 rounded-3xl border border-slate-200 bg-white hover:border-blue-500 hover:shadow-md transition-all group">
-            <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-            </div>
-            <div>
-                <h4 class="font-black text-[#3d2c1d]">Mis Aulas</h4>
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Directorio de estudiantes</p>
+                <span class="block font-black text-base text-[#3d2c1d] group-hover:text-[#e6ac27] transition-colors">Mi Asistencia</span>
+                <span class="block text-xs font-medium text-slate-500 mt-0.5">Historial y reportes</span>
             </div>
         </a>
     </div>
 
     <!-- EL CALENDARIO INTERACTIVO -->
-    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden relative">
         
-        <!-- Zona 1: Indicador de Esquema Flotante -->
-        <div class="absolute top-5 left-6 z-10 flex items-center gap-2">
-            <span class="relative flex h-3 w-3">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-            </span>
-            <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest border border-slate-200 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm">
-                Horario Activo: Tipo {{ $esquemaActivo ?? 'Regular' }}
-            </span>
-        </div>
-
-        <div class="p-6 pt-16 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <!-- Cabecera Limpia sin elementos flotantes superpuestos -->
+        <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
             <div>
-                <h3 class="text-lg font-black text-[#3d2c1d]">Mi Agenda Semanal</h3>
-                <p class="text-xs text-slate-400 font-bold mt-0.5">Haz clic en un bloque de clase para pasar asistencia o evaluar.</p>
+                <h3 class="text-xl font-black text-[#3d2c1d]">Agenda Semanal</h3>
+                <p class="text-sm font-medium text-slate-500 mt-1">Selecciona una clase para evaluar o pasar asistencia.</p>
+            </div>
+            
+            <div class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100 font-bold text-sm">
+                <span class="relative flex h-2.5 w-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                Esquema {{ $esquemaActivo ?? 'Regular' }} Activo
             </div>
         </div>
 
@@ -63,12 +50,12 @@
                 <table class="w-full text-left border-collapse min-w-[800px]">
                     <thead>
                         <tr>
-                            <th class="w-24 bg-slate-50 border-r border-b border-slate-100 px-4 py-3 text-center sticky left-0 z-20">
+                            <th class="w-24 bg-white border-r border-b border-slate-100 px-4 py-3 text-center sticky left-0 z-20">
                                 <svg class="w-5 h-5 text-slate-300 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             </th>
                             @foreach($diasSemana as $dia)
-                                <th class="bg-slate-50 border-b border-slate-100 px-4 py-3 text-center w-1/5">
-                                    <span class="text-[11px] font-black text-slate-500 uppercase tracking-widest">{{ $dia }}</span>
+                                <th class="bg-white border-b border-slate-100 px-4 py-3 text-center w-1/5">
+                                    <span class="text-xs font-black text-slate-400 uppercase tracking-widest">{{ $dia }}</span>
                                 </th>
                             @endforeach
                         </tr>
@@ -81,7 +68,7 @@
                             @endphp
                             <tr class="hover:bg-slate-50/50 transition-colors">
                                 <td class="border-r border-slate-100 px-2 py-4 text-center sticky left-0 bg-white z-10 shadow-[1px_0_0_0_#f1f5f9]">
-                                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">{{ $horaFmt }}</span>
+                                    <span class="text-[11px] font-black text-slate-500 uppercase tracking-widest">{{ $horaFmt }}</span>
                                 </td>
                                 
                                 @foreach($diasSemana as $dia)
@@ -92,7 +79,6 @@
                                     <td class="p-2 border-r border-slate-50 last:border-r-0 align-top">
                                         @if($clase)
                                             @php
-                                                // Escala de colores automática según la modalidad del aula
                                                 $colorBg = 'bg-amber-50'; $colorBorder = 'border-amber-200'; $colorText = 'text-amber-700'; $colorIcon = 'text-amber-500';
                                                 
                                                 if($clase['modalidad_id'] == 2) { 
@@ -102,7 +88,6 @@
                                                 }
                                             @endphp
                                             
-                                            <!-- Botón Interactivo que dispara el Modal de tu Dashboard -->
                                             <button @click="$dispatch('abrir-modal-decision-clase', { 
                                                         id: '{{ $clase['asignacion_id'] }}', 
                                                         asignatura: '{{ addslashes($clase['asignatura']) }}', 
@@ -119,7 +104,7 @@
                                             </button>
                                         @else
                                             <div class="w-full h-full min-h-[4.5rem] rounded-xl border border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center">
-                                                <span class="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Libre</span>
+                                                <span class="text-[10px] font-bold text-slate-400 tracking-wide">Libre</span>
                                             </div>
                                         @endif
                                     </td>
@@ -132,10 +117,10 @@
         @else
             <div class="p-16 text-center flex flex-col items-center justify-center">
                 <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mb-4 border border-slate-100">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                 </div>
-                <h3 class="text-lg font-black text-[#3d2c1d]">Sin carga horaria</h3>
-                <p class="text-sm font-medium text-slate-400 mt-1 max-w-sm">No tienes asignaturas programadas para el esquema de horario activo actual.</p>
+                <h3 class="text-xl font-black text-[#3d2c1d]">Sin carga horaria</h3>
+                <p class="text-sm font-medium text-slate-500 mt-1 max-w-sm">No tienes asignaturas programadas para el esquema activo actual.</p>
             </div>
         @endif
     </div>

@@ -10,19 +10,36 @@ use Illuminate\Support\Facades\Auth;
 class AsistenciaPersonalController extends Controller
 {
     public function index(Request $request)
-    {
-        $fechaFiltro = $request->get('fecha', Carbon::now('America/Managua')->toDateString());
-        $fechaFormateada = Carbon::parse($fechaFiltro)->format('d/m/y');
-        
-        // Excluimos a Director y Subdirector de la obligación de asistencia
-        $personal = \App\Models\Usuario::with(['roles', 'asistencias' => function($query) use ($fechaFiltro) {
-            $query->where('fecha', $fechaFiltro);
-        }])->whereHas('roles', function($q) {
-            $q->whereIn('name', ['Docente Guia', 'Docente por Asignatura']);
-        })->get();
+{
+    /** @var \App\Models\Usuario $usuario */
+    $usuario = auth()->user();
 
-        return view('academico.asistencia.personal.index', compact('personal', 'fechaFiltro', 'fechaFormateada'));
-    }
+    // 1. Obtener el mes a consultar (Por defecto: mes actual)
+    $mes = $request->get('mes', now()->timezone('America/Managua')->format('Y-m'));
+    
+    // Extraer año y mes numérico para la consulta SQL
+    $anio = date('Y', strtotime($mes));
+    $mesNumerico = date('m', strtotime($mes));
+
+    // 2. Traer el historial exclusivo del usuario logueado
+    $asistencias = \App\Models\AsistenciaPersonal::where('usuario_id', $usuario->id)
+        ->whereYear('fecha', $anio)
+        ->whereMonth('fecha', $mesNumerico)
+        ->orderBy('fecha', 'desc')
+        ->get();
+
+    // 3. Calcular los KPIs de bolsillo
+    $totalPresentes = $asistencias->where('estado', 'Presente')->count();
+    $totalRetardos  = $asistencias->where('estado', 'Retardo')->count();
+    $totalAusencias = $asistencias->whereIn('estado', ['Ausente', 'Justificado'])->count();
+
+    return view('academico.asistencia.personal.index', compact(
+        'asistencias', 
+        'totalPresentes', 
+        'totalRetardos', 
+        'totalAusencias'
+    ));
+}
 
     public function marcarLlegada(Request $request)
     {

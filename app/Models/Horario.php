@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\BloqueHorario;
 
 class Horario extends Model
 {
@@ -21,6 +22,11 @@ class Horario extends Model
 
     // Nueva relación al bloque maestro
     public function bloque()
+    {
+        return $this->belongsTo(BloqueHorario::class, 'bloque_horario_id');
+    }
+
+    public function bloqueHorario()
     {
         return $this->belongsTo(BloqueHorario::class, 'bloque_horario_id');
     }
