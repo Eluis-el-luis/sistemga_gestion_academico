@@ -133,4 +133,30 @@ class AlumnoController extends Controller
         return redirect()->route('academico.alumnos.index')
                          ->with('success', 'Alumno eliminado del sistema.');
     }
+
+    public function misAlumnos()
+{
+    /** @var \App\Models\Usuario $usuario */
+    $usuario = auth()->user();
+    
+    $docente = \App\Models\Docente::where('usuario_id', $usuario->id)->firstOrFail();
+    
+    // Obtener el aula donde este docente es el guía principal
+    $aula = \App\Models\Aula::with('grado')->where('docente_guia_id', $docente->id)->first();
+    
+    if (!$aula) {
+        return redirect()->route('dashboard')->with('error', 'No tienes un aula asignada como Maestro Guía.');
+    }
+
+    // Traer únicamente a los alumnos matriculados en esta aula
+    $alumnos = \App\Models\Alumno::whereHas('matriculas', function($q) use ($aula) {
+        $q->where('aula_id', $aula->id)->where('estado', 'activo');
+    })->get();
+
+    // NOTA TÉCNICA: Aquí deberás iterar sobre $alumnos para sumar sus promedios 
+    // y contar sus clases reprobadas según tu tabla de notas. 
+    // Para renderizar la vista y avanzar, enviaremos la estructura base.
+
+    return view('academico.alumnos.mis-alumnos', compact('aula', 'alumnos'));
+}
 }

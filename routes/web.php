@@ -6,6 +6,7 @@ use App\Http\Controllers\AlumnoController;
 use App\Http\Controllers\MatriculaController;
 use App\Http\Controllers\AulaController;
 use App\Http\Controllers\MallaCurricularController;
+use App\Http\Controllers\DocenteGuiaController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -95,6 +96,9 @@ Route::middleware('auth')->group(function () {
         Route::put('usuarios/{usuario}/reset-password', [\App\Http\Controllers\UsuarioController::class, 'resetPassword'])
              ->name('usuarios.reset-password');
         Route::resource('usuarios', \App\Http\Controllers\UsuarioController::class);
+        
+        // Panel Exclusivo del Maestro Guía
+        Route::get('tutor/mis-alumnos', [\App\Http\Controllers\DocenteGuiaController::class, 'misAlumnos'])->name('tutor.mis-alumnos');
 
         // Fase 5: Calificaciones
         Route::get('notas', [\App\Http\Controllers\NotaController::class, 'index'])->name('notas.index');
@@ -129,7 +133,8 @@ Route::middleware('auth')->group(function () {
         // Fase 7: Boletines
         Route::get('boletines', [\App\Http\Controllers\BoletinController::class, 'index'])->name('boletines.index');
         Route::get('boletines/{matricula}', [\App\Http\Controllers\BoletinController::class, 'show'])->name('boletines.show');
-
+        Route::post('boletines/{matricula}/aprobar', [\App\Http\Controllers\BoletinController::class, 'aprobarBoletin'])->name('boletines.aprobar');
+        
         // Fase 7: Examen de Reparación
         Route::get('reparacion', [\App\Http\Controllers\ExamenReparacionController::class, 'index'])->name('reparacion.index');
         Route::post('reparacion', [\App\Http\Controllers\ExamenReparacionController::class, 'store'])->name('reparacion.store');
