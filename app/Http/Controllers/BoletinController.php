@@ -30,12 +30,11 @@ class BoletinController extends Controller
     public function index(Request $request)
     {
         $this->authorize('viewAny', Boletin::class);
-
         $usuario = auth()->user();
 
         $aulas = Aula::with(['grado', 'anioEscolar'])
             ->whereHas('anioEscolar', fn ($q) => $q->where('activo', true))
-            ->when($usuario->docente && !$usuario->hasRole(['Director', 'Subdirector']), function ($q) use ($usuario) {
+            ->when($usuario->docente && !$usuario->hasRole(['Director', 'Subdirector', 'Gestor de Usuarios']), function ($q) use ($usuario) {
                 $q->where('docente_guia_id', $usuario->docente->id);
             })
             ->get();
@@ -44,7 +43,7 @@ class BoletinController extends Controller
 
         $matriculas = collect();
         if ($aulaSeleccionada) {
-            $matriculas = Matricula::with('alumno')
+            $matriculas = Matricula::with(['alumno', 'boletines'])
                 ->where('aula_id', $aulaSeleccionada)
                 ->where('estado', 'activo')
                 ->orderBy('id')
@@ -52,6 +51,31 @@ class BoletinController extends Controller
         }
 
         return view('academico.boletin.index', compact('aulas', 'aulaSeleccionada', 'matriculas'));
+    }
+
+    // Acción para que el Maestro Guía dé el Visto Bueno / Guarde en la Caja
+    public function aprobarBoletin(Request $request, Matricula $matricula)
+    {
+        $hoy = now()->timezone('America/Managua')->toDateString();
+        
+        // Obtener el corte evaluativo activo según las fechas del calendario escolar
+        $corteActivo = \App\Models\CorteEvaluativo::where('fecha_inicio', '<=', $hoy)
+            ->where('fecha_fin', '>=', $hoy)
+            ->first() ?? \App\Models\CorteEvaluativo::orderBy('numero', 'desc')->first();
+
+        // Registrar o actualizar el visto bueno en la tabla boletin (la "caja")
+        Boletin::updateOrCreate(
+            [
+                'matricula_id' => $matricula->id,
+                'corte_evaluativo_id' => $corteActivo->id ?? null,
+            ],
+            [
+                'fecha_generacion' => now(),
+                'archivo_path' => 'aprobado_por_tutor',
+            ]
+        );
+
+        return back()->with('success', 'Boletín verificado y guardado en la caja del aula correctamente.');
     }
 
     /**
@@ -76,9 +100,14 @@ class BoletinController extends Controller
             ->orderBy('numero')
             ->get();
 
+        // CORRECCIÓN 1: Obtener el corte ACTIVO basándonos en la fecha actual
+        $hoy = now()->timezone('America/Managua')->toDateString();
+        
         $corteActual = $request->query('corte_evaluativo_id')
             ? $cortes->firstWhere('id', $request->query('corte_evaluativo_id'))
-            : $cortes->last();
+            : ($cortes->first(fn($c) => $c->fecha_inicio <= $hoy && $c->fecha_fin >= $hoy) ?? $cortes->last());
+
+        $numeroActual = $corteActual->numero ?? 1;
 
         // Asignaturas de esta aula en el año activo
         $asignaciones = AulaAsignaturaDocente::with('asignatura')
@@ -168,29 +197,37 @@ class BoletinController extends Controller
             }
         }
 
-        // Asistencia por corte (ausencias justificadas/injustificadas por rango de fechas)
+        // CORRECCIÓN 2: Asistencia por corte (solo procesar hasta el parcial actual)
         $asistencia = [];
         foreach ([1, 2, 3, 4] as $numero) {
-            $corte = $cortePorNumero->get($numero);
-            $query = AsistenciaAula::where('matricula_id', $matricula->id);
-            if ($corte) {
-                $query->whereBetween('fecha', [$corte->fecha_inicio, $corte->fecha_fin]);
+            if ($numero <= $numeroActual) {
+                $corte = $cortePorNumero->get($numero);
+                $query = AsistenciaAula::where('matricula_id', $matricula->id);
+                if ($corte) {
+                    $query->whereBetween('fecha', [$corte->fecha_inicio, $corte->fecha_fin]);
+                }
+                $registros = $query->get();
+
+                $asistencia[$numero] = [
+                    'injustificadas' => $registros->where('estado_asistencia', 'Ausencia Injustificada')->count(),
+                    'justificadas' => $registros->where('estado_asistencia', 'Ausencia Justificada')->count(),
+                ];
+            } else {
+                $asistencia[$numero] = [
+                    'injustificadas' => '',
+                    'justificadas' => '',
+                ];
             }
-            $registros = $query->get();
-
-            $injustificadas = $registros->where('estado_asistencia', 'Ausencia Injustificada')->count();
-            $justificadas = $registros->where('estado_asistencia', 'Ausencia Justificada')->count();
-
-            $asistencia[$numero] = [
-                'injustificadas' => $injustificadas,
-                'justificadas' => $justificadas,
-            ];
         }
 
-        // Compromiso de padres: derivado del expediente (acepta_compromiso_cristiano)
+        // CORRECCIÓN 3: Compromiso de padres (solo llenar hasta el parcial actual)
         $compromiso = [];
         foreach ([1, 2, 3, 4] as $numero) {
-            $compromiso[$numero] = $matricula->alumno->acepta_compromiso_cristiano ? 'MB' : '—';
+            if ($numero <= $numeroActual) {
+                $compromiso[$numero] = $matricula->alumno->acepta_compromiso_cristiano ? 'MB' : '—';
+            } else {
+                $compromiso[$numero] = '';
+            }
         }
 
         return view('academico.boletin.show', compact(

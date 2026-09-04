@@ -24,6 +24,11 @@ class Matricula extends Model
     {
         return $this->belongsTo(AnioEscolar::class, 'anio_escolar_id');
     }
+    
+    public function boletines()
+    {
+        return $this->hasMany(Boletin::class, 'matricula_id');
+    }
 
     public function notas()
     {
