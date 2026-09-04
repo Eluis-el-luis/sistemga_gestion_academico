@@ -26,7 +26,7 @@ class DashboardController extends Controller
         $totalMatriculados = 0;
         $totalPersonal = 0;
         $horarios = collect();
-        $diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+        $diasSemana = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
         $dbMetricas = []; // Nueva variable que contendrá TODAS las gráficas
 
 // 3. CARGA DE DATOS PARA DIRECTIVA Y GESTIÓN

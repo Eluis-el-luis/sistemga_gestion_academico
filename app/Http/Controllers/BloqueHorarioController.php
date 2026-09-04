@@ -46,7 +46,7 @@ class BloqueHorarioController extends Controller
         $numeroBloque = $request->numero_bloque;
 
         // Si es una clase regular y no se proporcionó número, autoincrementamos
-        if (!$request->has('es_recreo') && is_null($numeroBloque)) {
+        if (!$request->boolean('es_recreo') && is_null($numeroBloque)) {
             $ultimoBloque = BloqueHorario::where('modalidad_id', $request->modalidad_id)
                 ->where('turno', $request->turno)
                 ->where('tipo_jornada', $request->tipo_jornada)
@@ -64,7 +64,7 @@ class BloqueHorarioController extends Controller
             'nombre' => $request->nombre,
             'hora_inicio' => $request->hora_inicio,
             'hora_fin' => $request->hora_fin,
-            'es_recreo' => $request->has('es_recreo'),
+            'es_recreo' => $request->boolean('es_recreo'),
         ]);
 
         return back()->with('success', 'Bloque de horario oficial agregado correctamente.');

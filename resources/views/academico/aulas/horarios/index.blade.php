@@ -80,7 +80,7 @@
                     <select name="dia_semana" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm font-medium transition-colors" required>
                         <option value="Lunes">Lunes</option>
                         <option value="Martes">Martes</option>
-                        <option value="Miércoles">Miércoles</option>
+                        <option value="Miercoles">Miercoles</option>
                         <option value="Jueves">Jueves</option>
                         <option value="Viernes">Viernes</option>
                     </select>

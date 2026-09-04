@@ -58,7 +58,7 @@ class VisorHorarioController extends Controller
         $calendario = [
             'Lunes'     => $horarios->where('dia_semana', 'Lunes'),
             'Martes'    => $horarios->where('dia_semana', 'Martes'),
-            'Miércoles' => $horarios->where('dia_semana', 'Miércoles'),
+            'Miércoles' => $horarios->where('dia_semana', 'Miercoles'),
             'Jueves'    => $horarios->where('dia_semana', 'Jueves'),
             'Viernes'   => $horarios->where('dia_semana', 'Viernes'),
         ];
@@ -98,7 +98,7 @@ class VisorHorarioController extends Controller
         $calendario = [
             'Lunes'     => $horarios->where('dia_semana', 'Lunes'),
             'Martes'    => $horarios->where('dia_semana', 'Martes'),
-            'Miércoles' => $horarios->where('dia_semana', 'Miércoles'),
+            'Miércoles' => $horarios->where('dia_semana', 'Miercoles'),
             'Jueves'    => $horarios->where('dia_semana', 'Jueves'),
             'Viernes'   => $horarios->where('dia_semana', 'Viernes'),
         ];

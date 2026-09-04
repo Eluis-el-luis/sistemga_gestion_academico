@@ -23,9 +23,11 @@ class HorarioController extends Controller
                             ->where('aula_id', $aula->id)
                             ->get();
 
-        // 1. Buscamos los bloques oficiales
+        // 1. Buscamos los bloques oficiales que corresponden a ESTA aula:
+        //    misma modalidad (sector), mismo turno y jornada regular por defecto.
         $bloquesOficiales = BloqueHorario::where('modalidad_id', $aula->modalidad_id)
                                 ->where('turno', $aula->turno)
+                                ->where('tipo_jornada', 'Regular')
                                 ->orderBy('hora_inicio')
                                 ->get();
 
@@ -53,7 +55,7 @@ class HorarioController extends Controller
         $calendario = [
             'Lunes' => $horarios->where('dia_semana', 'Lunes'),
             'Martes' => $horarios->where('dia_semana', 'Martes'),
-            'Miércoles' => $horarios->where('dia_semana', 'Miércoles'),
+            'Miércoles' => $horarios->where('dia_semana', 'Miercoles'),
             'Jueves' => $horarios->where('dia_semana', 'Jueves'),
             'Viernes' => $horarios->where('dia_semana', 'Viernes'),
         ];
@@ -67,7 +69,7 @@ class HorarioController extends Controller
 
         $request->validate([
             'aula_asignatura_docente_id' => 'required|exists:aula_asignatura_docente,id',
-            'dia_semana' => 'required|in:Lunes,Martes,Miércoles,Jueves,Viernes',
+            'dia_semana' => 'required|in:Lunes,Martes,Miercoles,Jueves,Viernes',
             'bloque_horario_id' => 'required|exists:bloque_horario,id',
         ]);
 
@@ -79,10 +81,13 @@ class HorarioController extends Controller
             return back()->with('error', 'La materia seleccionada no pertenece a esta aula.');
         }
 
-        // 1.6 Escudo de Bloque: el bloque debe pertenecer a la modalidad y turno del aula
+        // 1.6 Escudo de Bloque: el bloque debe pertenecer a la modalidad, turno y jornada del aula
         $bloque = BloqueHorario::findOrFail($request->bloque_horario_id);
         if ($bloque->modalidad_id !== $aula->modalidad_id || $bloque->turno !== $aula->turno) {
             return back()->with('error', 'El bloque de tiempo no pertenece a la modalidad o turno de esta aula.');
+        }
+        if ($bloque->tipo_jornada !== 'Regular') {
+            return back()->with('error', 'Este bloque pertenece a una jornada especial y no aplica para un horario regular.');
         }
         if ($bloque->es_recreo) {
             return back()->with('error', 'No se puede asignar una materia en un bloque de recreo.');
