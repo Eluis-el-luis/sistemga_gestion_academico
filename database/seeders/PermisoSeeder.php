@@ -62,7 +62,7 @@ class PermisoSeeder extends Seeder
 
         // 4. Asignar permisos al Director 
         $director->syncPermissions([
-            'alumnos.gestionar','alumnos.ver', 'notas.ver', 'asistencia.ver', 'indicadores.ver', 
+            'alumnos.gestionar','alumnos.ver', 'notas.ver', 'asistencia.ver', 'asistencia.gestionar','indicadores.ver', 
             'boletines.ver', 'malla.gestionar', 'aulas.gestionar', 'aulas.ver', 'asignaturas_aula.gestionar', 
             'horarios.ver', 'horarios.gestionar', 'avance.ver', 'apoyo_padres.ver', 'reparacion.ver', 
             'reportes.gestionar', 'configuracion.gestionar', 'configuracion.ver'
@@ -70,7 +70,7 @@ class PermisoSeeder extends Seeder
 
         // 5. Asignar permisos al Subdirector
         $subdirector->syncPermissions([
-            'alumnos.supervisar','alumnos.ver', 'notas.ver', 'asistencia.ver', 'indicadores.ver', 
+            'alumnos.supervisar','alumnos.ver', 'notas.ver', 'asistencia.ver', 'asistencia.gestionar','indicadores.ver', 
             'boletines.ver', 'malla.gestionar', 'aulas.gestionar', 'aulas.ver', 'asignaturas_aula.gestionar', 
             'horarios.ver', 'horarios.gestionar', 'avance.ver', 'apoyo_padres.ver', 'reparacion.ver', 
             'reportes.supervisar', 'configuracion.ver'

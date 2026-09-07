@@ -34,7 +34,7 @@ class BoletinController extends Controller
 
         $aulas = Aula::with(['grado', 'anioEscolar'])
             ->whereHas('anioEscolar', fn ($q) => $q->where('activo', true))
-            ->when($usuario->docente && !$usuario->hasRole(['Director', 'Subdirector', 'Gestor de Usuarios']), function ($q) use ($usuario) {
+            ->when($usuario->docente && !$usuario->hasRole(['Director', 'Subdirector']), function ($q) use ($usuario) {
                 $q->where('docente_guia_id', $usuario->docente->id);
             })
             ->get();
@@ -42,32 +42,71 @@ class BoletinController extends Controller
         $aulaSeleccionada = $request->query('aula_id', $aulas->first()->id ?? null);
 
         $matriculas = collect();
+        $todosAprobados = false;
+        $corteActivo = null;
+
         if ($aulaSeleccionada) {
-            $matriculas = Matricula::with(['alumno', 'boletines'])
-                ->where('aula_id', $aulaSeleccionada)
-                ->where('estado', 'activo')
-                ->orderBy('id')
-                ->get();
+            $anioEscolarId = Aula::where('id', $aulaSeleccionada)->value('anio_escolar_id');
+            $hoy = now()->timezone('America/Managua')->toDateString();
+
+            $corteActivo = CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)
+                ->where('fecha_inicio', '<=', $hoy)
+                ->where('fecha_fin', '>=', $hoy)
+                ->first() ?? CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)->orderBy('numero', 'desc')->first();
+
+            $matriculas = Matricula::with(['alumno', 'boletines' => function($q) use ($corteActivo) {
+                if ($corteActivo) {
+                    $q->where('corte_evaluativo_id', $corteActivo->id);
+                }
+            }])
+            ->where('aula_id', $aulaSeleccionada)
+            ->where('estado', 'activo')
+            ->orderBy('id')
+            ->get();
+
+            // Validar si todos los alumnos activos tienen el boletín en caja para este corte
+            if ($matriculas->isNotEmpty() && $corteActivo) {
+                $todosAprobados = $matriculas->every(fn($m) => $m->boletines->isNotEmpty());
+            }
         }
 
-        return view('academico.boletin.index', compact('aulas', 'aulaSeleccionada', 'matriculas'));
+        return view('academico.boletin.index', compact('aulas', 'aulaSeleccionada', 'matriculas', 'todosAprobados'));
     }
 
-    // Acción para que el Maestro Guía dé el Visto Bueno / Guarde en la Caja
     public function aprobarBoletin(Request $request, Matricula $matricula)
     {
+        $anioEscolarId = $matricula->anio_escolar_id;
         $hoy = now()->timezone('America/Managua')->toDateString();
         
-        // Obtener el corte evaluativo activo según las fechas del calendario escolar
-        $corteActivo = \App\Models\CorteEvaluativo::where('fecha_inicio', '<=', $hoy)
+        $corteActivo = CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)
+            ->where('fecha_inicio', '<=', $hoy)
             ->where('fecha_fin', '>=', $hoy)
-            ->first() ?? \App\Models\CorteEvaluativo::orderBy('numero', 'desc')->first();
+            ->first() ?? CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)->orderBy('numero', 'desc')->first();
 
-        // Registrar o actualizar el visto bueno en la tabla boletin (la "caja")
+        if (!$corteActivo) {
+            return back()->with('error', 'No hay un corte evaluativo activo para validar calificaciones.');
+        }
+
+        // 1. REGLA: Verificar que todas las asignaturas de esta aula tengan nota para este alumno
+        $asignacionesIds = AulaAsignaturaDocente::where('aula_id', $matricula->aula_id)
+            ->where('anio_escolar_id', $anioEscolarId)
+            ->pluck('id');
+
+        $notasRegistradas = Nota::where('matricula_id', $matricula->id)
+            ->where('corte_evaluativo_id', $corteActivo->id)
+            ->whereIn('aula_asignatura_docente_id', $asignacionesIds)
+            ->whereNotNull('nota_cuantitativa')
+            ->pluck('aula_asignatura_docente_id');
+
+        if ($notasRegistradas->count() < $asignacionesIds->count()) {
+            return back()->with('error', 'No se puede dar el Visto Bueno. El estudiante tiene asignaturas pendientes sin nota registrada en este corte.');
+        }
+
+        // 2. Guardar en la caja institucional
         Boletin::updateOrCreate(
             [
                 'matricula_id' => $matricula->id,
-                'corte_evaluativo_id' => $corteActivo->id ?? null,
+                'corte_evaluativo_id' => $corteActivo->id,
             ],
             [
                 'fecha_generacion' => now(),
@@ -220,16 +259,18 @@ class BoletinController extends Controller
             }
         }
 
-        // CORRECCIÓN 3: Compromiso de padres (solo llenar hasta el parcial actual)
-        $compromiso = [];
-        foreach ([1, 2, 3, 4] as $numero) {
-            if ($numero <= $numeroActual) {
-                $compromiso[$numero] = $matricula->alumno->acepta_compromiso_cristiano ? 'MB' : '—';
-            } else {
-                $compromiso[$numero] = '';
-            }
-        }
+            $compromiso = [];
+            $evaluacionesReales = \App\Models\EvaluacionFamiliar::where('matricula_id', $matricula->id)->get();
 
+            foreach ([1, 2, 3, 4] as $numero) {
+                if ($numero <= $numeroActual) {
+                    $corte = $cortePorNumero->get($numero);
+                    $eval = $corte ? $evaluacionesReales->firstWhere('corte_evaluativo_id', $corte->id) : null;
+                    $compromiso[$numero] = $eval ? $eval->evaluacion : '—';
+                } else {
+                    $compromiso[$numero] = '';
+                }
+            }
         return view('academico.boletin.show', compact(
             'matricula', 'areas', 'promedios', 'asistencia', 'compromiso', 'corteActual'
         ));

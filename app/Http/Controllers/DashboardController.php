@@ -33,7 +33,7 @@ class DashboardController extends Controller
         // 3. CARGA DE DATOS PARA DIRECTIVA Y GESTIÓN
         if ($user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
             $totalAlumnos = \App\Models\Alumno::count();
-            $totalDocentes = \App\Models\Usuario::role(['Docente Guía', 'Docente por Asignatura'])->count();
+            $totalDocentes = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count();
 
             // --- PRIMERA CONSULTA 100% REAL ---
             $matriculasActivas = DB::table('matricula')
@@ -68,33 +68,35 @@ class DashboardController extends Controller
         $docente = \App\Models\Docente::where('usuario_id', $user->id)->first();
         
         if ($docente) {
-            // Lógica para Docente Guía: Buscamos el aula que tiene a su cargo
-            if ($user->hasRole('Docente Guia')) {
-                $aulaGuia = \App\Models\Aula::with('grado')->where('docente_guia_id', $docente->id)->first();
-            }
+            // Lógica para Docente Guía: Buscamos si existe un aula donde él sea el 'docente_guia_id'
+            $aulaGuia = \App\Models\Aula::with('grado')->where('docente_guia_id', $docente->id)->first();
 
-            // Lógica para Docente por Asignatura: Buscamos sus horarios
-            if ($user->hasRole('Docente por Asignatura')) {
-                $horarios = \App\Models\Horario::with([
-                        'bloqueHorario',
-                        'aulaAsignaturaDocente.asignatura',
-                        'aulaAsignaturaDocente.aula.grado',
-                        'aulaAsignaturaDocente.aula.modalidad'
-                    ])
-                    ->whereHas('aulaAsignaturaDocente', function($q) use ($docente) {
-                        $q->where('docente_id', $docente->id);
-                    })
-                    ->get()
-                    ->sortBy(fn($horario) => $horario->bloqueHorario->hora_inicio)
-                    ->groupBy('dia_semana');
-            }
+            // Si necesitas inicializar la variable booleana para tu vista Blade:
+            $esDocenteGuia = $aulaGuia ? true : false;
+
+            // Lógica para Docente por Asignatura: Buscamos si tiene horarios asignados
+            $horarios = \App\Models\Horario::with([
+                    'bloqueHorario',
+                    'aulaAsignaturaDocente.asignatura',
+                    'aulaAsignaturaDocente.aula.grado',
+                    'aulaAsignaturaDocente.aula.modalidad'
+                ])
+                ->whereHas('aulaAsignaturaDocente', function($q) use ($docente) {
+                    $q->where('docente_id', $docente->id);
+                })
+                ->get()
+                ->sortBy(fn($horario) => $horario->bloqueHorario->hora_inicio)
+                ->groupBy('dia_semana');
+        } else {
+            $esDocenteGuia = false;
         }
 
         // 5. ENRUTAMIENTO ÚNICO AL DASHBOARD COMPONENTIZADO
         // Es vital que 'aulaGuia' vaya aquí en el compact
         return view('dashboard', compact(
-            'avisos', 'totalAlumnos', 'totalDocentes', 'horarios', 'diasSemana', 'dbMetricas', 'aulaGuia'
+            'avisos', 'totalAlumnos', 'totalDocentes', 'horarios', 'diasSemana', 'dbMetricas', 'aulaGuia', 'esDocenteGuia'
         ));
+
     }
 
     /**
