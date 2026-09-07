@@ -25,19 +25,32 @@
                 </div>
             @endif
 
+            @if(session('error'))
+                <div class="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl shadow-sm flex items-center gap-3 font-medium">
+                    <svg class="w-5 h-5 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    {{ session('error') }}
+                </div>
+            @endif
+
             @if($aulas->count() > 0)
                 <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6 border-l-4 border-l-[#e6ac27] flex justify-between items-center flex-wrap gap-4">
                     <div>
                         <h3 class="font-black text-lg text-[#3d2c1d]">
                             Tutoría Activa: <span class="text-[#e6ac27]">{{ $aulas->first()->grado->nombre ?? '' }} - Sección "{{ $aulas->first()->nombre }}"</span>
                         </h3>
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">Estado del paquete: En revisión por el tutor</p>
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">Estado del paquete: {{ $todosAprobados ? 'Completo y listo para enviar' : 'Revisión en curso (Faltan alumnos)' }}</p>
                     </div>
 
-                    <!-- Botón para empaquetar y enviar todo al Gestor de Usuarios -->
-                    <button type="button" onclick="Swal.fire('¡Paquete enviado!', 'Los boletines validados han sido colocados en la caja para el Gestor de Usuarios.', 'success')" class="px-5 py-3 bg-[#3d2c1d] text-white rounded-xl hover:bg-slate-800 text-xs font-black uppercase tracking-widest shadow-md transition-all">
-                         Enviar Paquete al Gestor de Usuarios
-                    </button>
+                    <!-- Botón condicionado: Solo se puede enviar si todos están en la caja -->
+                    @if($todosAprobados)
+                        <button type="button" onclick="Swal.fire('¡Paquete enviado!', 'Los boletines han sido entregados exitosamente al Gestor de Usuarios para su impresión oficial.', 'success')" class="px-5 py-3 bg-[#3d2c1d] text-white rounded-xl hover:bg-slate-800 text-xs font-black uppercase tracking-widest shadow-md transition-all">
+                            Enviar Paquete al Gestor de Usuarios
+                        </button>
+                    @else
+                        <button type="button" onclick="Swal.fire('Paquete incompleto', 'No puedes enviar el paquete hasta que todos los estudiantes tengan su Visto Bueno en la caja.', 'warning')" class="px-5 py-3 bg-slate-300 text-slate-600 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm cursor-not-allowed">
+                            Enviar Paquete al Gestor de Usuarios
+                        </button>
+                    @endif
                 </div>
             @endif
 
@@ -79,12 +92,10 @@
                                         @endif
                                     </td>
                                     <td class="p-5 text-right flex justify-end gap-2">
-                                        <!-- Ver Previsualización para chequear notas -->
                                         <a href="{{ route('academico.boletines.show', $matricula->id) }}" class="inline-flex items-center gap-1 px-3 py-2 bg-slate-50 border border-slate-200 hover:border-[#e6ac27] text-slate-600 rounded-xl text-xs font-black transition-all shadow-sm">
                                             Revisar Notas
                                         </a>
 
-                                        <!-- Botón para dar Visto Bueno / Guardar en Caja -->
                                         <form action="{{ route('academico.boletines.aprobar', $matricula->id) }}" method="POST" class="inline">
                                             @csrf
                                             <button type="submit" class="inline-flex items-center gap-1 px-3 py-2 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-xl text-xs font-black transition-all shadow-sm">
@@ -105,4 +116,5 @@
 
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </x-app-layout>

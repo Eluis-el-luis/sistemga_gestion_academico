@@ -7,6 +7,7 @@ use App\Http\Controllers\MatriculaController;
 use App\Http\Controllers\AulaController;
 use App\Http\Controllers\MallaCurricularController;
 use App\Http\Controllers\DocenteGuiaController;
+use App\Http\Controllers\PrematriculaController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -71,6 +72,11 @@ Route::middleware('auth')->group(function () {
         
         Route::resource('malla', \App\Http\Controllers\MallaCurricularController::class)
         ->only(['index', 'store', 'destroy']);
+        
+        //prematricula
+        Route::get('prematricula', [PrematriculaController::class, 'index'])->name('prematricula.index');
+        Route::post('prematricula/{matricula}/promover', [PrematriculaController::class, 'promover'])->name('prematricula.promover');
+        Route::post('prematricula/{matricula}/remitir', [PrematriculaController::class, 'remitir'])->name('prematricula.remitir');
 
         // Rutas adicionales para gestión avanzada de la malla
         Route::put('malla/item/{id}', [\App\Http\Controllers\MallaCurricularController::class, 'update'])->name('malla.item.update');
@@ -149,6 +155,8 @@ Route::middleware('auth')->group(function () {
         Route::get('apoyo-padres', [\App\Http\Controllers\ApoyoPadresController::class, 'index'])->name('apoyo-padres.index');
         Route::post('apoyo-padres', [\App\Http\Controllers\ApoyoPadresController::class, 'store'])->name('apoyo-padres.store');
         Route::delete('apoyo-padres/{apoyo}', [\App\Http\Controllers\ApoyoPadresController::class, 'destroy'])->name('apoyo-padres.destroy');
+        Route::get('apoyo-familiar', [\App\Http\Controllers\ApoyoFamiliarController::class, 'index'])->name('apoyo_familiar.index');
+        Route::post('apoyo-familiar', [\App\Http\Controllers\ApoyoFamiliarController::class, 'store'])->name('apoyo_familiar.store');
 
         // Fase 8: Control Disciplinario
         Route::get('disciplina', [\App\Http\Controllers\IncidenciaDisciplinariaController::class, 'index'])->name('disciplina.index');
