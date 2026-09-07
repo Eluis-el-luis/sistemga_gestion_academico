@@ -105,6 +105,12 @@ class ReporteService
 
             $pendientes = max(0, $total - $conNota);
 
+            // Estado de cierre del parcial (fuente: corte_cerrado)
+            $cerrado = \App\Models\CorteCerrado::where('aula_asignatura_docente_id', $asignacion->id)
+                ->when($corteId, fn ($q) => $q->where('corte_evaluativo_id', $corteId))
+                ->where('bloqueado', true)
+                ->exists();
+
             // filtro de tipo: si se pide solo ingresadas o solo pendientes
             if ($tipo === 'ingresadas' && $conNota === 0) continue;
             if ($tipo === 'pendientes' && $pendientes === 0) continue;
@@ -118,6 +124,7 @@ class ReporteService
                 'registradas' => $conNota,
                 'pendientes' => $pendientes,
                 'porcentaje' => $total > 0 ? round(($conNota / $total) * 100, 1) : 0,
+                'cerrado' => $cerrado,
             ];
         }
 

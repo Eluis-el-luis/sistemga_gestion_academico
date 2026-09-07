@@ -115,13 +115,6 @@ class BoletinController extends Controller
             ->where('anio_escolar_id', $anioEscolarId)
             ->get();
 
-        // Notas del alumno en el año
-        $notas = Nota::with(['aulaAsignaturaDocente.asignatura', 'indicadorLogro'])
-            ->where('matricula_id', $matricula->id)
-            ->whereHas('aulaAsignaturaDocente', fn ($q) => $q->where('anio_escolar_id', $anioEscolarId))
-            ->get()
-            ->groupBy('aula_asignatura_docente_id');
-
         // Mapa de corte numérico -> id
         $cortePorNumero = $cortes->keyBy('numero');
 
@@ -130,25 +123,14 @@ class BoletinController extends Controller
         $acumuladoCortes = [1 => [], 2 => [], 3 => [], 4 => []];
 
         foreach ($asignaciones as $asignacion) {
-            $notasAsignatura = $notas->get($asignacion->id, collect());
+            // Resumen integrado por asignatura (cortes, semestres, nota final, aprobado)
+            $resumen = $this->notaService->calcularResumenAsignatura($matricula, $asignacion);
 
             $cortesData = [1 => null, 2 => null, 3 => null, 4 => null];
-            $finalCuan = null;
-
-            // Mapa id de corte -> número para notas
-            $notaPorCorte = [];
-            foreach ($notasAsignatura as $nota) {
-                $corte = $cortes->firstWhere('id', $nota->corte_evaluativo_id);
-                if (!$corte) continue;
-                $numero = $corte->numero;
-                $notaPorCorte[$numero] = $nota;
-            }
-
             $notasFinales = [];
             foreach ([1, 2, 3, 4] as $numero) {
-                $nota = $notaPorCorte[$numero] ?? null;
-                if ($nota && !is_null($nota->nota_cuantitativa)) {
-                    $cuan = (float) $nota->nota_cuantitativa;
+                if (isset($resumen['cortes'][$numero]) && $resumen['cortes'][$numero] !== null) {
+                    $cuan = (float) $resumen['cortes'][$numero];
                     $cua = $this->notaService->calcularIndicadorLogro((int) round($cuan));
 
                     $cortesData[$numero] = ['cua' => $cua, 'cuan' => number_format($cuan, 0)];
@@ -157,20 +139,9 @@ class BoletinController extends Controller
                 }
             }
 
-            // Nota final: promedio de los cortes con nota (si hay los 4, usar promedio simple)
-            if (count($notasFinales) === 4) {
-                $finalCuan = $this->notaService->calcularNotaFinal(
-                    (int) round($notasFinales[1]),
-                    (int) round($notasFinales[2]),
-                    (int) round($notasFinales[3]),
-                    (int) round($notasFinales[4]),
-                );
-            } elseif (count($notasFinales) > 0) {
-                $finalCuan = (int) round(array_sum($notasFinales) / count($notasFinales));
-            }
-
+            $finalCuan = $resumen['nota_final'];
             $final = ($finalCuan !== null)
-                ? ['cua' => $this->notaService->calcularIndicadorLogro($finalCuan), 'cuan' => number_format($finalCuan, 0)]
+                ? ['cua' => $resumen['indicador_final'], 'cuan' => number_format($finalCuan, 0)]
                 : null;
 
             $area = $asignacion->asignatura->area ?? 'Otras Áreas';
@@ -179,6 +150,7 @@ class BoletinController extends Controller
                 'nombre' => $asignacion->asignatura->nombre,
                 'cortes' => $cortesData,
                 'final' => $final,
+                'aprobado' => $resumen['aprobado'],
             ];
         }
 

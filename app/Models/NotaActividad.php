@@ -12,6 +12,7 @@ class NotaActividad extends Model
         'matricula_id',
         'actividad_evaluativa_id',
         'nota_obtenida',
+        'updated_by',
     ];
 
     public function matricula()

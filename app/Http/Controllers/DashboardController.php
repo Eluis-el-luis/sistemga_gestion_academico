@@ -23,8 +23,8 @@ class DashboardController extends Controller
             ->get();
 
         // 2. INICIALIZAR VARIABLES POR DEFECTO
-        $totalAlumnos = 0;
-        $totalDocentes = 0;
+        $totalMatriculados = 0;
+        $totalPersonal = 0;
         $horarios = collect();
         $diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
         $dbMetricas = []; 
@@ -32,36 +32,13 @@ class DashboardController extends Controller
 
         // 3. CARGA DE DATOS PARA DIRECTIVA Y GESTIÓN
         if ($user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
-            $totalAlumnos = \App\Models\Alumno::count();
-            $totalDocentes = \App\Models\Usuario::role(['Docente Guía', 'Docente por Asignatura'])->count();
+            // "Alumnos Activos": matrículas en estado activo del ciclo vigente
+            $totalMatriculados = \App\Models\Matricula::where('estado', 'activo')->count();
+            // "Docentes": usuarios con rol de docencia
+            $totalPersonal = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count();
 
-            // --- PRIMERA CONSULTA 100% REAL ---
-            $matriculasActivas = DB::table('matricula')
-                ->join('aula', 'matricula.aula_id', '=', 'aula.id')
-                ->join('modalidad', 'aula.modalidad_id', '=', 'modalidad.id')
-                ->select('modalidad.nombre', DB::raw('count(matricula.id) as total'))
-                ->groupBy('modalidad.nombre')
-                ->pluck('total', 'nombre');
-
-            $preescolar = $matriculasActivas['Preescolar'] ?? 0;
-            $primaria   = $matriculasActivas['Primaria'] ?? 0;
-            $secundaria = $matriculasActivas['Secundaria'] ?? 0;
-
-            // --- ARMAMOS EL PAQUETE DE GRÁFICAS PARA ENVIAR A JAVASCRIPT ---
-            $dbMetricas = [
-                'matriculados'          => ['titulo' => 'Alumnos Matriculados (Dato Real)', 'datos' => [$preescolar, $primaria, $secundaria]],
-                'asistencia_alumnos'    => ['titulo' => 'Asistencia de Alumnos (%)', 'datos' => [0, 0, 0]],
-                'asistencia_docentes'   => ['titulo' => 'Asistencia de Docentes (%)', 'datos' => [0, 0, 0]],
-                'rendimiento_modalidad' => ['titulo' => 'Rendimiento Académico General (%)', 'datos' => [0, 0, 0]],
-                'apoyo_padres'          => ['titulo' => 'Participación de Padres (%)', 'datos' => [0, 0, 0]],
-                'aprobados'             => ['titulo' => 'Alumnos Aprobados Limpios (%)', 'datos' => [0, 0, 0]],
-                'reprobados_leves'      => ['titulo' => 'Reprobados (1 a 2 Clases) (%)', 'datos' => [0, 0, 0]],
-                'reprobados_graves'     => ['titulo' => 'Reprobados Críticos (3+ Clases) (%)', 'datos' => [0, 0, 0]],
-                'promedio_notas'        => ['titulo' => 'Promedio de Calificaciones (Escala 0-100)', 'datos' => [0, 0, 0]],
-                'avances_silabo'        => ['titulo' => 'Avance Curricular del Maestro (%)', 'datos' => [0, 0, 0]],
-                'retencion'             => ['titulo' => 'Retención Estudiantil (%)', 'datos' => [0, 0, 0]],
-                'puntualidad'           => ['titulo' => 'Puntualidad en Horario de Entrada (%)', 'datos' => [0, 0, 0]]
-            ];
+            // --- MÉTRICAS PARA GRÁFICAS (datos reales por modalidad) ---
+            $dbMetricas = $this->calcularMetricas();
         }
 
         // 4. CARGA DE DATOS PARA DOCENTES (Guía y Asignatura)
@@ -93,7 +70,7 @@ class DashboardController extends Controller
         // 5. ENRUTAMIENTO ÚNICO AL DASHBOARD COMPONENTIZADO
         // Es vital que 'aulaGuia' vaya aquí en el compact
         return view('dashboard', compact(
-            'avisos', 'totalAlumnos', 'totalDocentes', 'horarios', 'diasSemana', 'dbMetricas', 'aulaGuia'
+            'avisos', 'totalMatriculados', 'totalPersonal', 'horarios', 'diasSemana', 'dbMetricas', 'aulaGuia'
         ));
     }
 

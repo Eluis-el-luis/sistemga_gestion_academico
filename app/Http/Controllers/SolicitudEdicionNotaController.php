@@ -45,10 +45,10 @@ class SolicitudEdicionNotaController extends Controller
 
         $notaReferencia = $solicitud->nota;
         if ($notaReferencia) {
-            // Desbloqueamos TODAS las notas del mismo parcial (asignación + corte)
-            Nota::where('aula_asignatura_docente_id', $notaReferencia->aula_asignatura_docente_id)
+            // Desbloqueamos el parcial completo (asignación + corte)
+            \App\Models\CorteCerrado::where('aula_asignatura_docente_id', $notaReferencia->aula_asignatura_docente_id)
                 ->where('corte_evaluativo_id', $notaReferencia->corte_evaluativo_id)
-                ->update(['bloqueado' => false]);
+                ->delete();
         }
 
         $solicitud->update([
