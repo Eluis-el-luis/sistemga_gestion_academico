@@ -8,12 +8,12 @@ use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
-   public function index()
+    public function index()
     {
         /** @var \App\Models\Usuario $user */
         $user = Auth::user();
 
-        // 1. DATOS GLOBALES (Avisos para todos)
+        // 1. DATOS GLOBALES
         $avisos = DB::table('aviso')
             ->join('usuario', 'aviso.autor_id', '=', 'usuario.id')
             ->select('aviso.*', 'usuario.nombre_completo as autor_nombre')
@@ -22,32 +22,27 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        // 2. INICIALIZAR VARIABLES POR DEFECTO
-        $totalMatriculados = 0;
-        $totalPersonal = 0;
-        $horarios = collect();
+        // 2. INICIALIZAR TODAS LAS VARIABLES ESPERADAS POR LA VISTA
+        $totalAlumnos = 0;   // Corregido para coincidir con compact()
+        $totalDocentes = 0;  // Corregido para coincidir con compact()
         $diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
         $dbMetricas = []; 
-        $aulaGuia = null; // Inicializamos la variable para el Maestro Guía
-
-        // 3. CARGA DE DATOS PARA DIRECTIVA Y GESTIÓN
-        if ($user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
-            // "Alumnos Activos": matrículas en estado activo del ciclo vigente
-            $totalMatriculados = \App\Models\Matricula::where('estado', 'activo')->count();
-            // "Docentes": usuarios con rol de docencia
-            $totalPersonal = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count();
-
-            // --- MÉTRICAS PARA GRÁFICAS (datos reales por modalidad) ---
-            $dbMetricas = $this->calcularMetricas();
-        }
-
-        // 4. CARGA DE DATOS PARA DOCENTES (Guía y Asignatura)
-        $docente = \App\Models\Docente::where('usuario_id', $user->id)->first();
-        $anioActivo = \App\Models\AnioEscolar::where('activo', true)->first();
-        
+        $aulaGuia = null;
+        $esDocenteGuia = false;
         $bloques = collect();
         $matrizHorario = [];
         $esquemaActivo = 'Regular';
+
+        // 3. CARGA DE DATOS PARA DIRECTIVA
+        if ($user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
+            $totalAlumnos = \App\Models\Matricula::where('estado', 'activo')->count();
+            $totalDocentes = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count();
+            $dbMetricas = $this->calcularMetricas();
+        }
+
+        // 4. CARGA DE DATOS PARA DOCENTES
+        $docente = \App\Models\Docente::where('usuario_id', $user->id)->first();
+        $anioActivo = \App\Models\AnioEscolar::where('activo', true)->first();
         
         if ($docente && $anioActivo) {
             $aulaGuia = \App\Models\Aula::with('grado')
@@ -70,14 +65,12 @@ class DashboardController extends Controller
                 })
                 ->get();
 
-            // 1. Extraer los bloques de horas (Filas de la tabla)
             $bloques = $horariosRaw->pluck('bloqueHorario')->unique('id')->sortBy('hora_inicio')->values();
             
             if($bloques->count() > 0) {
                 $esquemaActivo = $bloques->first()->tipo_jornada ?? 'Regular';
             }
 
-            // 2. Construir la Matriz [Día][Hora] para la cuadrícula
             foreach ($horariosRaw as $horario) {
                 $dia = $horario->dia_semana;
                 $hora = $horario->bloqueHorario->hora_inicio;
@@ -91,41 +84,24 @@ class DashboardController extends Controller
                     'modalidad_id'  => $horario->aulaAsignaturaDocente->aula->modalidad_id,
                 ];
             }
-        } else {
-            $esDocenteGuia = false;
         }
 
         return view('dashboard', compact(
             'avisos', 'totalAlumnos', 'totalDocentes', 'diasSemana', 'dbMetricas', 'aulaGuia', 'esDocenteGuia', 'bloques', 'matrizHorario', 'esquemaActivo'
         ));
-
     }
 
-    /**
-     * Calcula las métricas para las gráficas del panel directivo, segmentadas
-     * por modalidad (Preescolar, Primaria, Secundaria).
-     */
     protected function calcularMetricas(): array
     {
         $modalidades = \App\Models\Modalidad::orderBy('id')->get();
-
-        $matriculados = [];
-        $asistenciaAlumnos = [];
-        $asistenciaDocentes = [];
-        $rendimiento = [];
-        $apoyoPadres = [];
-        $aprobados = [];
-        $reprobadosLeves = [];
-        $reprobadosGraves = [];
-        $promedioNotas = [];
-        $avances = [];
-        $retencion = [];
-        $puntualidad = [];
+        $matriculados = []; $asistenciaAlumnos = []; $asistenciaDocentes = [];
+        $rendimiento = []; $apoyoPadres = []; $aprobados = [];
+        $reprobadosLeves = []; $reprobadosGraves = []; $promedioNotas = [];
+        $avances = []; $retencion = []; $puntualidad = [];
 
         foreach ($modalidades as $modalidad) {
             $aulaIds = \App\Models\Aula::where('modalidad_id', $modalidad->id)->pluck('id');
 
-            // Matriculados activos
             $matriculaQuery = \App\Models\Matricula::whereIn('aula_id', $aulaIds);
             $activos = (clone $matriculaQuery)->where('estado', 'activo')->count();
             $retirados = (clone $matriculaQuery)->where('estado', 'retirado')->count();
@@ -133,67 +109,52 @@ class DashboardController extends Controller
 
             $matriculaIds = (clone $matriculaQuery)->where('estado', 'activo')->pluck('id');
 
-            // Asistencia de alumnos (% presentes)
             $asistAula = \App\Models\AsistenciaAula::whereIn('matricula_id', $matriculaIds)->get();
             $totalRegAula = $asistAula->count();
             $presentesAula = $asistAula->whereIn('estado_asistencia', ['Presente', 'Actividad Institucional'])->count();
             $asistenciaAlumnos[] = $totalRegAula > 0 ? round(($presentesAula / $totalRegAula) * 100, 1) : 0;
 
-            // Puntualidad (% Presente sin retardo) sobre asistencia personal del día
-            // Se calcula globalmente al final; aquí dejamos acumuladores por modalidad no aplican.
-
-            // Rendimiento académico (% aprobados con promedio >= 60)
             $notasModalidad = \App\Models\Nota::whereIn('matricula_id', $matriculaIds)->get();
             $aprob = $notasModalidad->where('nota_cuantitativa', '>=', 60)->count();
             $totalNotas = $notasModalidad->count();
             $rendimiento[] = $totalNotas > 0 ? round(($aprob / $totalNotas) * 100, 1) : 0;
-
-            // Promedio de calificaciones (escala 0-100)
             $promedioNotas[] = $totalNotas > 0 ? round((float) $notasModalidad->avg('nota_cuantitativa'), 2) : 0;
 
-            // Apoyo de padres (% de padres que apoyan)
             $apoyo = \App\Models\ApoyoPadres::whereIn('aula_id', $aulaIds)->get();
             $totApoyo = $apoyo->sum('total_padres');
             $cantApoyo = $apoyo->sum('cantidad_apoyan');
             $apoyoPadres[] = $totApoyo > 0 ? round(($cantApoyo / $totApoyo) * 100, 1) : 0;
 
-            // Aprobados limpios / reprobados por alumno (conteo de asignaturas reprobadas)
-            $alumnosNotas = \App\Models\Nota::whereIn('matricula_id', $matriculaIds)
-                ->get()
-                ->groupBy('matricula_id');
+            $alumnosNotas = \App\Models\Nota::whereIn('matricula_id', $matriculaIds)->get()->groupBy('matricula_id');
             $limpios = 0; $leves = 0; $graves = 0; $totalAlumnosEval = $alumnosNotas->count();
+            
             foreach ($alumnosNotas as $notasAlumno) {
                 $reprobadas = $notasAlumno->where('nota_cuantitativa', '<', 60)->count();
                 if ($reprobadas === 0) $limpios++;
                 elseif ($reprobadas <= 2) $leves++;
                 else $graves++;
             }
+            
             $aprobados[] = $totalAlumnosEval > 0 ? round(($limpios / $totalAlumnosEval) * 100, 1) : 0;
             $reprobadosLeves[] = $totalAlumnosEval > 0 ? round(($leves / $totalAlumnosEval) * 100, 1) : 0;
             $reprobadosGraves[] = $totalAlumnosEval > 0 ? round(($graves / $totalAlumnosEval) * 100, 1) : 0;
 
-            // Avance curricular (promedio de porcentaje de avance)
             $asignacionIds = \App\Models\AulaAsignaturaDocente::whereIn('aula_id', $aulaIds)->pluck('id');
             $avancesMod = \App\Models\AvanceContenido::whereIn('aula_asignatura_docente_id', $asignacionIds)->get();
             $avances[] = $avancesMod->count() > 0 ? round((float) $avancesMod->avg('porcentaje_avance'), 1) : 0;
 
-            // Retención = activos / (activos + retirados)
             $retencion[] = ($activos + $retirados) > 0 ? round(($activos / ($activos + $retirados)) * 100, 1) : 0;
         }
 
-        // Puntualidad y asistencia de docentes: globales (AsistenciaPersonal)
         $docentesIds = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->pluck('id');
         $asisPersonal = \App\Models\AsistenciaPersonal::whereIn('usuario_id', $docentesIds)->get();
         $totPersonal = $asisPersonal->count();
         $presentesPersonal = $asisPersonal->where('estado', 'Presente')->count();
-        $retardos = $asisPersonal->where('estado', 'Retardo')->count();
+        
         $asistenciaDocentes[] = $totPersonal > 0 ? round(($presentesPersonal / $totPersonal) * 100, 1) : 0;
-        $puntualidad[] = $totPersonal > 0 ? round((($presentesPersonal) / $totPersonal) * 100, 1) : 0;
+        $puntualidad[] = $totPersonal > 0 ? round(($presentesPersonal / $totPersonal) * 100, 1) : 0;
 
-        // Para puntualidad distribuimos el mismo valor (no hay segmentación por modalidad en AsistenciaPersonal)
         $puntualidad = array_fill(0, count($modalidades), count($puntualidad) ? $puntualidad[0] : 0);
-
-        // asistencia_docentes también puede repetirse por modalidad (sin segmentación)
         $asistenciaDocentesArr = array_fill(0, count($modalidades), $asistenciaDocentes[0] ?? 0);
 
         return [
