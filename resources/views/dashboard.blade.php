@@ -219,36 +219,6 @@
     </div>
 
     <!-- MODALES GLOBALES -->
-    <div x-data="{ open: false }" @abrir-modal-horarios.window="open = true" x-show="open" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div x-show="open" x-transition.opacity class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="open = false"></div>
-        <div x-show="open" x-transition.scale class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div class="px-6 py-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                <h3 class="text-lg font-black text-[#3d2c1d]">Consulta de Horarios</h3>
-                <button @click="open = false" class="text-slate-400 hover:text-rose-500 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
-            </div>
-            <div class="p-6 grid gap-4">
-                <a href="{{ route('academico.visor.aulas') }}" class="group flex items-center p-4 border border-slate-200 rounded-2xl hover:border-[#e6ac27] hover:bg-[#FFFDF5] transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] group-hover:bg-[#e6ac27] group-hover:text-white flex items-center justify-center mr-4 transition-colors">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                    </div>
-                    <div>
-                        <span class="block font-black text-[#3d2c1d]">Horarios de Aulas</span>
-                        <span class="block text-xs text-slate-500 font-medium mt-0.5">Por grado y sección</span>
-                    </div>
-                </a>
-                <a href="{{ route('academico.visor.docentes') }}" class="group flex items-center p-4 border border-slate-200 rounded-2xl hover:border-[#e6ac27] hover:bg-[#FFFDF5] transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] group-hover:bg-[#e6ac27] group-hover:text-white flex items-center justify-center mr-4 transition-colors">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                    </div>
-                    <div>
-                        <span class="block font-black text-[#3d2c1d]">Horarios de Docentes</span>
-                        <span class="block text-xs text-slate-500 font-medium mt-0.5">Carga horaria individual</span>
-                    </div>
-                </a>
-            </div>
-        </div>
-    </div>
-
     <div x-data="{ open: false }" @abrir-modal-asistencia.window="open = true" x-show="open" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div x-show="open" x-transition.opacity class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="open = false"></div>
         <div x-show="open" x-transition.scale class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
@@ -337,6 +307,7 @@
         </div>
     </div>
 
+    <!-- MODAL DE DECISIÓN DE CLASE (ÚNICO Y CORREGIDO) -->
     <div x-data="{ open: false, asignacionId: '', asignaturaInfo: '', aulaInfo: '', horaInfo: '' }" 
          @abrir-modal-decision-clase.window="
             open = true;
@@ -365,9 +336,10 @@
                         <svg class="w-8 h-8 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         <span class="font-black uppercase tracking-widest text-[11px] text-center">Pasar<br>Asistencia</span>
                     </a>
-                    <a x-bind:href="'{{ url('academico/notas/actividades') }}/' + asignacionId" class="flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border border-[#e6ac27]/20 bg-[#FFFDF5] text-[#3d2c1d] hover:bg-[#e6ac27] hover:text-white transition-all transform hover:-translate-y-1 shadow-sm group">
+                    
+                    <a x-bind:href="'{{ url('academico/notas/evaluar') }}/' + asignacionId" class="flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border border-[#e6ac27]/20 bg-[#FFFDF5] text-[#3d2c1d] hover:bg-[#e6ac27] hover:text-white transition-all transform hover:-translate-y-1 shadow-sm group">
                         <svg class="w-8 h-8 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-                        <span class="font-black uppercase tracking-widest text-[11px] text-center">Gestionar<br>Notas</span>
+                        <span class="font-black uppercase tracking-widest text-[11px] text-center">Realizar<br>Evaluación</span>
                     </a>
                 </div>
             </div>
