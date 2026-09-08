@@ -33,6 +33,7 @@
                             <th class="px-6 py-4 text-left">Docente</th>
                             <th class="px-6 py-4 text-center">Registradas</th>
                             <th class="px-6 py-4 text-center">Pendientes</th>
+                            <th class="px-6 py-4 text-center">Estado</th>
                             <th class="px-6 py-4 text-center">Avance</th>
                         </tr>
                     </thead>
@@ -45,6 +46,13 @@
                                 <td class="px-6 py-4 {{ $fila['docente'] === 'Sin asignar' ? 'text-rose-500 font-bold' : '' }}">{{ $fila['docente'] }}</td>
                                 <td class="px-6 py-4 text-center font-bold text-emerald-600">{{ $fila['registradas'] }}</td>
                                 <td class="px-6 py-4 text-center font-bold {{ $fila['pendientes'] > 0 ? 'text-rose-600' : 'text-slate-400' }}">{{ $fila['pendientes'] }}</td>
+                                <td class="px-6 py-4 text-center">
+                                    @if(!empty($fila['cerrado']))
+                                        <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-rose-100 text-rose-700">Cerrado</span>
+                                    @else
+                                        <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700">Abierto</span>
+                                    @endif
+                                </td>
                                 <td class="px-6 py-4">
                                     <div class="w-28 bg-slate-200 rounded-full h-2 mx-auto">
                                         <div class="h-2 rounded-full {{ $fila['porcentaje'] == 100 ? 'bg-emerald-500' : 'bg-[#e6ac27]' }}" style="width: {{ $fila['porcentaje'] }}%"></div>
@@ -53,7 +61,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="7" class="px-6 py-12 text-center text-stone-500 font-bold">No hay resultados para los filtros seleccionados.</td></tr>
+                            <tr><td colspan="8" class="px-6 py-12 text-center text-stone-500 font-bold">No hay resultados para los filtros seleccionados.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

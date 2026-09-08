@@ -67,7 +67,7 @@ class NotaController extends Controller
                             ->get();
 
         // Verificamos si este parcial ya fue cerrado y bloqueado por el maestro
-        $estaBloqueado = Nota::where('aula_asignatura_docente_id', $asignacion->id)
+        $estaBloqueado = \App\Models\CorteCerrado::where('aula_asignatura_docente_id', $asignacion->id)
                             ->where('corte_evaluativo_id', $corteSeleccionado)
                             ->where('bloqueado', true)
                             ->exists();
@@ -81,16 +81,26 @@ class NotaController extends Controller
         ->get()
         ->sortBy(fn($m) => $m->alumno->nombre_completo);
 
-        // Cargamos también las notas individuales de las actividades usando DB para cruzar rápido
-        $notasActividades = DB::table('nota_actividad')
-            ->whereIn('matricula_id', $matriculas->pluck('id'))
+        // Cargamos también las notas individuales de las actividades usando el modelo
+        $notasActividades = NotaActividad::whereIn('matricula_id', $matriculas->pluck('id'))
             ->whereIn('actividad_evaluativa_id', $actividades->pluck('id'))
             ->get()
             ->groupBy('matricula_id');
 
+        // Guía de pesos del corte (acumulado vs examen) para la planilla
+        $corteActivo = \App\Models\CorteEvaluativo::find($corteSeleccionado);
+        $sumaAcumulado = $actividades->where('tipo', 'acumulado')->sum('puntaje_maximo');
+        $sumaExamen = $actividades->where('tipo', 'examen')->sum('puntaje_maximo');
+        $pesoAcumulado = $corteActivo->peso_acumulado ?? 0;
+        $pesoExamen = $corteActivo->peso_examen ?? 0;
+
         $asignacion->load('aula.grado', 'asignatura');
 
-        return view('academico.notas.planilla', compact('asignacion', 'cortes', 'corteSeleccionado', 'matriculas', 'actividades', 'notasActividades', 'estaBloqueado'));
+        return view('academico.notas.planilla', compact(
+            'asignacion', 'cortes', 'corteSeleccionado', 'matriculas', 'actividades',
+            'notasActividades', 'estaBloqueado', 'corteActivo',
+            'sumaAcumulado', 'sumaExamen', 'pesoAcumulado', 'pesoExamen'
+        ));
     }
 
     // 3. AUTO-SUMA Y VALIDACIÓN ESTRICTA
@@ -118,7 +128,11 @@ class NotaController extends Controller
                             ->where('corte_evaluativo_id', $corteId)
                             ->get()->keyBy('id');
 
-        DB::transaction(function () use ($request, $asignacion, $corteId, $actividades) {
+        // Total posible: suma de los puntajes máximos de las actividades del parcial.
+        $totalPosible = (float) $actividades->sum('puntaje_maximo');
+
+        DB::transaction(function () use ($request, $asignacion, $corteId, $actividades, $totalPosible) {
+            // El front-end enviará un arreglo: name="notas[matricula_id][actividad_id]"
             foreach ($request->notas as $matriculaId => $calificaciones) {
                 
                 $sumaTotalAlumno = 0;
@@ -131,15 +145,17 @@ class NotaController extends Controller
 
                     $notaFinal = min(abs($notaIngresada), $actividad->puntaje_maximo);
 
-                    \App\Models\NotaActividad::updateOrCreate(
+                    // 1. Guardar la nota individual usando el modelo Eloquent (con auditoría)
+                    NotaActividad::updateOrCreate(
                         ['matricula_id' => $matriculaId, 'actividad_evaluativa_id' => $actividadId],
-                        ['nota_obtenida' => $notaFinal]
+                        ['nota_obtenida' => $notaFinal, 'updated_by' => auth()->id()]
                     );
 
                     $sumaTotalAlumno += $notaFinal;
                 }
 
-                $this->notaService->registrarNotaFinal($matriculaId, $asignacion->id, $corteId, $sumaTotalAlumno);
+                // 2. Auto-Suma Global en la tabla 'nota' (escalado a 0-100)
+                $this->notaService->registrarNotaFinal($matriculaId, $asignacion->id, $corteId, $sumaTotalAlumno, $totalPosible);
             }
         });
 
@@ -149,10 +165,21 @@ class NotaController extends Controller
     public function cerrarParcial(Request $request, AulaAsignaturaDocente $asignacion)
     {
         $this->authorize('calificar', $asignacion);
-        
-        Nota::where('aula_asignatura_docente_id', $asignacion->id)
-            ->where('corte_evaluativo_id', $request->corte_evaluativo_id)
-            ->update(['bloqueado' => true]);
+
+        $corteId = $request->corte_evaluativo_id;
+
+        // Cierra el parcial a nivel de asignación + corte (no por fila)
+        \App\Models\CorteCerrado::updateOrCreate(
+            [
+                'aula_asignatura_docente_id' => $asignacion->id,
+                'corte_evaluativo_id' => $corteId,
+            ],
+            [
+                'bloqueado' => true,
+                'cerrado_por' => auth()->id(),
+                'fecha_cierre' => now(),
+            ]
+        );
 
         return back()->with('success', 'Calificaciones cerradas de forma permanente. Ya no pueden ser editadas.');
     }

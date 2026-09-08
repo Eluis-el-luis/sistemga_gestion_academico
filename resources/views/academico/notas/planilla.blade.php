@@ -14,21 +14,47 @@
             </div>
             
             <!-- Selector de Corte Evaluativo (Recarga la página al cambiar) -->
-            <form action="{{ route('academico.notas.create', $asignacion->id) }}" method="GET" class="flex items-center gap-3">
-                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Parcial:</label>
-                <select name="corte_evaluativo_id" onchange="this.form.submit()" class="border-slate-200 bg-white rounded-xl focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm text-[#3d2c1d] font-bold shadow-sm cursor-pointer">
-                    @foreach($cortes as $corte)
-                        <option value="{{ $corte->id }}" {{ $corteSeleccionado == $corte->id ? 'selected' : '' }}>
-                            Corte {{ $corte->numero }} ({{ $corte->anioEscolar->nombre }})
-                        </option>
-                    @endforeach
-                </select>
-            </form>
+            <div class="flex items-center gap-3">
+                <form action="{{ route('academico.notas.create', $asignacion->id) }}" method="GET" class="flex items-center gap-3">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Parcial:</label>
+                    <select name="corte_evaluativo_id" onchange="this.form.submit()" class="border-slate-200 bg-white rounded-xl focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm text-[#3d2c1d] font-bold shadow-sm cursor-pointer">
+                        @foreach($cortes as $corte)
+                            <option value="{{ $corte->id }}" {{ $corteSeleccionado == $corte->id ? 'selected' : '' }}>
+                                Corte {{ $corte->numero }} ({{ $corte->anioEscolar->nombre }})
+                            </option>
+                        @endforeach
+                    </select>
+                </form>
+                <button onclick="window.print()" class="px-4 py-2 bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-md transition-all flex items-center gap-2 print:hidden">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H8v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    Imprimir / PDF
+                </button>
+            </div>
         </div>
     </x-slot>
 
     <div class="py-6 min-h-screen bg-slate-50 relative">
         <div class="max-w-[95%] mx-auto sm:px-6 lg:px-8 space-y-6">
+
+            <!-- GUÍA DE PESOS (Acumulado vs Examen) -->
+            @if($corteActivo)
+            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden">
+                <div>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Peso Acumulado</p>
+                    <p class="text-xl font-black text-[#3d2c1d]">{{ $sumaAcumulado }} / {{ $pesoAcumulado }} pts</p>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Peso Examen</p>
+                    <p class="text-xl font-black text-[#3d2c1d]">{{ $sumaExamen }} / {{ $pesoExamen }} pts</p>
+                </div>
+                <div>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Parcial</p>
+                    <p class="text-xl font-black {{ ($sumaAcumulado + $sumaExamen) === ($pesoAcumulado + $pesoExamen) ? 'text-emerald-600' : 'text-rose-600' }}">
+                        {{ $sumaAcumulado + $sumaExamen }} / {{ $pesoAcumulado + $pesoExamen }} pts
+                    </p>
+                </div>
+            </div>
+            @endif
 
             <!-- BARRA DE ESTADO Y ACCIONES -->
             <div class="bg-white p-5 rounded-3xl border {{ $estaBloqueado ? 'border-rose-200 bg-rose-50/30' : 'border-[#e6ac27]/30' }} shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">

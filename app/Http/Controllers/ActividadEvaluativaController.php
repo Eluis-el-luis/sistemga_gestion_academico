@@ -150,7 +150,10 @@ class ActividadEvaluativaController extends Controller
     {
         $actividades = ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacionId)
             ->where('corte_evaluativo_id', $corteId)
-            ->pluck('id');
+            ->get();
+
+        $totalPosible = (float) $actividades->sum('puntaje_maximo');
+        $actividadIds = $actividades->pluck('id');
 
         $matriculas = \App\Models\Matricula::where('aula_id', \App\Models\AulaAsignaturaDocente::find($asignacionId)->aula_id)
             ->where('estado', 'activo')
@@ -158,10 +161,10 @@ class ActividadEvaluativaController extends Controller
 
         foreach ($matriculas as $matriculaId) {
             $suma = \App\Models\NotaActividad::where('matricula_id', $matriculaId)
-                ->whereIn('actividad_evaluativa_id', $actividades)
+                ->whereIn('actividad_evaluativa_id', $actividadIds)
                 ->sum('nota_obtenida');
 
-            app(\App\Services\NotaService::class)->registrarNotaFinal($matriculaId, $asignacionId, $corteId, (float) $suma);
+            app(\App\Services\NotaService::class)->registrarNotaFinal($matriculaId, $asignacionId, $corteId, (float) $suma, $totalPosible);
         }
     }
 }
