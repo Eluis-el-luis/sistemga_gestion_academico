@@ -58,10 +58,11 @@ class PermisoSeeder extends Seeder
         $alumno = Role::firstOrCreate(['name' => 'Alumno', 'guard_name' => 'web']);
         $coordinador = Role::firstOrCreate(['name' => 'Coordinador', 'guard_name' => 'web']);
         $gestor = Role::firstOrCreate(['name' => 'Gestor de Usuarios', 'guard_name' => 'web']);
+        $secretaria = Role::firstOrCreate(['name' => 'Secretaria', 'guard_name' => 'web']);
 
         // 4. Asignar permisos al Director 
         $director->syncPermissions([
-            'alumnos.gestionar','alumnos.ver', 'notas.ver', 'asistencia.ver', 'indicadores.ver', 
+            'alumnos.gestionar','alumnos.ver', 'notas.ver', 'asistencia.ver', 'asistencia.gestionar','indicadores.ver', 
             'boletines.ver', 'malla.gestionar', 'aulas.gestionar', 'aulas.ver', 'asignaturas_aula.gestionar', 
             'horarios.ver', 'horarios.gestionar', 'avance.ver', 'apoyo_padres.ver', 'reparacion.ver', 
             'reportes.gestionar', 'configuracion.gestionar', 'configuracion.ver'
@@ -69,7 +70,7 @@ class PermisoSeeder extends Seeder
 
         // 5. Asignar permisos al Subdirector
         $subdirector->syncPermissions([
-            'alumnos.supervisar','alumnos.ver', 'notas.ver', 'asistencia.ver', 'indicadores.ver', 
+            'alumnos.supervisar','alumnos.ver', 'notas.ver', 'asistencia.ver', 'asistencia.gestionar','indicadores.ver', 
             'boletines.ver', 'malla.gestionar', 'aulas.gestionar', 'aulas.ver', 'asignaturas_aula.gestionar', 
             'horarios.ver', 'horarios.gestionar', 'avance.ver', 'apoyo_padres.ver', 'reparacion.ver', 
             'reportes.supervisar', 'configuracion.ver'
@@ -112,6 +113,14 @@ class PermisoSeeder extends Seeder
         $coordinador->syncPermissions([
             'alumnos.ver', 'aulas.ver', 'notas.ver', 'asistencia.ver', 
             'indicadores.ver', 'horarios.ver', 'reportes.ver'
+        ]);
+
+        // 10. LA SECRETARÍA (Nuevo)
+        // Gestiona expedientes, matrículas y genera reportes oficiales.
+        $secretaria->syncPermissions([
+            'alumnos.gestionar', 'alumnos.ver',
+            'notas.ver', 'asistencia.ver', 'boletines.ver',
+            'reportes.ver', 'reportes.gestionar',
         ]);
     }
 }

@@ -6,6 +6,8 @@ use App\Http\Controllers\AlumnoController;
 use App\Http\Controllers\MatriculaController;
 use App\Http\Controllers\AulaController;
 use App\Http\Controllers\MallaCurricularController;
+use App\Http\Controllers\DocenteGuiaController;
+use App\Http\Controllers\PrematriculaController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -41,6 +43,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/asistencia-personal/marcar', [\App\Http\Controllers\AsistenciaPersonalController::class, 'marcarLlegada'])->name('asistencia.personal.marcar');
     
     Route::prefix('academico')->name('academico.')->group(function () {
+
+        // Catálogo de Asignaturas
+        Route::resource('asignaturas', \App\Http\Controllers\AsignaturaController::class)->except(['create', 'show', 'edit']);
         
         Route::get('asistencia/personal', [\App\Http\Controllers\AsistenciaPersonalController::class, 'index'])->name('asistencia.personal.index');
         Route::resource('alumnos', AlumnoController::class);
@@ -68,10 +73,22 @@ Route::middleware('auth')->group(function () {
         Route::resource('malla', \App\Http\Controllers\MallaCurricularController::class)
         ->only(['index', 'store', 'destroy']);
         
+        //prematricula
+        Route::get('prematricula', [PrematriculaController::class, 'index'])->name('prematricula.index');
+        Route::post('prematricula/{matricula}/promover', [PrematriculaController::class, 'promover'])->name('prematricula.promover');
+        Route::post('prematricula/{matricula}/remitir', [PrematriculaController::class, 'remitir'])->name('prematricula.remitir');
+
+        // Rutas adicionales para gestión avanzada de la malla
+        Route::put('malla/item/{id}', [\App\Http\Controllers\MallaCurricularController::class, 'update'])->name('malla.item.update');
+        Route::post('malla/clonar', [\App\Http\Controllers\MallaCurricularController::class, 'clonarMalla'])->name('malla.clonar');
+        
         // Bloques de Modalidades (Antes Horario General)
         Route::resource('bloques', \App\Http\Controllers\BloqueHorarioController::class)
             ->only(['index', 'store', 'destroy']);
-
+        Route::post('bloques/clonar', [\App\Http\Controllers\BloqueHorarioController::class, 'clonar'])->name('bloques.clonar');
+        Route::post('bloques/generar-masivo', [\App\Http\Controllers\BloqueHorarioController::class, 'generarMasivo'])->name('bloques.generar-masivo');
+        Route::delete('bloques/jornada/eliminar', [\App\Http\Controllers\BloqueHorarioController::class, 'destroyJornada'])->name('bloques.jornada.destroy');
+        
         // --- VISOR DE HORARIOS (Solo Lectura) ---
         Route::prefix('visor-horarios')->name('visor.')->group(function () {
             Route::get('/', [\App\Http\Controllers\VisorHorarioController::class, 'index'])->name('index');
@@ -85,16 +102,30 @@ Route::middleware('auth')->group(function () {
         Route::put('usuarios/{usuario}/reset-password', [\App\Http\Controllers\UsuarioController::class, 'resetPassword'])
              ->name('usuarios.reset-password');
         Route::resource('usuarios', \App\Http\Controllers\UsuarioController::class);
+        
+        // Panel Exclusivo del Maestro Guía
+        Route::get('tutor/mis-alumnos', [\App\Http\Controllers\DocenteGuiaController::class, 'misAlumnos'])->name('tutor.mis-alumnos');
 
         // Fase 5: Calificaciones
         Route::get('notas', [\App\Http\Controllers\NotaController::class, 'index'])->name('notas.index');
         Route::get('notas/planilla/{asignacion}', [\App\Http\Controllers\NotaController::class, 'create'])->name('notas.create');
-        Route::post('notas', [\App\Http\Controllers\NotaController::class, 'store'])->name('notas.store');
+        Route::post('notas/{asignacion}', [\App\Http\Controllers\NotaController::class, 'store'])->name('notas.store');
+        
+        // --- NUEVAS RUTAS DE BLOQUEO Y AUDITORÍA ---
+        Route::post('notas/{asignacion}/cerrar', [\App\Http\Controllers\NotaController::class, 'cerrarParcial'])->name('notas.cerrar');
+        Route::post('notas/{asignacion}/solicitar-desbloqueo', [\App\Http\Controllers\NotaController::class, 'solicitarDesbloqueo'])->name('notas.solicitar-desbloqueo');
+
+        // Resolución de solicitudes de edición (Dirección / Subdirección)
+        Route::get('notas/solicitudes', [\App\Http\Controllers\SolicitudEdicionNotaController::class, 'index'])->name('notas.solicitudes.index');
+        Route::patch('notas/solicitudes/{solicitud}/aprobar', [\App\Http\Controllers\SolicitudEdicionNotaController::class, 'aprobar'])->name('notas.solicitudes.aprobar');
+        Route::patch('notas/solicitudes/{solicitud}/rechazar', [\App\Http\Controllers\SolicitudEdicionNotaController::class, 'rechazar'])->name('notas.solicitudes.rechazar');
+        
         Route::get('cortes-evaluativos', [\App\Http\Controllers\CorteEvaluativoController::class, 'index'])->name('cortes.index');
         Route::put('cortes-evaluativos/{corte}', [\App\Http\Controllers\CorteEvaluativoController::class, 'update'])->name('cortes.update');
     
         Route::get('notas/actividades/{asignacion}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'index'])->name('notas.actividades.index');
         Route::post('notas/actividades/{asignacion}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'store'])->name('notas.actividades.store');
+        Route::put('notas/actividades/{asignacion}/{actividad}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'update'])->name('notas.actividades.update');
         Route::delete('notas/actividades/{asignacion}/{actividad}', [\App\Http\Controllers\ActividadEvaluativaController::class, 'destroy'])->name('notas.actividades.destroy');
 
         // Fase 6: Asistencia (Docente Guía)
@@ -108,7 +139,8 @@ Route::middleware('auth')->group(function () {
         // Fase 7: Boletines
         Route::get('boletines', [\App\Http\Controllers\BoletinController::class, 'index'])->name('boletines.index');
         Route::get('boletines/{matricula}', [\App\Http\Controllers\BoletinController::class, 'show'])->name('boletines.show');
-
+        Route::post('boletines/{matricula}/aprobar', [\App\Http\Controllers\BoletinController::class, 'aprobarBoletin'])->name('boletines.aprobar');
+        
         // Fase 7: Examen de Reparación
         Route::get('reparacion', [\App\Http\Controllers\ExamenReparacionController::class, 'index'])->name('reparacion.index');
         Route::post('reparacion', [\App\Http\Controllers\ExamenReparacionController::class, 'store'])->name('reparacion.store');
@@ -123,6 +155,36 @@ Route::middleware('auth')->group(function () {
         Route::get('apoyo-padres', [\App\Http\Controllers\ApoyoPadresController::class, 'index'])->name('apoyo-padres.index');
         Route::post('apoyo-padres', [\App\Http\Controllers\ApoyoPadresController::class, 'store'])->name('apoyo-padres.store');
         Route::delete('apoyo-padres/{apoyo}', [\App\Http\Controllers\ApoyoPadresController::class, 'destroy'])->name('apoyo-padres.destroy');
+        Route::get('apoyo-familiar', [\App\Http\Controllers\ApoyoFamiliarController::class, 'index'])->name('apoyo_familiar.index');
+        Route::post('apoyo-familiar', [\App\Http\Controllers\ApoyoFamiliarController::class, 'store'])->name('apoyo_familiar.store');
+
+        // Fase 8: Control Disciplinario
+        Route::get('disciplina', [\App\Http\Controllers\IncidenciaDisciplinariaController::class, 'index'])->name('disciplina.index');
+        Route::post('disciplina', [\App\Http\Controllers\IncidenciaDisciplinariaController::class, 'store'])->name('disciplina.store');
+        Route::put('disciplina/{incidencia}', [\App\Http\Controllers\IncidenciaDisciplinariaController::class, 'update'])->name('disciplina.update');
+        // Fase 8: Centro de Reportes
+        Route::get('reportes', [\App\Http\Controllers\ReporteController::class, 'index'])->name('reportes.index');
+
+        // Control de ingreso de notas
+        Route::get('reportes/control-notas', [\App\Http\Controllers\ReporteController::class, 'controlNotas'])->name('reportes.control-notas');
+        Route::get('reportes/notas-globales', [\App\Http\Controllers\ReporteController::class, 'notasGlobales'])->name('reportes.notas-globales');
+        Route::get('reportes/notas-pendientes', [\App\Http\Controllers\ReporteController::class, 'notasPendientes'])->name('reportes.notas-pendientes');
+
+        // Asistencia (segmentada)
+        Route::get('reportes/asistencia-global', [\App\Http\Controllers\ReporteController::class, 'asistenciaGlobal'])->name('reportes.asistencia-global');
+        Route::get('reportes/estadisticas-asistencia', [\App\Http\Controllers\ReporteController::class, 'estadisticasAsistencia'])->name('reportes.estadisticas-asistencia');
+        Route::get('reportes/asistencia-seccion-dia', [\App\Http\Controllers\ReporteController::class, 'asistenciaSeccionDia'])->name('reportes.asistencia-seccion-dia');
+        Route::get('reportes/asistencia-seccion-rango', [\App\Http\Controllers\ReporteController::class, 'asistenciaSeccionRango'])->name('reportes.asistencia-seccion-rango');
+        Route::get('reportes/asistencia-estudiante', [\App\Http\Controllers\ReporteController::class, 'estadisticasPorEstudiante'])->name('reportes.asistencia-estudiante');
+
+        // Rendimiento académico
+        Route::get('reportes/notas-por-asignatura', [\App\Http\Controllers\ReporteController::class, 'notasPorAsignatura'])->name('reportes.notas-por-asignatura');
+        Route::get('reportes/historial-estudiante', [\App\Http\Controllers\ReporteController::class, 'historialPorEstudiante'])->name('reportes.historial-estudiante');
+
+        // Otros reportes (MINED, estudiantes, padres)
+        Route::get('reportes/mined', [\App\Http\Controllers\ReporteController::class, 'mined'])->name('reportes.mined');
+        Route::get('reportes/estudiantes', [\App\Http\Controllers\ReporteController::class, 'estudiantes'])->name('reportes.estudiantes');
+        Route::get('reportes/padres', [\App\Http\Controllers\ReporteController::class, 'padres'])->name('reportes.padres');
     });
 });
 

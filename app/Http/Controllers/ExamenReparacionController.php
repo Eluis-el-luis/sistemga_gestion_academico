@@ -2,8 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Aula;
-use App\Models\AulaAsignaturaDocente;
+use App\Models\AnioEscolar;
 use App\Models\Asignatura;
 use App\Models\ExamenReparacion;
 use App\Models\Matricula;
@@ -23,41 +22,46 @@ class ExamenReparacionController extends Controller
     }
 
     /**
-     * Listado de exámenes de reparación y alumnos con asignaturas aplazadas.
+     * Listado de exámenes de reparación: alumnos con asignaturas reprobadas
+     * (excluye grados de promoción automática).
      */
     public function index(Request $request)
     {
         $this->authorize('viewAny', ExamenReparacion::class);
 
         $usuario = auth()->user();
+        $anioActivo = AnioEscolar::where('activo', true)->first();
 
-        $aulas = Aula::with(['grado', 'anioEscolar'])
-            ->whereHas('anioEscolar', fn ($q) => $q->where('activo', true))
+        // Grados con promoción automática (no requieren examen de reparación)
+        $gradosAutoPromovidos = [1, 2, 3, 4, 5];
+
+        $matriculasRaw = Matricula::with(['alumno', 'aula.grado'])
+            ->when($anioActivo, fn ($q) => $q->where('anio_escolar_id', $anioActivo->id))
+            ->where('estado', 'activo')
+            ->whereHas('aula', function ($q) use ($gradosAutoPromovidos) {
+                $q->whereNotIn('grado_id', $gradosAutoPromovidos);
+            })
             ->when($usuario->docente && !$usuario->hasRole(['Director', 'Subdirector']), function ($q) use ($usuario) {
-                $q->where('docente_guia_id', $usuario->docente->id);
+                $q->whereHas('aula', fn ($q2) => $q2->where('docente_guia_id', $usuario->docente->id));
             })
             ->get();
 
-        $aulaSeleccionada = $request->query('aula_id', $aulas->first()->id ?? null);
-
-        $matriculas = collect();
-        $asignaturas = collect();
-
-        if ($aulaSeleccionada) {
-            $matriculas = Matricula::with('alumno')
-                ->where('aula_id', $aulaSeleccionada)
-                ->where('estado', 'activo')
+        $matriculas = $matriculasRaw->map(function ($matricula) {
+            // Notas reprobadas (nota anual < 60) con su asignatura
+            $matricula->clases_reprobadas = \App\Models\Nota::with('aulaAsignaturaDocente.asignatura')
+                ->where('matricula_id', $matricula->id)
+                ->whereNotNull('nota_cuantitativa')
+                ->where('nota_cuantitativa', '<', 60)
                 ->get();
 
-            // Asignaturas impartidas en esta aula (vía asignaciones)
-            $asignaturas = Asignatura::whereIn('id',
-                AulaAsignaturaDocente::where('aula_id', $aulaSeleccionada)->pluck('asignatura_id')
-            )->get();
-        }
+            return $matricula;
+        })
+        ->filter(function ($matricula) {
+            return $matricula->clases_reprobadas->count() > 0;
+        })
+        ->values();
 
-        return view('academico.reparacion.index', compact(
-            'aulas', 'aulaSeleccionada', 'matriculas', 'asignaturas'
-        ));
+        return view('academico.reparacion.index', compact('matriculas'));
     }
 
     /**

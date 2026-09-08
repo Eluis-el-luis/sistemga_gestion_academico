@@ -33,11 +33,45 @@ class UsuarioController extends Controller
     public function create()
     {
         $this->authorize('create', Usuario::class);
+
+        // 1. Ocultamos 'Alumno' por defecto en el panel de personal
+        $rolesExcluidos = ['Alumno']; 
         
-        $roles = Role::all();
-        $modalidades = \App\Models\Modalidad::all();
+        // 2. Si ya hay Director, ocultamos la casilla
+        if (\App\Models\Usuario::role('Director')->exists()) {
+            $rolesExcluidos[] = 'Director';
+        }
         
-        return view('academico.usuarios.create', compact('roles', 'modalidades'));
+        // 3. Si ya hay Subdirector, ocultamos la casilla
+        if (\App\Models\Usuario::role('Subdirector')->exists()) {
+            $rolesExcluidos[] = 'Subdirector';
+        }
+
+        // Consultamos a Spatie trayendo solo los roles permitidos
+        $roles = \Spatie\Permission\Models\Role::whereNotIn('name', $rolesExcluidos)->get();
+
+        return view('academico.usuarios.create', compact('roles'));
+    }
+
+    public function edit(Usuario $usuario)
+    {
+        $this->authorize('update', $usuario);
+
+        $rolesExcluidos = ['Alumno'];
+        
+        // En la edición, ocultamos el rol SOLO si está ocupado por OTRA persona.
+        // Si estamos editando al Director actual, la casilla sí debe aparecerle marcada.
+        if (\App\Models\Usuario::role('Director')->where('id', '!=', $usuario->id)->exists()) {
+            $rolesExcluidos[] = 'Director';
+        }
+        
+        if (\App\Models\Usuario::role('Subdirector')->where('id', '!=', $usuario->id)->exists()) {
+            $rolesExcluidos[] = 'Subdirector';
+        }
+
+        $roles = \Spatie\Permission\Models\Role::whereNotIn('name', $rolesExcluidos)->get();
+
+        return view('academico.usuarios.edit', compact('usuario', 'roles'));
     }
 
     public function store(Request $request)
@@ -47,9 +81,9 @@ class UsuarioController extends Controller
         $request->validate([
             'nombre_completo' => 'required|string|max:120',
             'email'           => 'required|email|unique:usuario,email',
-            'password'        => 'required|string|min:8',
+            'password'        => 'required|string|min:8', // Ajusta si autogeneras contraseñas
             'roles'           => 'required|array|min:1',
-            'codigo_unico_persona'  => 'nullable|string|max:20|unique:docente,codigo_unico_persona',
+            'codigo_unico_persona'  => 'nullable|string|max:20',
             'sexo'            => 'nullable|in:M,F',
             'modalidad_coordina_id' => 'nullable|exists:modalidad,id'
         ]);
@@ -59,58 +93,43 @@ class UsuarioController extends Controller
         $esSubdirector = in_array('Subdirector', $rolesSeleccionados);
 
         if ($esDirector && \App\Models\Usuario::role('Director')->exists()) {
-            return back()->withErrors(['roles' => 'Ya existe una cuenta de Dirección. No pueden existir dos.'])->withInput();
+            return back()->withErrors(['roles' => 'Ya existe una cuenta de Dirección asignada en el sistema.']);
         }
 
         if ($esSubdirector && \App\Models\Usuario::role('Subdirector')->exists()) {
-            return back()->withErrors(['roles' => 'Ya existe una cuenta de Subdirección. No pueden existir dos.'])->withInput();
+            return back()->withErrors(['roles' => 'Ya existe una cuenta de Subdirección asignada en el sistema.']);
         }
 
-        
-        $primerRolSpatie = is_array($request->roles) ? $request->roles[0] : 'Docente por Asignatura';
-        $rolNativoId = Rol::firstOrCreate(['nombre' => $primerRolSpatie])->id;
-
-        // Creación inyectando el rol_id obligatorio
+        // Creamos el usuario sin la columna fantasma rol_id
         $usuario = Usuario::create([
             'nombre_completo' => $request->nombre_completo,
             'email'           => $request->email,
-            'password'        => Hash::make($request->password),
+            'password'        => bcrypt($request->password), 
             'activo'          => true,
-            'rol_id'          => $rolNativoId 
         ]);
 
-        // Spatie se encarga de la relación real de permisos aquí
-        $usuario->syncRoles($request->roles);
+        // Spatie asigna los permisos correctamente en su tabla intermedia
+        $usuario->assignRole($request->roles);
 
         $esDocente = collect($request->roles)->contains(function ($rol) {
             return str_contains($rol, 'Docente') || $rol === 'Coordinador';
         });
 
         if ($esDocente) {
-            $esCoordinador = collect($request->roles)->contains('Coordinador');
-            
             \App\Models\Docente::create([
                 'usuario_id'            => $usuario->id,
                 'codigo_unico_persona'  => $request->codigo_unico_persona ?? 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
                 'sexo'                  => $request->sexo ?? 'M',
-                'es_coordinador'        => $esCoordinador,
-                'modalidad_coordina_id' => $esCoordinador ? $request->modalidad_coordina_id : null,
+                'es_coordinador'        => collect($request->roles)->contains('Coordinador'),
+                'modalidad_coordina_id' => collect($request->roles)->contains('Coordinador') ? $request->modalidad_coordina_id : null,
             ]);
         }
 
         return redirect()->route('academico.usuarios.index')
-                         ->with('success', 'Usuario creado exitosamente con sus accesos y perfil.');
+                         ->with('success', 'Personal registrado y accesos configurados correctamente.');
     }
 
-    public function edit(Usuario $usuario)
-    {
-        $this->authorize('update', $usuario);
-        
-        $roles = Role::all();
-        $modalidades = \App\Models\Modalidad::all();
-        
-        return view('academico.usuarios.edit', compact('usuario', 'roles', 'modalidades'));
-    }
+    
 
     public function update(Request $request, Usuario $usuario)
     {
@@ -138,18 +157,14 @@ class UsuarioController extends Controller
             return back()->withErrors(['roles' => 'Ya existe otra cuenta de Subdirección asignada en el sistema.']);
         }
 
-        // 🔒 PARCHE: Obtenemos el ID del primer rol seleccionado para satisfacer a PostgreSQL
-        $primerRolSpatie = is_array($request->roles) ? $request->roles[0] : 'Docente por Asignatura';
-        $rolNativoId = Rol::firstOrCreate(['nombre' => $primerRolSpatie])->id;
-
-        // Actualización inyectando el rol_id
+        // Actualizamos únicamente los datos propios del usuario
         $usuario->update([
             'nombre_completo' => $request->nombre_completo,
             'email'           => $request->email,
             'activo'          => $request->activo,
-            'rol_id'          => $rolNativoId // <-- Inyectamos el ID aquí
         ]);
 
+        // Spatie se encarga mágicamente de guardar la relación del rol en la base de datos aquí:
         $usuario->syncRoles($request->roles);
 
         $esDocente = collect($request->roles)->contains(function ($rol) {

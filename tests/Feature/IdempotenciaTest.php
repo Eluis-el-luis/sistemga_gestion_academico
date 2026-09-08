@@ -30,6 +30,7 @@ class IdempotenciaTest extends TestCase
     protected AulaAsignaturaDocente $asignacion;
     protected Matricula $matricula;
     protected CorteEvaluativo $corte;
+    protected \App\Models\ActividadEvaluativa $actividad;
 
     protected function setUp(): void
     {
@@ -80,6 +81,14 @@ class IdempotenciaTest extends TestCase
             'anio_escolar_id' => $anio->id,
         ]);
 
+        // Crear actividad evaluativa asociada (necesaria para el nuevo flujo de notas)
+        $this->actividad = \App\Models\ActividadEvaluativa::factory()->create([
+            'aula_asignatura_docente_id' => $this->asignacion->id,
+            'corte_evaluativo_id' => $this->corte->id,
+            'nombre' => 'Examen',
+            'puntaje_maximo' => 100,
+        ]);
+
         // Crear bloque horario para la modalidad (necesario para asistencia por asignatura)
         BloqueHorario::factory()->create([
             'modalidad_id' => $modalidad->id,
@@ -92,12 +101,13 @@ class IdempotenciaTest extends TestCase
     {
         $this->actingAs($this->docenteAsignatura);
 
-        // Primera creación
-        $response1 = $this->post(route('academico.notas.store'), [
-            'aula_asignatura_docente_id' => $this->asignacion->id,
+        // Primera creación (formato nuevo: notas[matricula_id][actividad_id])
+        $response1 = $this->post(route('academico.notas.store', $this->asignacion), [
             'corte_evaluativo_id' => $this->corte->id,
             'notas' => [
-                ['matricula_id' => $this->matricula->id, 'nota_cuantitativa' => 85],
+                $this->matricula->id => [
+                    $this->actividad->id => 85,
+                ],
             ],
         ]);
         $response1->assertSessionHas('success');
@@ -110,11 +120,12 @@ class IdempotenciaTest extends TestCase
         $this->assertEquals(1, Nota::count());
 
         // Segunda actualización (mismo key) - debe actualizar, no duplicar
-        $response2 = $this->post(route('academico.notas.store'), [
-            'aula_asignatura_docente_id' => $this->asignacion->id,
+        $response2 = $this->post(route('academico.notas.store', $this->asignacion), [
             'corte_evaluativo_id' => $this->corte->id,
             'notas' => [
-                ['matricula_id' => $this->matricula->id, 'nota_cuantitativa' => 90],
+                $this->matricula->id => [
+                    $this->actividad->id => 90,
+                ],
             ],
         ]);
         $response2->assertSessionHas('success');

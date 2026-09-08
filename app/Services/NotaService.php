@@ -2,8 +2,51 @@
 
 namespace App\Services;
 
+use App\Models\Nota;
+use App\Models\IndicadorLogro;
+use App\Models\Matricula;
+use App\Models\AulaAsignaturaDocente;
+
 class NotaService
 {
+    /**
+     * Registra/actualiza la nota final de un parcial para una matrícula,
+     * escalando los puntos obtenidos a la escala 0-100 según el total posible
+     * del corte (suma de puntajes máximos de sus actividades).
+     */
+    public function registrarNotaFinal(int $matriculaId, int $asignacionId, int $corteId, float $suma, ?float $totalPosible = null): ?Nota
+    {
+        $nota = $this->escalarNota($suma, $totalPosible);
+
+        $codigo = $this->calcularIndicadorLogro((int) round($nota));
+        $indicadorId = $codigo ? IndicadorLogro::where('codigo', $codigo)->value('id') : null;
+
+        return Nota::updateOrCreate(
+            [
+                'matricula_id' => $matriculaId,
+                'aula_asignatura_docente_id' => $asignacionId,
+                'corte_evaluativo_id' => $corteId,
+            ],
+            [
+                'nota_cuantitativa' => $nota,
+                'indicador_logro_id' => $indicadorId,
+            ]
+        );
+    }
+
+    /**
+     * Escala los puntos obtenidos a 0-100 según el total posible.
+     * Si no se indica el total posible, asume que la suma ya está en escala 0-100.
+     */
+    public function escalarNota(float $puntos, ?float $totalPosible = null): float
+    {
+        if ($totalPosible && $totalPosible > 0) {
+            $puntos = ($puntos / $totalPosible) * 100;
+        }
+
+        return max(0, min(100, round($puntos, 2)));
+    }
+
     /**
      * Convierte la nota cuantitativa (0-100) en el Indicador de Logro Cualitativo (MINED)
      * Basado en los rangos oficiales del MINED.
@@ -84,5 +127,45 @@ class NotaService
     public function estaAprobado(int $notaFinal): bool
     {
         return $notaFinal >= 60; // 60 es la nota mínima para aprobar (Aprendizaje Fundamental)
+    }
+
+    /**
+     * Resumen completo de calificaciones de un alumno en una asignación:
+     * promedia los 4 cortes, calcula nota semestral, nota final, indicador y estado.
+     */
+    public function calcularResumenAsignatura(Matricula $matricula, AulaAsignaturaDocente $asignacion): array
+    {
+        $notas = Nota::where('matricula_id', $matricula->id)
+            ->where('aula_asignatura_docente_id', $asignacion->id)
+            ->get()
+            ->keyBy('corte_evaluativo_id');
+
+        // Cortes ordenados por número (1..4)
+        $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('activo', true))
+            ->orderBy('numero')
+            ->get();
+
+        $valores = [];
+        foreach ($cortes as $corte) {
+            $valores[$corte->numero] = isset($notas[$corte->id])
+                ? (int) round((float) $notas[$corte->id]->nota_cuantitativa)
+                : null;
+        }
+
+        $semestre1 = $this->calcularNotaSemestral($valores[1] ?? null, $valores[2] ?? null);
+        $semestre2 = $this->calcularNotaSemestral($valores[3] ?? null, $valores[4] ?? null);
+        $notaFinal = $this->calcularNotaFinal(
+            $valores[1] ?? null, $valores[2] ?? null, $valores[3] ?? null, $valores[4] ?? null
+        );
+
+        return [
+            'cortes' => $valores,
+            'semestre1' => $semestre1,
+            'semestre2' => $semestre2,
+            'promedio_general' => $this->calcularPromedioGeneral(array_values(array_filter($valores))),
+            'nota_final' => $notaFinal,
+            'indicador_final' => $notaFinal !== null ? $this->calcularIndicadorLogro($notaFinal) : null,
+            'aprobado' => $notaFinal !== null ? $this->estaAprobado($notaFinal) : null,
+        ];
     }
 }

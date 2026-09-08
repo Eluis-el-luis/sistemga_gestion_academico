@@ -16,6 +16,7 @@ class RolSeeder extends Seeder
             ['nombre' => 'Coordinador'],
             ['nombre' => 'Docente Guia'],
             ['nombre' => 'Docente por Asignatura'],
+            ['nombre' => 'Secretaria'],
             ['nombre' => 'Alumno'],
         ];
 

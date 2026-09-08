@@ -15,6 +15,8 @@ class ActividadEvaluativa extends Model
         'aula_asignatura_docente_id',
         'corte_evaluativo_id',
         'nombre',
+        'descripcion',
+        'fecha',
         'tipo', // ej: 'Acumulado', 'Examen'
         'puntaje_maximo'
     ];
@@ -27,10 +29,5 @@ class ActividadEvaluativa extends Model
     public function corteEvaluativo()
     {
         return $this->belongsTo(CorteEvaluativo::class, 'corte_evaluativo_id');
-    }
-
-    public function calificaciones()
-    {
-        return $this->hasMany(CalificacionActividad::class, 'actividad_evaluativa_id');
     }
 }

@@ -130,7 +130,7 @@
                                                     <div class="flex items-center gap-2 text-xs">
                                                         <span class="font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 shadow-sm">[{{ $incidencia->bloqueHorario->nombre }}]</span> 
                                                         <span class="font-bold text-[#3d2c1d]">{{ $incidencia->estado_incidencia }}</span>
-                                                        <form action="{{ route('academico.asistencia.asignatura.destroy', $incidencia->id) }}" method="POST" class="inline">
+                                                        <form action="{{ route('academico.asistencia.asignatura.destroy', [$asignacion->id, $incidencia->id]) }}" method="POST" class="inline">
                                                             @csrf @method('DELETE')
                                                             <button type="submit" class="text-slate-300 hover:text-rose-500 font-bold ml-1 hover:bg-rose-50 px-1.5 rounded transition-colors" title="Deshacer reporte">✕</button>
                                                         </form>

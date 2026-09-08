@@ -30,7 +30,6 @@ class BoletinController extends Controller
     public function index(Request $request)
     {
         $this->authorize('viewAny', Boletin::class);
-
         $usuario = auth()->user();
 
         $aulas = Aula::with(['grado', 'anioEscolar'])
@@ -43,15 +42,79 @@ class BoletinController extends Controller
         $aulaSeleccionada = $request->query('aula_id', $aulas->first()->id ?? null);
 
         $matriculas = collect();
+        $todosAprobados = false;
+        $corteActivo = null;
+
         if ($aulaSeleccionada) {
-            $matriculas = Matricula::with('alumno')
-                ->where('aula_id', $aulaSeleccionada)
-                ->where('estado', 'activo')
-                ->orderBy('id')
-                ->get();
+            $anioEscolarId = Aula::where('id', $aulaSeleccionada)->value('anio_escolar_id');
+            $hoy = now()->timezone('America/Managua')->toDateString();
+
+            $corteActivo = CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)
+                ->where('fecha_inicio', '<=', $hoy)
+                ->where('fecha_fin', '>=', $hoy)
+                ->first() ?? CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)->orderBy('numero', 'desc')->first();
+
+            $matriculas = Matricula::with(['alumno', 'boletines' => function($q) use ($corteActivo) {
+                if ($corteActivo) {
+                    $q->where('corte_evaluativo_id', $corteActivo->id);
+                }
+            }])
+            ->where('aula_id', $aulaSeleccionada)
+            ->where('estado', 'activo')
+            ->orderBy('id')
+            ->get();
+
+            // Validar si todos los alumnos activos tienen el boletín en caja para este corte
+            if ($matriculas->isNotEmpty() && $corteActivo) {
+                $todosAprobados = $matriculas->every(fn($m) => $m->boletines->isNotEmpty());
+            }
         }
 
-        return view('academico.boletin.index', compact('aulas', 'aulaSeleccionada', 'matriculas'));
+        return view('academico.boletin.index', compact('aulas', 'aulaSeleccionada', 'matriculas', 'todosAprobados'));
+    }
+
+    public function aprobarBoletin(Request $request, Matricula $matricula)
+    {
+        $anioEscolarId = $matricula->anio_escolar_id;
+        $hoy = now()->timezone('America/Managua')->toDateString();
+        
+        $corteActivo = CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)
+            ->where('fecha_inicio', '<=', $hoy)
+            ->where('fecha_fin', '>=', $hoy)
+            ->first() ?? CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)->orderBy('numero', 'desc')->first();
+
+        if (!$corteActivo) {
+            return back()->with('error', 'No hay un corte evaluativo activo para validar calificaciones.');
+        }
+
+        // 1. REGLA: Verificar que todas las asignaturas de esta aula tengan nota para este alumno
+        $asignacionesIds = AulaAsignaturaDocente::where('aula_id', $matricula->aula_id)
+            ->where('anio_escolar_id', $anioEscolarId)
+            ->pluck('id');
+
+        $notasRegistradas = Nota::where('matricula_id', $matricula->id)
+            ->where('corte_evaluativo_id', $corteActivo->id)
+            ->whereIn('aula_asignatura_docente_id', $asignacionesIds)
+            ->whereNotNull('nota_cuantitativa')
+            ->pluck('aula_asignatura_docente_id');
+
+        if ($notasRegistradas->count() < $asignacionesIds->count()) {
+            return back()->with('error', 'No se puede dar el Visto Bueno. El estudiante tiene asignaturas pendientes sin nota registrada en este corte.');
+        }
+
+        // 2. Guardar en la caja institucional
+        Boletin::updateOrCreate(
+            [
+                'matricula_id' => $matricula->id,
+                'corte_evaluativo_id' => $corteActivo->id,
+            ],
+            [
+                'fecha_generacion' => now(),
+                'archivo_path' => 'aprobado_por_tutor',
+            ]
+        );
+
+        return back()->with('success', 'Boletín verificado y guardado en la caja del aula correctamente.');
     }
 
     /**
@@ -76,22 +139,20 @@ class BoletinController extends Controller
             ->orderBy('numero')
             ->get();
 
+        // CORRECCIÓN 1: Obtener el corte ACTIVO basándonos en la fecha actual
+        $hoy = now()->timezone('America/Managua')->toDateString();
+        
         $corteActual = $request->query('corte_evaluativo_id')
             ? $cortes->firstWhere('id', $request->query('corte_evaluativo_id'))
-            : $cortes->last();
+            : ($cortes->first(fn($c) => $c->fecha_inicio <= $hoy && $c->fecha_fin >= $hoy) ?? $cortes->last());
+
+        $numeroActual = $corteActual->numero ?? 1;
 
         // Asignaturas de esta aula en el año activo
         $asignaciones = AulaAsignaturaDocente::with('asignatura')
             ->where('aula_id', $matricula->aula_id)
             ->where('anio_escolar_id', $anioEscolarId)
             ->get();
-
-        // Notas del alumno en el año
-        $notas = Nota::with(['aulaAsignaturaDocente.asignatura', 'indicadorLogro'])
-            ->where('matricula_id', $matricula->id)
-            ->whereHas('aulaAsignaturaDocente', fn ($q) => $q->where('anio_escolar_id', $anioEscolarId))
-            ->get()
-            ->groupBy('aula_asignatura_docente_id');
 
         // Mapa de corte numérico -> id
         $cortePorNumero = $cortes->keyBy('numero');
@@ -101,25 +162,14 @@ class BoletinController extends Controller
         $acumuladoCortes = [1 => [], 2 => [], 3 => [], 4 => []];
 
         foreach ($asignaciones as $asignacion) {
-            $notasAsignatura = $notas->get($asignacion->id, collect());
+            // Resumen integrado por asignatura (cortes, semestres, nota final, aprobado)
+            $resumen = $this->notaService->calcularResumenAsignatura($matricula, $asignacion);
 
             $cortesData = [1 => null, 2 => null, 3 => null, 4 => null];
-            $finalCuan = null;
-
-            // Mapa id de corte -> número para notas
-            $notaPorCorte = [];
-            foreach ($notasAsignatura as $nota) {
-                $corte = $cortes->firstWhere('id', $nota->corte_evaluativo_id);
-                if (!$corte) continue;
-                $numero = $corte->numero;
-                $notaPorCorte[$numero] = $nota;
-            }
-
             $notasFinales = [];
             foreach ([1, 2, 3, 4] as $numero) {
-                $nota = $notaPorCorte[$numero] ?? null;
-                if ($nota && !is_null($nota->nota_cuantitativa)) {
-                    $cuan = (float) $nota->nota_cuantitativa;
+                if (isset($resumen['cortes'][$numero]) && $resumen['cortes'][$numero] !== null) {
+                    $cuan = (float) $resumen['cortes'][$numero];
                     $cua = $this->notaService->calcularIndicadorLogro((int) round($cuan));
 
                     $cortesData[$numero] = ['cua' => $cua, 'cuan' => number_format($cuan, 0)];
@@ -128,20 +178,9 @@ class BoletinController extends Controller
                 }
             }
 
-            // Nota final: promedio de los cortes con nota (si hay los 4, usar promedio simple)
-            if (count($notasFinales) === 4) {
-                $finalCuan = $this->notaService->calcularNotaFinal(
-                    (int) round($notasFinales[1]),
-                    (int) round($notasFinales[2]),
-                    (int) round($notasFinales[3]),
-                    (int) round($notasFinales[4]),
-                );
-            } elseif (count($notasFinales) > 0) {
-                $finalCuan = (int) round(array_sum($notasFinales) / count($notasFinales));
-            }
-
+            $finalCuan = $resumen['nota_final'];
             $final = ($finalCuan !== null)
-                ? ['cua' => $this->notaService->calcularIndicadorLogro($finalCuan), 'cuan' => number_format($finalCuan, 0)]
+                ? ['cua' => $resumen['indicador_final'], 'cuan' => number_format($finalCuan, 0)]
                 : null;
 
             $area = $asignacion->asignatura->area ?? 'Otras Áreas';
@@ -150,6 +189,7 @@ class BoletinController extends Controller
                 'nombre' => $asignacion->asignatura->nombre,
                 'cortes' => $cortesData,
                 'final' => $final,
+                'aprobado' => $resumen['aprobado'],
             ];
         }
 
@@ -168,31 +208,41 @@ class BoletinController extends Controller
             }
         }
 
-        // Asistencia por corte (ausencias justificadas/injustificadas por rango de fechas)
+        // CORRECCIÓN 2: Asistencia por corte (solo procesar hasta el parcial actual)
         $asistencia = [];
         foreach ([1, 2, 3, 4] as $numero) {
-            $corte = $cortePorNumero->get($numero);
-            $query = AsistenciaAula::where('matricula_id', $matricula->id);
-            if ($corte) {
-                $query->whereBetween('fecha', [$corte->fecha_inicio, $corte->fecha_fin]);
+            if ($numero <= $numeroActual) {
+                $corte = $cortePorNumero->get($numero);
+                $query = AsistenciaAula::where('matricula_id', $matricula->id);
+                if ($corte) {
+                    $query->whereBetween('fecha', [$corte->fecha_inicio, $corte->fecha_fin]);
+                }
+                $registros = $query->get();
+
+                $asistencia[$numero] = [
+                    'injustificadas' => $registros->where('estado_asistencia', 'Ausencia Injustificada')->count(),
+                    'justificadas' => $registros->where('estado_asistencia', 'Ausencia Justificada')->count(),
+                ];
+            } else {
+                $asistencia[$numero] = [
+                    'injustificadas' => '',
+                    'justificadas' => '',
+                ];
             }
-            $registros = $query->get();
-
-            $injustificadas = $registros->where('estado_asistencia', 'Ausencia Injustificada')->count();
-            $justificadas = $registros->where('estado_asistencia', 'Ausencia Justificada')->count();
-
-            $asistencia[$numero] = [
-                'injustificadas' => $injustificadas,
-                'justificadas' => $justificadas,
-            ];
         }
 
-        // Compromiso de padres: derivado del expediente (acepta_compromiso_cristiano)
-        $compromiso = [];
-        foreach ([1, 2, 3, 4] as $numero) {
-            $compromiso[$numero] = $matricula->alumno->acepta_compromiso_cristiano ? 'MB' : '—';
-        }
+            $compromiso = [];
+            $evaluacionesReales = \App\Models\EvaluacionFamiliar::where('matricula_id', $matricula->id)->get();
 
+            foreach ([1, 2, 3, 4] as $numero) {
+                if ($numero <= $numeroActual) {
+                    $corte = $cortePorNumero->get($numero);
+                    $eval = $corte ? $evaluacionesReales->firstWhere('corte_evaluativo_id', $corte->id) : null;
+                    $compromiso[$numero] = $eval ? $eval->evaluacion : '—';
+                } else {
+                    $compromiso[$numero] = '';
+                }
+            }
         return view('academico.boletin.show', compact(
             'matricula', 'areas', 'promedios', 'asistencia', 'compromiso', 'corteActual'
         ));
