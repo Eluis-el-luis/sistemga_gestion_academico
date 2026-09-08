@@ -43,35 +43,60 @@ class DashboardController extends Controller
 
         // 4. CARGA DE DATOS PARA DOCENTES (Guía y Asignatura)
         $docente = \App\Models\Docente::where('usuario_id', $user->id)->first();
+        $anioActivo = \App\Models\AnioEscolar::where('activo', true)->first();
         
-        if ($docente) {
-            // Lógica para Docente Guía: Buscamos si existe un aula donde él sea el 'docente_guia_id'
-            $aulaGuia = \App\Models\Aula::with('grado')->where('docente_guia_id', $docente->id)->first();
+        $bloques = collect();
+        $matrizHorario = [];
+        $esquemaActivo = 'Regular';
+        
+        if ($docente && $anioActivo) {
+            $aulaGuia = \App\Models\Aula::with('grado')
+                ->where('docente_guia_id', $docente->id)
+                ->where('anio_escolar_id', $anioActivo->id)
+                ->first();
 
-            // Si necesitas inicializar la variable booleana para tu vista Blade:
             $esDocenteGuia = $aulaGuia ? true : false;
 
-            // Lógica para Docente por Asignatura: Buscamos si tiene horarios asignados
-            $horarios = \App\Models\Horario::with([
+            $horariosRaw = \App\Models\Horario::with([
                     'bloqueHorario',
                     'aulaAsignaturaDocente.asignatura',
                     'aulaAsignaturaDocente.aula.grado',
                     'aulaAsignaturaDocente.aula.modalidad'
                 ])
-                ->whereHas('aulaAsignaturaDocente', function($q) use ($docente) {
-                    $q->where('docente_id', $docente->id);
+                ->whereHas('aulaAsignaturaDocente', function($q) use ($docente, $anioActivo) {
+                    $q->where('docente_id', $docente->id)
+                      ->where('anio_escolar_id', $anioActivo->id)
+                      ->where('activo', true); 
                 })
-                ->get()
-                ->sortBy(fn($horario) => $horario->bloqueHorario->hora_inicio)
-                ->groupBy('dia_semana');
+                ->get();
+
+            // 1. Extraer los bloques de horas (Filas de la tabla)
+            $bloques = $horariosRaw->pluck('bloqueHorario')->unique('id')->sortBy('hora_inicio')->values();
+            
+            if($bloques->count() > 0) {
+                $esquemaActivo = $bloques->first()->tipo_jornada ?? 'Regular';
+            }
+
+            // 2. Construir la Matriz [Día][Hora] para la cuadrícula
+            foreach ($horariosRaw as $horario) {
+                $dia = $horario->dia_semana;
+                $hora = $horario->bloqueHorario->hora_inicio;
+
+                $matrizHorario[$dia][$hora] = [
+                    'asignacion_id' => $horario->aula_asignatura_docente_id,
+                    'asignatura'    => $horario->aulaAsignaturaDocente->asignatura->nombre,
+                    'aula'          => $horario->aulaAsignaturaDocente->aula->grado->nombre . ' - ' . $horario->aulaAsignaturaDocente->aula->nombre,
+                    'hora_inicio'   => $horario->bloqueHorario->hora_inicio,
+                    'hora_fin'      => $horario->bloqueHorario->hora_fin,
+                    'modalidad_id'  => $horario->aulaAsignaturaDocente->aula->modalidad_id,
+                ];
+            }
         } else {
             $esDocenteGuia = false;
         }
 
-        // 5. ENRUTAMIENTO ÚNICO AL DASHBOARD COMPONENTIZADO
-        // Es vital que 'aulaGuia' vaya aquí en el compact
         return view('dashboard', compact(
-            'avisos', 'totalMatriculados', 'totalPersonal', 'horarios', 'diasSemana', 'dbMetricas', 'aulaGuia', 'esDocenteGuia'
+            'avisos', 'totalMatriculados', 'totalPersonal', 'diasSemana', 'dbMetricas', 'aulaGuia', 'esDocenteGuia', 'bloques', 'matrizHorario', 'esquemaActivo'
         ));
 
     }

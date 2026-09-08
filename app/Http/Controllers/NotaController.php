@@ -103,25 +103,29 @@ class NotaController extends Controller
         ));
     }
 
-    // 3. AUTO-SUMA Y VALIDACIÓN ESTRICTA (Reemplaza el store anterior)
+    // 3. AUTO-SUMA Y VALIDACIÓN ESTRICTA
     public function store(Request $request, AulaAsignaturaDocente $asignacion)
     {
         $this->authorize('calificar', $asignacion);
-        
+
         $corteId = $request->corte_evaluativo_id;
 
-        // Validar el corte
+        // Validar que venga el corte
         if (!$corteId || !\App\Models\CorteEvaluativo::where('id', $corteId)->exists()) {
             return back()->with('error', 'Debe seleccionar un periodo evaluativo válido.');
         }
 
         // BARRERA 1: ¿El parcial está bloqueado?
-        $estaBloqueado = \App\Models\CorteCerrado::where('aula_asignatura_docente_id', $asignacion->id)
+        if (\App\Models\CorteCerrado::where('aula_asignatura_docente_id', $asignacion->id)
             ->where('corte_evaluativo_id', $corteId)
             ->where('bloqueado', true)
-            ->exists();
-        if ($estaBloqueado) {
+            ->exists()) {
             return back()->with('error', 'El parcial está cerrado. Solicita autorización para modificar.');
+        }
+
+        // Validar que venga el array de notas
+        if (!$request->has('notas') || !is_array($request->notas)) {
+            return back()->with('error', 'No se recibieron calificaciones para guardar.');
         }
 
         $actividades = \App\Models\ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
@@ -143,7 +147,6 @@ class NotaController extends Controller
                     $actividad = $actividades->get($actividadId);
                     if (!$actividad) continue;
 
-                    // BARRERA 2: Limitar la nota al puntaje máximo de la actividad
                     $notaFinal = min(abs($notaIngresada), $actividad->puntaje_maximo);
 
                     // 1. Guardar la nota individual usando el modelo Eloquent (con auditoría)
@@ -162,7 +165,6 @@ class NotaController extends Controller
 
         return back()->with('success', 'Calificaciones actualizadas. La auto-suma se ha calculado exitosamente.');
     }
-
     // 4. NUEVO: CERRAR PARCIAL (Congela las notas)
     public function cerrarParcial(Request $request, AulaAsignaturaDocente $asignacion)
     {
@@ -184,6 +186,57 @@ class NotaController extends Controller
         );
 
         return back()->with('success', 'Calificaciones cerradas de forma permanente. Ya no pueden ser editadas.');
+    }
+
+    public function evaluar(Request $request, AulaAsignaturaDocente $asignacion)
+    {
+        $this->authorize('calificar', $asignacion);
+
+        $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('activo', true))->get();
+        $corteSeleccionado = $request->query('corte_evaluativo_id', $cortes->first()->id ?? null);
+
+        // Actividades que el maestro configuró para este parcial
+        $actividades = \App\Models\ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
+                            ->where('corte_evaluativo_id', $corteSeleccionado)
+                            ->orderBy('fecha', 'asc')
+                            ->get();
+
+        // Estado de bloqueo del parcial
+        $estaBloqueado = \App\Models\CorteCerrado::where('aula_asignatura_docente_id', $asignacion->id)
+                            ->where('corte_evaluativo_id', $corteSeleccionado)
+                            ->where('bloqueado', true)
+                            ->exists();
+
+        // Matrículas activas con sus notas del corte
+        $matriculas = \App\Models\Matricula::with(['alumno', 'notas' => function($query) use ($asignacion, $corteSeleccionado) {
+            $query->where('aula_asignatura_docente_id', $asignacion->id)
+                  ->where('corte_evaluativo_id', $corteSeleccionado);
+        }])
+        ->where('aula_id', $asignacion->aula_id)
+        ->where('estado', 'activo')
+        ->get()
+        ->sortBy(fn($m) => $m->alumno->nombre_completo);
+
+        // Notas individuales por actividad
+        $notasActividades = NotaActividad::whereIn('matricula_id', $matriculas->pluck('id'))
+            ->whereIn('actividad_evaluativa_id', $actividades->pluck('id'))
+            ->get()
+            ->groupBy('matricula_id');
+
+        // Guía de pesos del corte
+        $corteActivo = \App\Models\CorteEvaluativo::find($corteSeleccionado);
+        $sumaAcumulado = $actividades->where('tipo', 'acumulado')->sum('puntaje_maximo');
+        $sumaExamen = $actividades->where('tipo', 'examen')->sum('puntaje_maximo');
+        $pesoAcumulado = $corteActivo->peso_acumulado ?? 0;
+        $pesoExamen = $corteActivo->peso_examen ?? 0;
+
+        $asignacion->load('aula.grado', 'asignatura');
+
+        return view('academico.notas.evaluar', compact(
+            'asignacion', 'cortes', 'corteSeleccionado', 'matriculas', 'actividades',
+            'notasActividades', 'estaBloqueado', 'corteActivo',
+            'sumaAcumulado', 'sumaExamen', 'pesoAcumulado', 'pesoExamen'
+        ));
     }
 
     // 5. NUEVO: SOLICITAR DESBLOQUEO (Auditoría)

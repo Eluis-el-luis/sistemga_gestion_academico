@@ -7,7 +7,9 @@ use App\Http\Controllers\MatriculaController;
 use App\Http\Controllers\AulaController;
 use App\Http\Controllers\MallaCurricularController;
 use App\Http\Controllers\DocenteGuiaController;
+use App\Http\Controllers\NotaController;
 use App\Http\Controllers\PrematriculaController;
+use App\Http\Controllers\GestorBoletinController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -62,6 +64,16 @@ Route::middleware('auth')->group(function () {
         Route::get('asignaciones/{aula}', [AulaController::class, 'showAsignaciones'])->name('asignaciones.show');
         Route::get('gestor-horarios', [AulaController::class, 'indexHorarios'])->name('gestor-horarios.index');
         
+        // ... tus rutas actuales de alumnos, matriculas y aulas ...
+        
+        Route::put('usuarios/{usuario}/reset-password', [\App\Http\Controllers\UsuarioController::class, 'resetPassword'])
+             ->name('usuarios.reset-password');
+        Route::resource('usuarios', \App\Http\Controllers\UsuarioController::class);
+
+        // NUEVO: Bandeja de Impresión de Boletines (Exclusivo Gestor/Dirección)
+        Route::get('boletines/bandeja', [GestorBoletinController::class, 'bandeja'])->name('boletin.bandeja');
+
+        Route::get('notas/evaluar/{asignacion}', [\App\Http\Controllers\NotaController::class, 'evaluar'])->name('notas.evaluar');
         Route::post('aulas/{aula}/asignaturas', [\App\Http\Controllers\AulaAsignaturaController::class, 'store'])->name('aulas.asignaturas.store');
         Route::put('aulas/{aula}/asignaturas/{asignatura}', [\App\Http\Controllers\AulaAsignaturaController::class, 'update'])->name('aulas.asignaturas.update');
         
