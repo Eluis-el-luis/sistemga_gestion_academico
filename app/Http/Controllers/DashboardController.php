@@ -96,7 +96,7 @@ class DashboardController extends Controller
         }
 
         return view('dashboard', compact(
-            'avisos', 'totalAlumnos', 'totalDocentes', 'diasSemana', 'dbMetricas', 'aulaGuia', 'esDocenteGuia', 'bloques', 'matrizHorario', 'esquemaActivo'
+            'avisos', 'totalMatriculados', 'totalPersonal', 'diasSemana', 'dbMetricas', 'aulaGuia', 'esDocenteGuia', 'bloques', 'matrizHorario', 'esquemaActivo'
         ));
 
     }
