@@ -121,31 +121,39 @@ class AulaController extends Controller
     {
         $this->authorize('update', $aula);
 
-        // Exigimos que el docente guía sea OBLIGATORIO (required)
         $validated = $request->validate([
+            'grado_id' => 'required|exists:grado,id',
+            'modalidad_id' => 'required|exists:modalidad,id',
+            'nombre' => 'required|string|max:20',
+            'turno' => 'required|string|max:20',
+            'cupo' => 'required|integer|min:1|max:50',
             'anio_escolar_id' => 'required|exists:anio_escolar,id',
-            'docente_guia_id' => 'required|exists:docente,id',
+            'docente_guia_id' => 'nullable|exists:docente,id',
         ]);
+
+        // Detectar si cambió el grado para re-sincronizar las asignaturas de la malla
+        $cambioGrado = $aula->grado_id !== (int) $validated['grado_id'];
 
         $aula->update($validated);
 
+        // Si cambió el grado, reemplazamos las asignaturas por las de la nueva malla
+        if ($cambioGrado) {
+            $this->aulaService->sincronizarMalla($aula);
+        }
+
         return redirect()->route('academico.aulas.index')
-                         ->with('success', 'Asignación del aula actualizada exitosamente.');
+                         ->with('success', 'Aula actualizada exitosamente.');
     }
     public function destroy(\App\Models\Aula $aula)
     {
         $this->authorize('delete', $aula);
 
         try {
-            $aula->delete();
-            return back()->with('success', 'Aula eliminada correctamente.');
-            
-        } catch (\Illuminate\Database\QueryException $e) {
-            if ($e->getCode() == 23000 || $e->getCode() == 23503) {
-                return back()->with('error', 'No se puede eliminar esta aula porque tiene clases asignadas o alumnos. Elimine sus clases o traslade a los alumnos primero.');
-            }
-            
-            return back()->with('error', 'Ocurrió un error en la base de datos al intentar eliminar el aula.');
+            $this->aulaService->eliminarAula($aula);
+            return redirect()->route('academico.aulas.index')
+                             ->with('success', 'Aula eliminada correctamente junto con sus asignaturas y matrículas.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'No se pudo eliminar el aula. ' . $e->getMessage());
         }
     }
 
