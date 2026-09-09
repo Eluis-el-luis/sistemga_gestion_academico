@@ -339,7 +339,7 @@
                     
                     <a x-bind:href="'{{ url('academico/notas/evaluar') }}/' + asignacionId" class="flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border border-[#e6ac27]/20 bg-[#FFFDF5] text-[#3d2c1d] hover:bg-[#e6ac27] hover:text-white transition-all transform hover:-translate-y-1 shadow-sm group">
                         <svg class="w-8 h-8 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-                        <span class="font-black uppercase tracking-widest text-[11px] text-center">Realizar<br>Evaluación</span>
+                        <span class="font-black uppercase tracking-widest text-[11px] text-center">Ingresar<br>Calificaciones</span>
                     </a>
                 </div>
             </div>
