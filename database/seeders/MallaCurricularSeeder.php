@@ -15,9 +15,14 @@ class MallaCurricularSeeder extends Seeder
         $idTemaMotivador = Asignatura::where('nombre', 'Tema motivador')->value('id');
 
         foreach ($gradosPreescolar as $grado) {
+            // Solo sembrar si la asignatura de preescolar existe
+            if (!$idTemaMotivador) {
+                continue;
+            }
+
             MallaCurricular::firstOrCreate(
                 ['grado_id' => $grado->id, 'asignatura_id' => $idTemaMotivador],
-                ['horas_semanales_sugeridas' => 20]
+                ['horas_semanales_sugeridas' => 20, 'activo' => true]
             );
         }
 
@@ -102,7 +107,7 @@ class MallaCurricularSeeder extends Seeder
 
                 MallaCurricular::firstOrCreate(
                     ['grado_id' => $grado->id, 'asignatura_id' => $asignatura->id],
-                    ['horas_semanales_sugeridas' => $asignatura->es_extracurricular ? 2 : 4]
+                    ['horas_semanales_sugeridas' => $asignatura->es_extracurricular ? 2 : 4, 'activo' => true]
                 );
             }
         }
