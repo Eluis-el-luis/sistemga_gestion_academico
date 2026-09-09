@@ -4,7 +4,7 @@
     <!-- Encabezado de Contexto -->
     <div class="flex items-center justify-between mb-2 px-2">
         <div>
-            <h3 class="text-xl font-black text-[#3d2c1d]">Tutoría Activa: <span class="text-[#e6ac27]">{{ $aulaGuia->grado->nombre ?? 'Sin Grado' }} - Sección "{{ $aulaGuia->nombre ?? 'N/A' }}"</span></h3>
+            <h3 class="text-xl font-black text-[#3d2c1d]">Tutoría Activa: <span class="text-[#e6ac27]">{{ $aulaGuia?->grado?->nombre ?? 'Sin Grado' }} - Sección "{{ $aulaGuia?->nombre ?? 'N/A' }}"</span></h3>
             <p class="text-sm text-slate-500 font-medium mt-1">Panel de control y seguimiento integral del grupo asignado.</p>
         </div>
     </div>
@@ -71,35 +71,14 @@
         <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div>
                 <h3 class="font-black text-[#3d2c1d] mb-6">Asistencia Semanal</h3>
-                
+
                 <!-- KPI General -->
                 <div class="text-center mb-8">
-                    <span class="text-6xl font-black text-[#e6ac27] drop-shadow-sm">95<span class="text-3xl text-slate-300">%</span></span>
+                    <span class="text-6xl font-black text-[#e6ac27] drop-shadow-sm">{{ $asistenciaSemanal['porcentaje'] ?? 0 }}<span class="text-3xl text-slate-300">%</span></span>
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">Promedio General de la Semana</p>
-                </div>
-
-                <!-- Desglose por Sexo -->
-                <div class="space-y-5">
-                    <!-- Niñas (Rosa) -->
-                    <div>
-                        <div class="flex justify-between items-end text-xs font-black uppercase tracking-widest mb-1.5">
-                            <span class="text-pink-500">Niñas (20/21)</span>
-                            <span class="text-slate-500 text-sm">98%</span>
-                        </div>
-                        <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                            <div class="bg-pink-400 h-full rounded-full transition-all" style="width: 98%"></div>
-                        </div>
-                    </div>
-                    <!-- Niños (Celeste) -->
-                    <div>
-                        <div class="flex justify-between items-end text-xs font-black uppercase tracking-widest mb-1.5">
-                            <span class="text-sky-500">Niños (18/19)</span>
-                            <span class="text-slate-500 text-sm">92%</span>
-                        </div>
-                        <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                            <div class="bg-sky-400 h-full rounded-full transition-all" style="width: 92%"></div>
-                        </div>
-                    </div>
+                    <p class="text-xs font-bold text-slate-500 mt-1">
+                        {{ $asistenciaSemanal['total_matriculas'] ?? 0 }} estudiantes matriculados activos
+                    </p>
                 </div>
             </div>
 

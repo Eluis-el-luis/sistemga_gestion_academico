@@ -95,8 +95,53 @@ class DashboardController extends Controller
             $esDocenteGuia = false;
         }
 
+        // 5. KPIs POR ROL (datos reales)
+        $docentesSinMarcar = collect();
+        $solicitudesPendientes = collect();
+        $asistenciaSemanal = null;
+
+        // Coordinador: docentes que no registraron asistencia hoy + solicitudes de edición pendientes
+        if ($user->hasRole('Coordinador')) {
+            $hoy = now()->timezone('America/Managua')->toDateString();
+            $docentesIds = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->pluck('id');
+            $docentesQueMarcaron = \App\Models\AsistenciaPersonal::where('fecha', $hoy)
+                ->whereIn('usuario_id', $docentesIds)
+                ->pluck('usuario_id');
+
+            $docentesSinMarcar = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])
+                ->whereNotIn('id', $docentesQueMarcaron)
+                ->whereHas('docente')
+                ->get();
+
+            $solicitudesPendientes = \App\Models\SolicitudEdicionNota::with(['docente.usuario', 'nota.aulaAsignaturaDocente.asignatura'])
+                ->where('estado', 'Pendiente')
+                ->orderByDesc('created_at')
+                ->get();
+        }
+
+        // Docente Guía: asistencia semanal de su aula
+        if ($aulaGuia) {
+            $matriculaIds = \App\Models\Matricula::where('aula_id', $aulaGuia->id)->where('estado', 'activo')->pluck('id');
+
+            $inicioSemana = now()->timezone('America/Managua')->startOfWeek();
+            $finSemana = now()->timezone('America/Managua')->endOfWeek();
+
+            $asistencias = \App\Models\AsistenciaAula::whereIn('matricula_id', $matriculaIds)
+                ->whereBetween('fecha', [$inicioSemana->toDateString(), $finSemana->toDateString()])
+                ->get();
+
+            $totalRegistros = $asistencias->count();
+            $presentes = $asistencias->whereIn('estado_asistencia', ['Presente', 'Actividad Institucional'])->count();
+
+            $asistenciaSemanal = [
+                'porcentaje' => $totalRegistros > 0 ? round(($presentes / $totalRegistros) * 100, 1) : 0,
+                'total_matriculas' => $matriculaIds->count(),
+            ];
+        }
+
         return view('dashboard', compact(
-            'avisos', 'totalMatriculados', 'totalPersonal', 'diasSemana', 'dbMetricas', 'aulaGuia', 'esDocenteGuia', 'bloques', 'matrizHorario', 'esquemaActivo'
+            'avisos', 'totalMatriculados', 'totalPersonal', 'diasSemana', 'dbMetricas', 'aulaGuia', 'esDocenteGuia', 'bloques', 'matrizHorario', 'esquemaActivo',
+            'docentesSinMarcar', 'solicitudesPendientes', 'asistenciaSemanal'
         ));
 
     }
