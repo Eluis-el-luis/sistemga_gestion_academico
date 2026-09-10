@@ -33,10 +33,26 @@
             @endif
 
             @if($aulas->count() > 0)
+                <!-- Selector de aula/sección (Director/Subdirector ven todas) -->
+                <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
+                    <form method="GET" action="{{ route('academico.boletines.index') }}" class="flex flex-wrap items-end gap-4">
+                        <div class="flex-1 min-w-[260px]">
+                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Aula / Sección</label>
+                            <select name="aula_id" onchange="this.form.submit()" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
+                                @foreach($aulas as $aula)
+                                    <option value="{{ $aula->id }}" @selected($aula->id == $aulaSeleccionada)>
+                                        {{ $aula->grado->nombre ?? '' }} - Sección "{{ $aula->nombre }}" · {{ $aula->modalidad->nombre ?? '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </form>
+                </div>
+
                 <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6 border-l-4 border-l-[#e6ac27] flex justify-between items-center flex-wrap gap-4">
                     <div>
                         <h3 class="font-black text-lg text-[#3d2c1d]">
-                            Tutoría Activa: <span class="text-[#e6ac27]">{{ $aulas->first()->grado->nombre ?? '' }} - Sección "{{ $aulas->first()->nombre }}"</span>
+                            Tutoría Activa: <span class="text-[#e6ac27]">{{ $aulaActual->grado->nombre ?? '' }} - Sección "{{ $aulaActual->nombre ?? '' }}"</span>
                         </h3>
                         <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">Estado del paquete: {{ $todosAprobados ? 'Completo y listo para enviar' : 'Revisión en curso (Faltan alumnos)' }}</p>
                     </div>

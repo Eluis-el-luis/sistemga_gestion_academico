@@ -200,6 +200,13 @@ Route::middleware('auth')->group(function () {
         Route::get('reportes/mined', [\App\Http\Controllers\ReporteController::class, 'mined'])->name('reportes.mined');
         Route::get('reportes/estudiantes', [\App\Http\Controllers\ReporteController::class, 'estudiantes'])->name('reportes.estudiantes');
         Route::get('reportes/padres', [\App\Http\Controllers\ReporteController::class, 'padres'])->name('reportes.padres');
+
+        // Agrupaciones de materias (boletín oficial)
+        Route::get('grupo-materia', [\App\Http\Controllers\GrupoMateriaController::class, 'index'])->name('grupo-materia.index');
+        Route::post('grupo-materia', [\App\Http\Controllers\GrupoMateriaController::class, 'store'])->name('grupo-materia.store');
+        Route::put('grupo-materia/{grupo}', [\App\Http\Controllers\GrupoMateriaController::class, 'update'])->name('grupo-materia.update');
+        Route::delete('grupo-materia/{grupo}', [\App\Http\Controllers\GrupoMateriaController::class, 'destroy'])->name('grupo-materia.destroy');
+        Route::post('grupo-materia/asignar', [\App\Http\Controllers\GrupoMateriaController::class, 'asignarMaterias'])->name('grupo-materia.asignar');
     });
 });
 

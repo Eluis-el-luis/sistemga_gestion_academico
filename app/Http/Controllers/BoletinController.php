@@ -41,6 +41,8 @@ class BoletinController extends Controller
 
         $aulaSeleccionada = $request->query('aula_id', $aulas->first()->id ?? null);
 
+        $aulaActual = $aulas->firstWhere('id', $aulaSeleccionada);
+
         $matriculas = collect();
         $todosAprobados = false;
         $corteActivo = null;
@@ -70,7 +72,7 @@ class BoletinController extends Controller
             }
         }
 
-        return view('academico.boletin.index', compact('aulas', 'aulaSeleccionada', 'matriculas', 'todosAprobados'));
+        return view('academico.boletin.index', compact('aulas', 'aulaSeleccionada', 'aulaActual', 'matriculas', 'todosAprobados'));
     }
 
     public function aprobarBoletin(Request $request, Matricula $matricula)
@@ -149,7 +151,7 @@ class BoletinController extends Controller
         $numeroActual = $corteActual->numero ?? 1;
 
         // Asignaturas de esta aula en el año activo
-        $asignaciones = AulaAsignaturaDocente::with('asignatura')
+        $asignaciones = AulaAsignaturaDocente::with('asignatura.grupoMateria')
             ->where('aula_id', $matricula->aula_id)
             ->where('anio_escolar_id', $anioEscolarId)
             ->get();
@@ -183,7 +185,7 @@ class BoletinController extends Controller
                 ? ['cua' => $resumen['indicador_final'], 'cuan' => number_format($finalCuan, 0)]
                 : null;
 
-            $area = $asignacion->asignatura->area ?? 'Otras Áreas';
+            $area = $asignacion->asignatura->grupoMateria->nombre ?? 'Otros';
 
             $areas[$area][] = [
                 'nombre' => $asignacion->asignatura->nombre,
@@ -192,6 +194,14 @@ class BoletinController extends Controller
                 'aprobado' => $resumen['aprobado'],
             ];
         }
+
+        // Ordenar las áreas según el 'orden' del grupo de materia.
+        $ordenGrupos = \App\Models\GrupoMateria::pluck('orden', 'nombre')->toArray();
+        uksort($areas, function ($a, $b) use ($ordenGrupos) {
+            $oa = $ordenGrupos[$a] ?? 999;
+            $ob = $ordenGrupos[$b] ?? 999;
+            return $oa <=> $ob;
+        });
 
         // Promedios por corte
         $promedios = [];
@@ -263,7 +273,7 @@ class BoletinController extends Controller
             ->orderBy('numero')
             ->get();
 
-        $asignaciones = AulaAsignaturaDocente::with('asignatura')
+        $asignaciones = AulaAsignaturaDocente::with('asignatura.grupoMateria')
             ->where('aula_id', $matricula->aula_id)
             ->where('anio_escolar_id', $matricula->anio_escolar_id)
             ->get();
@@ -280,7 +290,7 @@ class BoletinController extends Controller
 
             $filas[] = [
                 'asignatura' => $asignacion->asignatura->nombre,
-                'area' => $asignacion->asignatura->area ?? 'Otras Áreas',
+                'area' => $asignacion->asignatura->grupoMateria->nombre ?? 'Otros',
                 'cortes' => $cortesValores,
                 'nota_final' => $resumen['nota_final'],
                 'indicador' => $resumen['indicador_final'],

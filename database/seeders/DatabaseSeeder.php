@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
             AnioEscolarSeeder::class,
             GradoSeeder::class,
             AsignaturaSeeder::class,
+            GrupoMateriaSeeder::class,
             MallaCurricularSeeder::class, 
             IndicadorLogroSeeder::class,
             CorteEvaluativoSeeder::class,
