@@ -247,4 +247,55 @@ class BoletinController extends Controller
             'matricula', 'areas', 'promedios', 'asistencia', 'compromiso', 'corteActual'
         ));
     }
+
+    /**
+     * Registro académico / constancia de notas del alumno (para trámites).
+     * Muestra una transcripción imprimible con todas las asignaturas,
+     * su nota por corte, nota final y promedio general.
+     */
+    public function constancia(Request $request, Matricula $matricula)
+    {
+        $this->authorize('view', $matricula);
+
+        $matricula->load(['alumno', 'aula.grado', 'aula.modalidad', 'aula.docenteGuia.usuario', 'anioEscolar']);
+
+        $cortes = CorteEvaluativo::where('anio_escolar_id', $matricula->anio_escolar_id)
+            ->orderBy('numero')
+            ->get();
+
+        $asignaciones = AulaAsignaturaDocente::with('asignatura')
+            ->where('aula_id', $matricula->aula_id)
+            ->where('anio_escolar_id', $matricula->anio_escolar_id)
+            ->get();
+
+        $filas = [];
+        $promediosFinales = [];
+        foreach ($asignaciones as $asignacion) {
+            $resumen = $this->notaService->calcularResumenAsignatura($matricula, $asignacion);
+
+            $cortesValores = [];
+            foreach ($cortes as $corte) {
+                $cortesValores[$corte->numero] = $resumen['cortes'][$corte->numero] ?? null;
+            }
+
+            $filas[] = [
+                'asignatura' => $asignacion->asignatura->nombre,
+                'area' => $asignacion->asignatura->area ?? 'Otras Áreas',
+                'cortes' => $cortesValores,
+                'nota_final' => $resumen['nota_final'],
+                'indicador' => $resumen['indicador_final'],
+                'aprobado' => $resumen['aprobado'],
+            ];
+
+            if ($resumen['nota_final'] !== null) {
+                $promediosFinales[] = $resumen['nota_final'];
+            }
+        }
+
+        $promedioGeneral = count($promediosFinales) > 0
+            ? round(array_sum($promediosFinales) / count($promediosFinales), 2)
+            : null;
+
+        return view('academico.boletin.constancia', compact('matricula', 'cortes', 'filas', 'promedioGeneral'));
+    }
 }

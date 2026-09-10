@@ -150,6 +150,7 @@ Route::middleware('auth')->group(function () {
 
         // Fase 7: Boletines
         Route::get('boletines', [\App\Http\Controllers\BoletinController::class, 'index'])->name('boletines.index');
+        Route::get('boletines/constancia/{matricula}', [\App\Http\Controllers\BoletinController::class, 'constancia'])->name('boletines.constancia');
         Route::get('boletines/{matricula}', [\App\Http\Controllers\BoletinController::class, 'show'])->name('boletines.show');
         Route::post('boletines/{matricula}/aprobar', [\App\Http\Controllers\BoletinController::class, 'aprobarBoletin'])->name('boletines.aprobar');
         
@@ -191,6 +192,7 @@ Route::middleware('auth')->group(function () {
 
         // Rendimiento académico
         Route::get('reportes/notas-por-asignatura', [\App\Http\Controllers\ReporteController::class, 'notasPorAsignatura'])->name('reportes.notas-por-asignatura');
+        Route::get('reportes/rendimiento-corte', [\App\Http\Controllers\ReporteController::class, 'rendimientoCorte'])->name('reportes.rendimiento-corte');
         Route::get('reportes/historial-estudiante', [\App\Http\Controllers\ReporteController::class, 'historialPorEstudiante'])->name('reportes.historial-estudiante');
 
         // Otros reportes (MINED, estudiantes, padres)
