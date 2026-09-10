@@ -1,22 +1,22 @@
 <x-app-layout>
     <x-slot name="header">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div class="flex items-center gap-4">
-                    <!-- Flecha de regreso -->
-                    <a href="{{ route('dashboard') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors mr-2" title="Volver al Panel">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                    </a>
-                    
-                    <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">
-                        Gestión de Personal y Docentes
-                    </h2>
-                </div>
-                
-                <a href="{{ route('academico.usuarios.create') }}" class="bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black py-2.5 px-6 rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 flex items-center gap-2 text-sm">
-                    <span>+</span> Registrar Personal
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div class="flex items-center gap-4">
+                <!-- Flecha de regreso -->
+                <a href="{{ route('dashboard') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors mr-2" title="Volver al Panel">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 </a>
+                
+                <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">
+                    Gestión de Personal y Docentes
+                </h2>
             </div>
-        </x-slot>
+            
+            <a href="{{ route('academico.usuarios.create') }}" class="bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black py-2.5 px-6 rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 flex items-center gap-2 text-sm">
+                <span>+</span> Registrar Personal
+            </a>
+        </div>
+    </x-slot>
 
     <!-- ALPINE MAESTRO: Modal, Scroll y Generador de Claves -->
     <div class="py-10 bg-slate-50 min-h-screen relative" x-data="{ 
@@ -55,11 +55,18 @@
             <div class="bg-white overflow-hidden shadow-sm rounded-3xl border border-slate-200" 
                  x-data="{
                      query: '{{ request('buscar') }}',
+                     modalidad: '{{ request('modalidad') }}',
                      cargando: false,
                      ejecutarBusqueda() {
                          this.cargando = true;
                          const url = new URL(window.location.href);
-                         url.searchParams.set('buscar', this.query);
+                         
+                         if(this.query) url.searchParams.set('buscar', this.query);
+                         else url.searchParams.delete('buscar');
+
+                         if(this.modalidad) url.searchParams.set('modalidad', this.modalidad);
+                         else url.searchParams.delete('modalidad');
+                         
                          url.searchParams.set('page', 1);
 
                          fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
@@ -74,18 +81,30 @@
                      }
                  }">
                 
-                <!-- Buscador -->
-                <div class="p-6 md:p-8 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white">
-                    <form @submit.prevent="ejecutarBusqueda" class="w-full sm:w-1/2 relative">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <svg x-show="!cargando" class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                            <svg x-show="cargando" style="display: none;" class="animate-spin h-5 w-5 text-[#e6ac27]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <!-- Buscador y Selector de Modalidad -->
+                <div class="p-6 md:p-8 border-b border-slate-100 flex flex-col justify-between items-center gap-4 bg-white">
+                    <form @submit.prevent="ejecutarBusqueda" class="w-full flex flex-col sm:flex-row gap-3 relative">
+                        
+                        <!-- Filtro de Modalidad -->
+                        <select x-model="modalidad" @change="ejecutarBusqueda" class="rounded-xl border-slate-200 bg-slate-50 text-slate-600 focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm shadow-sm w-full sm:w-56 transition-colors">
+                            <option value="">Todo el personal</option>
+                            @foreach($modalidades as $mod)
+                                <option value="{{ $mod->id }}">Personal de {{ $mod->nombre }}</option>
+                            @endforeach
+                        </select>
+
+                        <!-- Buscador de Texto -->
+                        <div class="relative w-full sm:w-1/2">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <svg x-show="!cargando" class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                <svg x-show="cargando" style="display: none;" class="animate-spin h-5 w-5 text-[#e6ac27]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            </div>
+                            <input type="text" x-model="query" @input.debounce.400ms="ejecutarBusqueda" placeholder="Buscar por nombre, correo o rol..." class="block w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#e6ac27] focus:border-[#e6ac27] transition-all shadow-sm sm:text-sm">
                         </div>
-                        <input type="text" x-model="query" @input.debounce.400ms="ejecutarBusqueda" placeholder="Buscar por nombre, correo o rol..." class="block w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#e6ac27] focus:border-[#e6ac27] transition-all shadow-sm sm:text-sm">
                     </form>
                 </div>
 
-                <!-- CONTENEDOR DE LA TABLA (ID CLAVE) -->
+                <!-- CONTENEDOR DE LA TABLA -->
                 <div id="contenedor-tabla" :class="{'opacity-50 pointer-events-none': cargando}" class="transition-opacity duration-200">
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-slate-100 text-left border-collapse">
@@ -103,8 +122,24 @@
                                     <tr class="hover:bg-slate-50/80 transition-colors group">
                                         <td class="px-8 py-5">
                                             <p class="font-black text-[#3d2c1d] text-base">{{ $usuario->nombre_completo ?? $usuario->name }}</p>
+                                            
+                                            <!-- ETIQUETAS VISUALES DE DOCENTE Y MODALIDAD -->
                                             @if($usuario->docente)
-                                                <p class="text-[11px] font-bold text-slate-400 mt-1">CUP: {{ $usuario->docente->codigo_unico_persona }}</p>
+                                                <div class="flex items-center gap-2 mt-1">
+                                                    <span class="text-[11px] font-bold text-slate-400">CUP: {{ $usuario->docente->codigo_unico_persona }}</span>
+                                                    
+                                                    @if($usuario->docente->modalidad_id)
+                                                        @php
+                                                            // Cruzamos el ID con la colección de modalidades para obtener el nombre sin saturar la Base de Datos
+                                                            $nombreModalidad = $modalidades->firstWhere('id', $usuario->docente->modalidad_id)->nombre ?? '';
+                                                        @endphp
+                                                        @if($nombreModalidad)
+                                                            <span class="inline-flex px-2 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-md bg-[#e6ac27]/10 text-[#c48e1b] border border-[#e6ac27]/20">
+                                                                {{ $nombreModalidad }}
+                                                            </span>
+                                                        @endif
+                                                    @endif
+                                                </div>
                                             @endif
                                         </td>
                                         <td class="px-6 py-5 font-medium text-slate-600">{{ $usuario->email }}</td>
@@ -134,17 +169,14 @@
                                         </td>
                                         <td class="px-8 py-5 text-right space-x-2 whitespace-nowrap">
                                             
-                                            <!-- Botón Editar -->
                                             <a href="{{ route('academico.usuarios.edit', $usuario) }}" class="inline-flex p-2 bg-slate-50 text-slate-500 rounded-xl hover:bg-[#FFFDF5] hover:text-[#e6ac27] border border-slate-200 hover:border-[#e6ac27] shadow-sm transition-all" title="Editar Información">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                             </a>
 
-                                            <!-- Botón Restablecer Contraseña -->
                                             <button type="button" @click="abrirModal({{ $usuario->id }}, '{{ addslashes($usuario->nombre_completo ?? $usuario->name) }}')" class="inline-flex p-2 bg-slate-50 text-slate-500 rounded-xl hover:bg-blue-50 hover:text-blue-600 border border-slate-200 hover:border-blue-200 shadow-sm transition-all" title="Restablecer Contraseña">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
                                             </button>
 
-                                            <!-- Botón Desactivar -->
                                             <form action="{{ route('academico.usuarios.destroy', $usuario) }}" method="POST" class="inline-block alerta-desactivar">
                                                 @csrf
                                                 @method('DELETE')
@@ -247,7 +279,7 @@
 
     <!-- Botón flotante -->
     <button x-show="showTopBtnGlobal" x-transition @click="window.scrollTo({top: 0, behavior: 'smooth'})" class="fixed bottom-8 right-8 z-50 p-3.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-full shadow-lg transition-all transform hover:scale-110 focus:outline-none" title="Volver arriba">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7-7m-7-7v18"/></svg>
     </button>
 
     <!-- Script de SweetAlert2 -->
