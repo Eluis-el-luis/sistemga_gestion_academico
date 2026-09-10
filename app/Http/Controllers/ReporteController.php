@@ -95,10 +95,17 @@ class ReporteController extends Controller
     public function notasGlobales(Request $request)
     {
         $this->autorizarReportes();
-        $notas = $this->reporteService->notasGlobales($this->filtros($request));
+        $datos = $this->reporteService->notasGlobalesPorAlumno($this->filtros($request));
         $catalogos = $this->pasarCatalogos($request);
 
-        return view('academico.reportes.notas-globales', array_merge(compact('notas'), $catalogos));
+        // Evitar que el catálogo 'asignaturas' (select de filtro) pise las columnas filtradas del reporte.
+        $columnas = $datos['asignaturas'];
+        $filas = $datos['filas'];
+
+        return view('academico.reportes.notas-globales', array_merge(
+            compact('columnas', 'filas'),
+            $catalogos
+        ));
     }
 
     public function notasPendientes(Request $request)
@@ -170,13 +177,63 @@ class ReporteController extends Controller
         return view('academico.reportes.notas-por-asignatura', array_merge(compact('filas'), $catalogos));
     }
 
+    public function rendimientoCorte(Request $request)
+    {
+        $this->autorizarReportes();
+        $datos = $this->reporteService->rendimientoCorteMined($this->filtros($request));
+        $catalogos = $this->pasarCatalogos($request);
+
+        return view('academico.reportes.rendimiento-corte', array_merge($datos, $catalogos));
+    }
+
     public function historialPorEstudiante(Request $request)
     {
         $this->autorizarReportes();
         $resultado = $this->reporteService->historialPorEstudiante($request->query('alumno_id'));
         $catalogos = $this->pasarCatalogos($request);
 
-        return view('academico.reportes.historial-estudiante', array_merge($resultado, $catalogos));
+        // Enriquecer con el resumen por asignatura del certificado de notas
+        $alumno = $resultado['alumno'] ?? null;
+        $resumenAsignaturas = [];
+        $promedioGeneral = null;
+
+        if ($alumno) {
+            $matricula = \App\Models\Matricula::with(['aula.grado', 'aula.modalidad', 'anioEscolar'])
+                ->where('alumno_id', $alumno->id)
+                ->where('estado', 'activo')
+                ->latest('id')
+                ->first();
+
+            if ($matricula) {
+                $notaService = app(\App\Services\NotaService::class);
+                $asignaciones = \App\Models\AulaAsignaturaDocente::with('asignatura')
+                    ->where('aula_id', $matricula->aula_id)
+                    ->where('anio_escolar_id', $matricula->anio_escolar_id)
+                    ->get();
+
+                $finales = [];
+                foreach ($asignaciones as $asignacion) {
+                    $resumen = $notaService->calcularResumenAsignatura($matricula, $asignacion);
+                    $resumenAsignaturas[] = [
+                        'asignatura' => $asignacion->asignatura->nombre,
+                        'area' => $asignacion->asignatura->area ?? 'Otras Áreas',
+                        'resumen' => $resumen,
+                    ];
+                    if ($resumen['nota_final'] !== null) {
+                        $finales[] = $resumen['nota_final'];
+                    }
+                }
+
+                if (count($finales) > 0) {
+                    $promedioGeneral = round(array_sum($finales) / count($finales), 2);
+                }
+            }
+        }
+
+        return view('academico.reportes.historial-estudiante', array_merge(
+            ['alumno' => $resultado['alumno'] ?? null, 'resumenAsignaturas' => $resumenAsignaturas, 'promedioGeneral' => $promedioGeneral, 'matricula' => $matricula ?? null],
+            $catalogos
+        ));
     }
 
     // =============================================================

@@ -79,4 +79,37 @@ class DocenteGuiaController extends Controller
             'riesgoCritico', 'pctRiesgo'
         ));
     }
+
+    /**
+     * Rendimiento por corte del aula/grado que guía el docente (solo Docente Guía).
+     */
+    public function rendimiento(Request $request)
+    {
+        $usuario = auth()->user();
+
+        if (!$usuario->hasRole('Docente Guia')) {
+            abort(403, 'Solo el Docente Guía puede ver el rendimiento de su aula.');
+        }
+
+        $docente = Docente::where('usuario_id', $usuario->id)->first();
+        if (!$docente) {
+            return redirect()->route('dashboard')->with('error', 'No se encontró su perfil de docente.');
+        }
+
+        $aula = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
+            ->where('docente_guia_id', $docente->id)
+            ->whereHas('anioEscolar', fn ($q) => $q->where('activo', true))
+            ->first();
+
+        if (!$aula) {
+            return redirect()->route('dashboard')->with('error', 'No tiene un aula asignada en el ciclo actual.');
+        }
+
+        $corteId = $request->query('corte_evaluativo_id');
+        $rendimientoAula = app(\App\Services\ReporteService::class)->rendimientoAula($aula, $corteId ? (int) $corteId : null);
+
+        $cortes = \App\Models\CorteEvaluativo::where('anio_escolar_id', $aula->anio_escolar_id)->orderBy('numero')->get();
+
+        return view('academico.docente-guia.rendimiento', compact('aula', 'rendimientoAula', 'cortes', 'corteId'));
+    }
 }

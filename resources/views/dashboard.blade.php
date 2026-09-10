@@ -332,7 +332,7 @@
             <div class="p-8 bg-white">
                 <h3 class="text-center font-bold text-slate-600 mb-6">¿Qué deseas gestionar para esta clase?</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <a x-bind:href="'{{ url('academico/asistencia/asignatura') }}/' + asignacionId + '/create'" class="flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border border-[#e6ac27]/20 bg-[#FFFDF5] text-[#3d2c1d] hover:bg-[#e6ac27] hover:text-white transition-all transform hover:-translate-y-1 shadow-sm group">
+                    <a x-bind:href="'{{ url('academico/asistencia/asignatura') }}/' + asignacionId" class="flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border border-[#e6ac27]/20 bg-[#FFFDF5] text-[#3d2c1d] hover:bg-[#e6ac27] hover:text-white transition-all transform hover:-translate-y-1 shadow-sm group">
                         <svg class="w-8 h-8 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         <span class="font-black uppercase tracking-widest text-[11px] text-center">Pasar<br>Asistencia</span>
                     </a>

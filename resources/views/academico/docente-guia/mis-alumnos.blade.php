@@ -14,7 +14,7 @@
             </div>
             
             <!-- Botón de Exportar (Opcional para futuro) -->
-            <button class="bg-[#3d2c1d] hover:bg-slate-800 text-white font-bold py-2 px-5 rounded-xl shadow-sm text-sm transition-transform transform hover:-translate-y-0.5 flex items-center gap-2">
+            <button onclick="window.print()" class="bg-[#3d2c1d] hover:bg-slate-800 text-white font-bold py-2 px-5 rounded-xl shadow-sm text-sm transition-transform transform hover:-translate-y-0.5 flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                 Imprimir Reporte
             </button>
@@ -103,9 +103,9 @@
                                         </span>
                                     </td>
                                     <td class="p-5 text-right">
-                                        <button class="inline-flex px-4 py-2 bg-slate-50 dark:bg-slate-800 text-[#e6ac27] border border-slate-200 dark:border-slate-700 hover:border-[#e6ac27] rounded-xl text-xs font-black transition-all shadow-sm transform hover:-translate-y-0.5">
+                                        <a href="{{ route('academico.alumnos.show', $alumno->id) }}" class="inline-flex px-4 py-2 bg-slate-50 dark:bg-slate-800 text-[#e6ac27] border border-slate-200 dark:border-slate-700 hover:border-[#e6ac27] rounded-xl text-xs font-black transition-all shadow-sm transform hover:-translate-y-0.5">
                                             Ver Detalles
-                                        </button>
+                                        </a>
                                     </td>
                                 </tr>
                             @empty
