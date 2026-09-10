@@ -490,6 +490,66 @@ class ReporteService
     }
 
     /**
+     * Rendimiento por corte de un aula específica (para el docente guía).
+     * Devuelve un resumen del grado del aula: MI/MA (AS/F), aprobados en todas,
+     * aplazados de 1/2/3+, total de docentes, % aprobados y % retención.
+     */
+    public function rendimientoAula(Aula $aula, ?int $corteId = null): array
+    {
+        $matriculas = Matricula::with('alumno')
+            ->where('aula_id', $aula->id)
+            ->where('anio_escolar_id', $aula->anio_escolar_id)
+            ->where('estado', 'activo')
+            ->get();
+
+        $asignaciones = AulaAsignaturaDocente::where('aula_id', $aula->id)
+            ->where('anio_escolar_id', $aula->anio_escolar_id)
+            ->get();
+        $totalDocentes = $asignaciones->whereNotNull('docente_id')->pluck('docente_id')->unique()->count();
+
+        // MI/MA por sexo
+        $miAs = $matriculas->where('alumno.sexo', 'M')->count();
+        $miF = $matriculas->where('alumno.sexo', 'F')->count();
+
+        $notas = Nota::whereIn('matricula_id', $matriculas->pluck('id'))
+            ->when($corteId, fn ($q) => $q->where('corte_evaluativo_id', $corteId))
+            ->get()
+            ->groupBy('matricula_id');
+
+        $aprobadosTodas = 0;
+        $aplazados1 = 0;
+        $aplazados2 = 0;
+        $aplazados3 = 0;
+
+        foreach ($matriculas as $matricula) {
+            $notasAlumno = $notas->get($matricula->id, collect());
+            if ($notasAlumno->isEmpty()) continue;
+
+            $reprobadas = $notasAlumno->where('nota_cuantitativa', '<', 60)->count();
+            if ($reprobadas === 0) $aprobadosTodas++;
+            elseif ($reprobadas === 1) $aplazados1++;
+            elseif ($reprobadas === 2) $aplazados2++;
+            else $aplazados3++;
+        }
+
+        $totalEvaluados = $aprobadosTodas + $aplazados1 + $aplazados2 + $aplazados3;
+
+        return [
+            'grado' => $aula->grado->nombre ?? '',
+            'seccion' => $aula->nombre,
+            'mi_as' => $miAs,
+            'mi_f' => $miF,
+            'aprobados_todas' => $aprobadosTodas,
+            'aplazados_1' => $aplazados1,
+            'aplazados_2' => $aplazados2,
+            'aplazados_3' => $aplazados3,
+            'total_docentes' => $totalDocentes,
+            'porcentaje_aprobados' => $totalEvaluados > 0 ? round(($aprobadosTodas / $totalEvaluados) * 100, 1) : 0,
+            'porcentaje_retencion' => ($miAs + $miF) > 0 ? 100.0 : 0.0,
+        ];
+    }
+
+    /**
      * Historial de notas por estudiante (todas las asignaturas y cortes).
      */
     public function historialPorEstudiante(?int $alumnoId): array

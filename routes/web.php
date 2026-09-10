@@ -117,6 +117,7 @@ Route::middleware('auth')->group(function () {
         
         // Panel Exclusivo del Maestro Guía
         Route::get('tutor/mis-alumnos', [\App\Http\Controllers\DocenteGuiaController::class, 'misAlumnos'])->name('tutor.mis-alumnos');
+        Route::get('tutor/rendimiento', [\App\Http\Controllers\DocenteGuiaController::class, 'rendimiento'])->name('tutor.rendimiento');
 
         // Fase 5: Calificaciones
         Route::get('notas', [\App\Http\Controllers\NotaController::class, 'index'])->name('notas.index');

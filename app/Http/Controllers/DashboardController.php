@@ -99,6 +99,7 @@ class DashboardController extends Controller
         $docentesSinMarcar = collect();
         $solicitudesPendientes = collect();
         $asistenciaSemanal = null;
+        $rendimientoAula = null;
 
         // Coordinador: docentes que no registraron asistencia hoy + solicitudes de edición pendientes
         if ($user->hasRole('Coordinador')) {
@@ -137,11 +138,14 @@ class DashboardController extends Controller
                 'porcentaje' => $totalRegistros > 0 ? round(($presentes / $totalRegistros) * 100, 1) : 0,
                 'total_matriculas' => $matriculaIds->count(),
             ];
+
+            // Rendimiento por corte del aula (grado) del docente guía
+            $rendimientoAula = app(\App\Services\ReporteService::class)->rendimientoAula($aulaGuia);
         }
 
         return view('dashboard', compact(
             'avisos', 'totalMatriculados', 'totalPersonal', 'diasSemana', 'dbMetricas', 'aulaGuia', 'esDocenteGuia', 'bloques', 'matrizHorario', 'esquemaActivo',
-            'docentesSinMarcar', 'solicitudesPendientes', 'asistenciaSemanal'
+            'docentesSinMarcar', 'solicitudesPendientes', 'asistenciaSemanal', 'rendimientoAula'
         ));
 
     }

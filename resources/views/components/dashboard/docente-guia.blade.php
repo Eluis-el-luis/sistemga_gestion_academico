@@ -56,35 +56,81 @@
         </a>
     </div>
 
-    <!-- Sección Inferior: Gráfica y Asistencia Demográfica -->
+    <!-- Sección Inferior: Rendimiento por Corte y Asistencia -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <!-- Gráfica de Rendimiento -->
+
+        <!-- Rendimiento por Corte del Aula -->
         <div class="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
-            <h3 class="font-black text-[#3d2c1d] mb-4">Rendimiento Académico del Aula</h3>
-            <div class="flex-grow bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center min-h-[250px]">
-                <span class="text-sm font-bold text-slate-400">Gráfica de Promedios Globales (Próximamente con Chart.js)</span>
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-black text-[#3d2c1d]">Rendimiento por Corte del Aula</h3>
+                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">{{ $rendimientoAula['grado'] ?? '' }} "{{ $rendimientoAula['seccion'] ?? '' }}"</span>
             </div>
-        </div>
 
-        <!-- Widget de Asistencia Demográfica -->
-        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
-            <div>
-                <h3 class="font-black text-[#3d2c1d] mb-6">Asistencia Semanal</h3>
-
-                <!-- KPI General -->
-                <div class="text-center mb-8">
-                    <span class="text-6xl font-black text-[#e6ac27] drop-shadow-sm">{{ $asistenciaSemanal['porcentaje'] ?? 0 }}<span class="text-3xl text-slate-300">%</span></span>
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">Promedio General de la Semana</p>
-                    <p class="text-xs font-bold text-slate-500 mt-1">
-                        {{ $asistenciaSemanal['total_matriculas'] ?? 0 }} estudiantes matriculados activos
-                    </p>
+            @if($rendimientoAula)
+            <div class="grid grid-cols-3 gap-4 mb-4">
+                <div class="bg-slate-50 rounded-2xl p-4 text-center">
+                    <p class="text-2xl font-black text-[#3d2c1d]">{{ $rendimientoAula['mi_as'] + $rendimientoAula['mi_f'] }}</p>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Matrícula</p>
+                </div>
+                <div class="bg-emerald-50 rounded-2xl p-4 text-center">
+                    <p class="text-2xl font-black text-emerald-600">{{ $rendimientoAula['aprobados_todas'] }}</p>
+                    <p class="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-1">Aprobados en Todas</p>
+                </div>
+                <div class="bg-rose-50 rounded-2xl p-4 text-center">
+                    <p class="text-2xl font-black text-rose-600">{{ $rendimientoAula['aplazados_1'] + $rendimientoAula['aplazados_2'] + $rendimientoAula['aplazados_3'] }}</p>
+                    <p class="text-[10px] font-black text-rose-500 uppercase tracking-widest mt-1">Aplazados</p>
                 </div>
             </div>
 
-            <button class="w-full mt-8 py-3.5 bg-[#FFFDF5] hover:bg-slate-50 border border-[#e6ac27]/30 text-[#e6ac27] rounded-xl text-sm font-black shadow-sm transition-colors">
-                Ver Reporte Detallado
-            </button>
+            <div class="space-y-4">
+                <div>
+                    <div class="flex justify-between text-xs font-bold text-slate-600 mb-1">
+                        <span>Aplazados de 1 asignatura</span>
+                        <span class="font-black">{{ $rendimientoAula['aplazados_1'] }}</span>
+                    </div>
+                    <div class="flex justify-between text-xs font-bold text-slate-600 mb-1">
+                        <span>Aplazados de 2 asignaturas</span>
+                        <span class="font-black">{{ $rendimientoAula['aplazados_2'] }}</span>
+                    </div>
+                    <div class="flex justify-between text-xs font-bold text-slate-600 mb-1">
+                        <span>Aplazados de 3 a más</span>
+                        <span class="font-black">{{ $rendimientoAula['aplazados_3'] }}</span>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-100 pt-4">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold text-slate-500">% Aprobados en todas</span>
+                        <span class="text-lg font-black text-[#e6ac27]">{{ $rendimientoAula['porcentaje_aprobados'] }}%</span>
+                    </div>
+                    <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div class="h-2 rounded-full bg-[#e6ac27]" style="width: {{ $rendimientoAula['porcentaje_aprobados'] }}%"></div>
+                    </div>
+                </div>
+            </div>
+            @else
+                <p class="text-sm text-slate-400">Aún no hay datos de rendimiento para esta aula.</p>
+            @endif
+        </div>
+
+        <!-- Widget de Asistencia y Accesos -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
+            <div>
+                <h3 class="font-black text-[#3d2c1d] mb-4">Asistencia Semanal</h3>
+                <div class="text-center mb-6">
+                    <span class="text-6xl font-black text-[#e6ac27] drop-shadow-sm">{{ $asistenciaSemanal['porcentaje'] ?? 0 }}<span class="text-3xl text-slate-300">%</span></span>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">Promedio General de la Semana</p>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <a href="{{ route('academico.asistencia.aula.create') }}" class="w-full inline-flex items-center justify-center gap-2 bg-[#FFFDF5] hover:bg-slate-50 border border-[#e6ac27]/30 text-[#e6ac27] rounded-xl py-3 text-sm font-black shadow-sm transition-colors">
+                    Pasar Asistencia del Aula
+                </a>
+                <a href="{{ route('academico.tutor.rendimiento') }}" class="w-full inline-flex items-center justify-center gap-2 bg-[#FFFDF5] hover:bg-slate-50 border border-[#e6ac27]/30 text-[#e6ac27] rounded-xl py-3 text-sm font-black shadow-sm transition-colors">
+                    Ver Rendimiento por Corte
+                </a>
+            </div>
         </div>
     </div>
 </div>
