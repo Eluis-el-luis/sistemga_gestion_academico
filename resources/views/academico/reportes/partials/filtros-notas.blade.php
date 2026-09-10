@@ -11,6 +11,15 @@
             @endforeach
         </select>
     </div>
+    <div>
+        <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Modalidad</label>
+        <select name="modalidad_id" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
+            <option value="">Todas</option>
+            @foreach($modalidades as $mod)
+                <option value="{{ $mod->id }}" @selected($mod->id == request('modalidad_id'))>{{ $mod->nombre }}</option>
+            @endforeach
+        </select>
+    </div>
     @if(!isset($ocultarGrado))
     <div>
         <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Grado</label>
@@ -22,6 +31,15 @@
         </select>
     </div>
     @endif
+    <div>
+        <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Aula / Sección</label>
+        <select name="aula_id" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
+            <option value="">Todas</option>
+            @foreach($aulas as $aula)
+                <option value="{{ $aula->id }}" @selected($aula->id == request('aula_id'))>{{ $aula->nombre }} ({{ $aula->grado->nombre ?? '' }})</option>
+            @endforeach
+        </select>
+    </div>
     <div>
         <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Asignatura</label>
         <select name="asignatura_id" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">

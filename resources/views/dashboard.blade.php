@@ -294,6 +294,48 @@
         </div>
     </div>
 
+    <!-- MODAL DE DECISIÓN DE CLASE (ÚNICO Y CORREGIDO) -->
+    <div x-data="{ open: false, asignacionId: '', asignaturaInfo: '', aulaInfo: '', horaInfo: '' }" 
+         @abrir-modal-decision-clase.window="
+            open = true;
+            asignacionId = $event.detail.id; 
+            asignaturaInfo = $event.detail.asignatura; 
+            aulaInfo = $event.detail.aula;
+            horaInfo = $event.detail.hora;
+         " x-show="open" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        
+        <div x-show="open" x-transition.opacity class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="open = false"></div>
+        <div x-show="open" x-transition.scale class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="bg-[#FFFDF5] px-8 py-5 border-b border-[#e6ac27]/20 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-[#e6ac27]/10 flex items-center justify-center text-[#e6ac27]">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>
+                </div>
+                <div>
+                    <h2 class="text-lg font-black text-[#3d2c1d] leading-tight" x-text="asignaturaInfo"></h2>
+                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-widest mt-0.5" x-text="aulaInfo + ' | ' + horaInfo"></p>
+                </div>
+            </div>
+            
+            <div class="p-8 bg-white">
+                <h3 class="text-center font-bold text-slate-600 mb-6">¿Qué deseas gestionar para esta clase?</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <a x-bind:href="'{{ url('academico/asistencia/asignatura') }}/' + asignacionId" class="flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border border-[#e6ac27]/20 bg-[#FFFDF5] text-[#3d2c1d] hover:bg-[#e6ac27] hover:text-white transition-all transform hover:-translate-y-1 shadow-sm group">
+                        <svg class="w-8 h-8 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span class="font-black uppercase tracking-widest text-[11px] text-center">Pasar<br>Asistencia</span>
+                    </a>
+                    
+                    <a x-bind:href="'{{ url('academico/notas/evaluar') }}/' + asignacionId" class="flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border border-[#e6ac27]/20 bg-[#FFFDF5] text-[#3d2c1d] hover:bg-[#e6ac27] hover:text-white transition-all transform hover:-translate-y-1 shadow-sm group">
+                        <svg class="w-8 h-8 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                        <span class="font-black uppercase tracking-widest text-[11px] text-center">Ingresar<br>Calificaciones</span>
+                    </a>
+                </div>
+            </div>
+            <div class="bg-slate-50 px-8 py-4 border-t border-slate-100 rounded-b-2xl text-center">
+                <button type="button" @click="open = false" class="text-xs font-bold text-slate-400 hover:text-slate-800 transition-colors uppercase tracking-widest py-2">Cancelar y Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- SWEETALERT2 PARA NOTIFICACIONES PREMIUM -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>

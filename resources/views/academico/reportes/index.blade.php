@@ -8,7 +8,7 @@
         </div>
     </x-slot>
 
-    <div class="pb-12 pt-6 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
+    <div class="pb-12 pt-6 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8" x-data="{ grupo: 'calificaciones' }">
 
         @if(session('success'))
             <div class="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl shadow-sm font-medium">{{ session('success') }}</div>
@@ -49,40 +49,89 @@
             </div>
         </div>
 
-        <!-- Grid de Reportes -->
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            @php
-                $reportes = [
-                    // Control de ingreso de notas
-                    ['ruta' => 'reportes.control-notas', 'titulo' => 'Control de Notas', 'desc' => 'Notas ingresadas o pendientes por asignatura, docente o grado.'],
-                    ['ruta' => 'reportes.notas-globales', 'titulo' => 'Notas Globales', 'desc' => 'Listado global de notas con filtros por asignatura, docente, grado y corte.'],
-                    ['ruta' => 'reportes.notas-pendientes', 'titulo' => 'Notas Pendientes', 'desc' => 'Estudiantes con notas pendientes por periodo evaluativo y docente.'],
-                    // Asistencia
-                    ['ruta' => 'reportes.asistencia-global', 'titulo' => 'Asistencia Global', 'desc' => 'Asistencia diaria por turno, grado y sección.'],
-                    ['ruta' => 'reportes.estadisticas-asistencia', 'titulo' => 'Estadísticas de Asistencia', 'desc' => 'Presencias y ausencias agregadas por rango de fechas.'],
-                    ['ruta' => 'reportes.asistencia-seccion-dia', 'titulo' => 'Asistencia por Sección (Día)', 'desc' => 'Asistencia de una sección específica en un día.'],
-                    ['ruta' => 'reportes.asistencia-seccion-rango', 'titulo' => 'Asistencia por Sección (Rango)', 'desc' => 'Asistencia de una sección en un rango de fechas.'],
-                    ['ruta' => 'reportes.asistencia-estudiante', 'titulo' => 'Asistencia por Estudiante', 'desc' => 'Estadísticas de asistencia individual por estudiante.'],
-                    // Rendimiento
-                    ['ruta' => 'reportes.notas-por-asignatura', 'titulo' => 'Notas por Asignatura', 'desc' => 'Rendimiento por asignatura, aula y docente.'],
-                    ['ruta' => 'reportes.historial-estudiante', 'titulo' => 'Historial por Estudiante', 'desc' => 'Historial completo de notas de un estudiante.'],
-                    // Otros
-                    ['ruta' => 'reportes.mined', 'titulo' => 'Reportes MINED', 'desc' => 'Reportes estadísticos del Ministerio de Educación.'],
-                    ['ruta' => 'reportes.estudiantes', 'titulo' => 'Estudiantes', 'desc' => 'Matrícula, retiros y expedientes incompletos.'],
-                    ['ruta' => 'reportes.padres', 'titulo' => 'Responsables y Padres', 'desc' => 'Contacto y adopción digital de responsables.'],
-                ];
-            @endphp
+        <!-- MENÚ DE GRUPOS (TABS) -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="flex border-b border-slate-200 overflow-x-auto">
+                @php
+                    $grupos = [
+                        'calificaciones' => 'Calificaciones',
+                        'asistencia' => 'Asistencia',
+                        'rendimiento' => 'Rendimiento',
+                        'gestión' => 'Gestión / Otros',
+                    ];
+                @endphp
+                @foreach($grupos as $key => $label)
+                    <button @click="grupo = '{{ $key }}'"
+                            :class="grupo === '{{ $key }}' ? 'border-[#e6ac27] text-[#3d2c1d] font-black bg-white' : 'border-transparent text-slate-500 hover:text-slate-800 font-bold'"
+                            class="px-6 py-3 border-b-4 text-sm transition-all whitespace-nowrap">
+                        {{ $label }}
+                    </button>
+                @endforeach
+            </div>
 
-            @foreach($reportes as $rep)
-                <a href="{{ route('academico.'.$rep['ruta']) }}" class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 hover:border-[#e6ac27]/40 hover:shadow-md transition-all group">
-                    <h3 class="font-black text-[#3d2c1d] text-lg">{{ $rep['titulo'] }}</h3>
-                    <p class="text-sm text-slate-500 mt-2 leading-relaxed">{{ $rep['desc'] }}</p>
-                    <span class="inline-flex items-center gap-1 text-sm font-bold text-[#e6ac27] mt-4 group-hover:gap-2 transition-all">
-                        Ver reporte
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
-                    </span>
-                </a>
-            @endforeach
+            <div class="p-6">
+                <!-- CALIFICACIONES -->
+                <div x-show="grupo === 'calificaciones'" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    @foreach([
+                        ['ruta' => 'reportes.control-notas', 'titulo' => 'Control de Notas', 'desc' => 'Notas ingresadas o pendientes por asignatura, docente o grado.'],
+                        ['ruta' => 'reportes.notas-globales', 'titulo' => 'Notas Globales', 'desc' => 'Un alumno por fila con todas sus asignaturas.'],
+                        ['ruta' => 'reportes.notas-pendientes', 'titulo' => 'Notas Pendientes', 'desc' => 'Estudiantes con notas pendientes por periodo y docente.'],
+                    ] as $rep)
+                        <a href="{{ route('academico.'.$rep['ruta']) }}" class="bg-slate-50 rounded-2xl border border-slate-200 p-6 hover:border-[#e6ac27]/40 hover:bg-white transition-all group">
+                            <h3 class="font-black text-[#3d2c1d] text-lg">{{ $rep['titulo'] }}</h3>
+                            <p class="text-sm text-slate-500 mt-2">{{ $rep['desc'] }}</p>
+                            <span class="inline-flex items-center gap-1 text-sm font-bold text-[#e6ac27] mt-4 group-hover:gap-2 transition-all">Ver →</span>
+                        </a>
+                    @endforeach
+                </div>
+
+                <!-- ASISTENCIA -->
+                <div x-show="grupo === 'asistencia'" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    @foreach([
+                        ['ruta' => 'reportes.asistencia-global', 'titulo' => 'Asistencia Global', 'desc' => 'Asistencia diaria por turno, grado y sección.'],
+                        ['ruta' => 'reportes.estadisticas-asistencia', 'titulo' => 'Estadísticas de Asistencia', 'desc' => 'Presencias y ausencias por rango de fechas.'],
+                        ['ruta' => 'reportes.asistencia-seccion-dia', 'titulo' => 'Asistencia por Sección (Día)', 'desc' => 'Asistencia de una sección en un día.'],
+                        ['ruta' => 'reportes.asistencia-seccion-rango', 'titulo' => 'Asistencia por Sección (Rango)', 'desc' => 'Asistencia de una sección en un rango.'],
+                        ['ruta' => 'reportes.asistencia-estudiante', 'titulo' => 'Asistencia por Estudiante', 'desc' => 'Estadísticas de asistencia individual.'],
+                    ] as $rep)
+                        <a href="{{ route('academico.'.$rep['ruta']) }}" class="bg-slate-50 rounded-2xl border border-slate-200 p-6 hover:border-[#e6ac27]/40 hover:bg-white transition-all group">
+                            <h3 class="font-black text-[#3d2c1d] text-lg">{{ $rep['titulo'] }}</h3>
+                            <p class="text-sm text-slate-500 mt-2">{{ $rep['desc'] }}</p>
+                            <span class="inline-flex items-center gap-1 text-sm font-bold text-[#e6ac27] mt-4 group-hover:gap-2 transition-all">Ver →</span>
+                        </a>
+                    @endforeach
+                </div>
+
+                <!-- RENDIMIENTO -->
+                <div x-show="grupo === 'rendimiento'" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    @foreach([
+                        ['ruta' => 'reportes.notas-por-asignatura', 'titulo' => 'Notas por Asignatura', 'desc' => 'Rendimiento por asignatura, aula y docente.'],
+                        ['ruta' => 'reportes.rendimiento-corte', 'titulo' => 'Rendimiento por Corte (MINED)', 'desc' => 'Formato oficial REA del Ministerio de Educación.'],
+                        ['ruta' => 'reportes.historial-estudiante', 'titulo' => 'Historial por Estudiante', 'desc' => 'Historial completo de notas de un estudiante.'],
+                        ['ruta' => 'reportes.mined', 'titulo' => 'Reportes MINED', 'desc' => 'Reportes estadísticos del Ministerio de Educación.'],
+                    ] as $rep)
+                        <a href="{{ route('academico.'.$rep['ruta']) }}" class="bg-slate-50 rounded-2xl border border-slate-200 p-6 hover:border-[#e6ac27]/40 hover:bg-white transition-all group">
+                            <h3 class="font-black text-[#3d2c1d] text-lg">{{ $rep['titulo'] }}</h3>
+                            <p class="text-sm text-slate-500 mt-2">{{ $rep['desc'] }}</p>
+                            <span class="inline-flex items-center gap-1 text-sm font-bold text-[#e6ac27] mt-4 group-hover:gap-2 transition-all">Ver →</span>
+                        </a>
+                    @endforeach
+                </div>
+
+                <!-- GESTIÓN / OTROS -->
+                <div x-show="grupo === 'gestión'" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    @foreach([
+                        ['ruta' => 'reportes.estudiantes', 'titulo' => 'Estudiantes', 'desc' => 'Matrícula, retiros y expedientes incompletos.'],
+                        ['ruta' => 'reportes.padres', 'titulo' => 'Responsables y Padres', 'desc' => 'Contacto y adopción digital de responsables.'],
+                    ] as $rep)
+                        <a href="{{ route('academico.'.$rep['ruta']) }}" class="bg-slate-50 rounded-2xl border border-slate-200 p-6 hover:border-[#e6ac27]/40 hover:bg-white transition-all group">
+                            <h3 class="font-black text-[#3d2c1d] text-lg">{{ $rep['titulo'] }}</h3>
+                            <p class="text-sm text-slate-500 mt-2">{{ $rep['desc'] }}</p>
+                            <span class="inline-flex items-center gap-1 text-sm font-bold text-[#e6ac27] mt-4 group-hover:gap-2 transition-all">Ver →</span>
+                        </a>
+                    @endforeach
+                </div>
+            </div>
         </div>
     </div>
 </x-app-layout>
