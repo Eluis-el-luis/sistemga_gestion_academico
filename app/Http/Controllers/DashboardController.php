@@ -54,9 +54,9 @@ class DashboardController extends Controller
 
         $avisos = $queryAvisos->orderBy('aviso.created_at', 'desc')->take(5)->get();
 
-        // 3. INICIALIZAR VARIABLES (Corregidos a totalAlumnos y totalDocentes para coincidir con tu vista)
-        $totalAlumnos = 0;
-        $totalDocentes = 0;
+        // 3. INICIALIZAR VARIABLES
+        $totalMatriculados = 0;
+        $totalPersonal = 0;
         $horarios = collect();
         $diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
         $dbMetricas = []; 
@@ -68,8 +68,8 @@ class DashboardController extends Controller
 
         // 4. CARGA DE DATOS PARA DIRECTIVA Y GESTIÓN
         if ($user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
-            $totalAlumnos = \App\Models\Matricula::where('estado', 'activo')->count();
-            $totalDocentes = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count();
+            $totalMatriculados = \App\Models\Matricula::where('estado', 'activo')->count();
+            $totalPersonal = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count();
             $dbMetricas = $this->calcularMetricas();
         }
 
