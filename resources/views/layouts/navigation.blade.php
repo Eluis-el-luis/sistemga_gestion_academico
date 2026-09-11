@@ -3,8 +3,8 @@
 <div x-show="sidebarOpen" class="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm lg:hidden" @click="sidebarOpen = false" x-transition.opacity style="display: none;"></div>
 
 <!-- SIDEBAR PREMIUM -->
-<aside :class="sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0 lg:w-20'" class="fixed inset-y-0 left-0 z-50 bg-[#FFFDF5] border-r border-[#e6ac27]/20 shadow-xl transition-all duration-300 ease-in-out flex flex-col overflow-hidden">
-    
+<aside @mouseenter="if(window.innerWidth >= 1024) sidebarOpen = true" @mouseleave="if(window.innerWidth >= 1024) sidebarOpen = false" :class="sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0 lg:w-20'" class="fixed inset-y-0 left-0 z-50 bg-[#FFFDF5] border-r border-[#e6ac27]/20 shadow-xl transition-all duration-300 ease-in-out flex flex-col overflow-hidden">
+
     <div class="h-16 border-b border-[#e6ac27]/20 shrink-0 bg-white/50 flex items-center justify-center transition-all">
         <span x-show="sidebarOpen" x-transition.opacity class="text-[10px] font-black uppercase tracking-widest text-slate-400">Navegación</span>
         <div x-show="!sidebarOpen" class="w-2 h-2 rounded-full bg-[#e6ac27]/40 hidden lg:block transition-all"></div>
@@ -52,7 +52,7 @@
 
             <a href="{{ route('academico.cortes.index') }}" title="Calificaciones" class="flex items-center gap-3 px-4 mx-3 py-3 rounded-xl transition-all {{ request()->routeIs('academico.cortes.*') ? 'bg-[#e6ac27]/15 text-[#e6ac27] font-black border border-[#e6ac27]/30 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-[#3d2c1d] font-bold' }}" :class="sidebarOpen ? 'justify-start' : 'justify-center lg:mx-2 lg:px-0'">
                 <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012-2m-6 9l2 2 4-4"></path></svg>
-                <span x-show="sidebarOpen" class="whitespace-nowrap">Calificaciones</span>
+                <span x-show="sidebarOpen" class="whitespace-nowrap">Criterios de Evaluacion</span>
             </a>
         </div>
 
@@ -122,7 +122,7 @@
 
             <a href="{{ route('academico.malla.index') }}" title="Malla Curricular" class="flex items-center gap-3 px-4 mx-3 py-3 rounded-xl transition-all {{ request()->routeIs('academico.malla.*') ? 'bg-[#e6ac27]/15 text-[#e6ac27] font-black border border-[#e6ac27]/30 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-[#3d2c1d] font-bold' }}" :class="sidebarOpen ? 'justify-start' : 'justify-center lg:mx-2 lg:px-0'">
                 <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
-                <span x-show="sidebarOpen" class="whitespace-nowrap">Malla Curricular</span>
+                <span x-show="sidebarOpen" class="whitespace-nowrap">Pensum</span>
             </a>
 
             <a href="{{ route('academico.grupo-materia.index') }}" title="Agrupaciones de Materias" class="flex items-center gap-3 px-4 mx-3 py-3 rounded-xl transition-all {{ request()->routeIs('academico.grupo-materia.*') ? 'bg-[#e6ac27]/15 text-[#e6ac27] font-black border border-[#e6ac27]/30 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-[#3d2c1d] font-bold' }}" :class="sidebarOpen ? 'justify-start' : 'justify-center lg:mx-2 lg:px-0'">

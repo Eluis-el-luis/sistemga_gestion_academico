@@ -12,42 +12,69 @@ class DashboardController extends Controller
     {
         /** @var \App\Models\Usuario $user */
         $user = Auth::user();
+        $docente = \App\Models\Docente::where('usuario_id', $user->id)->first();
 
-        // 1. DATOS GLOBALES (Avisos para todos)
-        $avisos = DB::table('aviso')
+        // 1. CARGA DE MODALIDADES (Necesario para el select del modal Nuevo Comunicado)
+        $modalidades = \App\Models\Modalidad::orderBy('id')->get();
+
+        // 2. FILTRADO INTELIGENTE DE AVISOS
+        $queryAvisos = DB::table('aviso')
             ->join('usuario', 'aviso.autor_id', '=', 'usuario.id')
             ->select('aviso.*', 'usuario.nombre_completo as autor_nombre')
-            ->where('aviso.activo', true)
-            ->orderBy('aviso.created_at', 'desc')
-            ->take(5)
-            ->get();
+            ->where('aviso.activo', true);
 
-        // 2. INICIALIZAR VARIABLES POR DEFECTO
-        $totalMatriculados = 0;
-        $totalPersonal = 0;
+        // Si NO es Directiva, aplicamos el filtro de lectura segmentado
+        if (!$user->hasAnyRole(['Director', 'Subdirector'])) {
+            $modalidadesPermitidas = [];
+
+            if ($user->hasRole('Coordinador') && $docente) {
+                $modalidadesPermitidas[] = $docente->modalidad_coordina_id;
+            }
+
+            if ($user->hasAnyRole(['Docente Guia', 'Docente por Asignatura']) && $docente) {
+                // Rastrear todas las modalidades donde el maestro tiene carga horaria activa
+                $modalidadesClase = \App\Models\AulaAsignaturaDocente::where('docente_id', $docente->id)
+                    ->where('activo', true)
+                    ->join('aula', 'aula_asignatura_docente.aula_id', '=', 'aula.id')
+                    ->pluck('aula.modalidad_id')
+                    ->toArray();
+                
+                $modalidadesPermitidas = array_merge($modalidadesPermitidas, $modalidadesClase);
+            }
+
+            $modalidadesPermitidas = array_filter(array_unique($modalidadesPermitidas));
+
+            $queryAvisos->where(function($q) use ($modalidadesPermitidas) {
+                $q->whereNull('aviso.modalidad_id'); // Siempre ver comunicados globales
+                if (!empty($modalidadesPermitidas)) {
+                    $q->orWhereIn('aviso.modalidad_id', $modalidadesPermitidas); // Ver comunicados de sus áreas
+                }
+            });
+        }
+
+        $avisos = $queryAvisos->orderBy('aviso.created_at', 'desc')->take(5)->get();
+
+        // 3. INICIALIZAR VARIABLES (Corregidos a totalAlumnos y totalDocentes para coincidir con tu vista)
+        $totalAlumnos = 0;
+        $totalDocentes = 0;
         $horarios = collect();
         $diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
         $dbMetricas = []; 
-        $aulaGuia = null; // Inicializamos la variable para el Maestro Guía
-
-        // 3. CARGA DE DATOS PARA DIRECTIVA Y GESTIÓN
-        if ($user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
-            // "Alumnos Activos": matrículas en estado activo del ciclo vigente
-            $totalMatriculados = \App\Models\Matricula::where('estado', 'activo')->count();
-            // "Docentes": usuarios con rol de docencia
-            $totalPersonal = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count();
-
-            // --- MÉTRICAS PARA GRÁFICAS (datos reales por modalidad) ---
-            $dbMetricas = $this->calcularMetricas();
-        }
-
-        // 4. CARGA DE DATOS PARA DOCENTES (Guía y Asignatura)
-        $docente = \App\Models\Docente::where('usuario_id', $user->id)->first();
-        $anioActivo = \App\Models\AnioEscolar::where('activo', true)->first();
-        
+        $aulaGuia = null; 
+        $esDocenteGuia = false;
         $bloques = collect();
         $matrizHorario = [];
         $esquemaActivo = 'Regular';
+
+        // 4. CARGA DE DATOS PARA DIRECTIVA Y GESTIÓN
+        if ($user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
+            $totalAlumnos = \App\Models\Matricula::where('estado', 'activo')->count();
+            $totalDocentes = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count();
+            $dbMetricas = $this->calcularMetricas();
+        }
+
+        // 5. CARGA DE DATOS PARA DOCENTES (Guía y Asignatura)
+        $anioActivo = \App\Models\AnioEscolar::where('activo', true)->first();
         
         if ($docente && $anioActivo) {
             $aulaGuia = \App\Models\Aula::with('grado')
@@ -70,14 +97,12 @@ class DashboardController extends Controller
                 })
                 ->get();
 
-            // 1. Extraer los bloques de horas (Filas de la tabla)
             $bloques = $horariosRaw->pluck('bloqueHorario')->unique('id')->sortBy('hora_inicio')->values();
             
             if($bloques->count() > 0) {
                 $esquemaActivo = $bloques->first()->tipo_jornada ?? 'Regular';
             }
 
-            // 2. Construir la Matriz [Día][Hora] para la cuadrícula
             foreach ($horariosRaw as $horario) {
                 $dia = $horario->dia_semana;
                 $hora = $horario->bloqueHorario->hora_inicio;
@@ -91,8 +116,6 @@ class DashboardController extends Controller
                     'modalidad_id'  => $horario->aulaAsignaturaDocente->aula->modalidad_id,
                 ];
             }
-        } else {
-            $esDocenteGuia = false;
         }
 
         // 5. KPIs POR ROL (datos reales)
@@ -147,9 +170,7 @@ class DashboardController extends Controller
             'avisos', 'totalMatriculados', 'totalPersonal', 'diasSemana', 'dbMetricas', 'aulaGuia', 'esDocenteGuia', 'bloques', 'matrizHorario', 'esquemaActivo',
             'docentesSinMarcar', 'solicitudesPendientes', 'asistenciaSemanal', 'rendimientoAula'
         ));
-
     }
-
     /**
      * Calcula las métricas para las gráficas del panel directivo, segmentadas
      * por modalidad (Preescolar, Primaria, Secundaria).
@@ -264,15 +285,33 @@ class DashboardController extends Controller
     public function storeAviso(Request $request)
     {
         $user = Auth::user();
-        if (!$user->hasAnyRole(['Director', 'Subdirector'])) { abort(403); }
+        if (!$user->hasAnyRole(['Director', 'Subdirector', 'Coordinador'])) { abort(403); }
 
-        $request->validate(['titulo' => 'required|string|max:120', 'mensaje' => 'required|string|max:1000']);
-        DB::table('aviso')->insert([
-            'titulo' => $request->titulo, 'mensaje' => $request->mensaje, 'autor_id' => Auth::id(),
-            'activo' => true, 'created_at' => now(), 'updated_at' => now(),
+        $request->validate([
+            'titulo' => 'required|string|max:120',
+            'mensaje' => 'required|string|max:1000',
+            'modalidad_id' => 'nullable|exists:modalidad,id'
         ]);
 
-        return redirect()->route('dashboard')->with('success', 'Aviso publicado correctamente.');
+        $modalidadId = $request->modalidad_id;
+
+        // BARRERA: Un coordinador está obligado a publicar solo en su modalidad
+        if ($user->hasRole('Coordinador') && !$user->hasAnyRole(['Director', 'Subdirector'])) {
+            $docente = \App\Models\Docente::where('usuario_id', $user->id)->first();
+            $modalidadId = $docente->modalidad_coordina_id; 
+        }
+
+        DB::table('aviso')->insert([
+            'titulo' => $request->titulo, 
+            'mensaje' => $request->mensaje, 
+            'autor_id' => $user->id,
+            'modalidad_id' => $modalidadId, // Guardamos el segmento
+            'activo' => true, 
+            'created_at' => now(), 
+            'updated_at' => now(),
+        ]);
+
+        return redirect()->route('dashboard')->with('success', 'Aviso segmentado publicado.');
     }
 
     public function updateAviso(Request $request, $id)
