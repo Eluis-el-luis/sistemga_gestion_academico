@@ -15,7 +15,6 @@ use App\Models\Docente;
 use App\Models\Grado;
 use App\Models\Matricula;
 use App\Models\Modalidad;
-use App\Models\Rol;
 use App\Models\Usuario;
 use App\Services\ReparacionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,19 +36,10 @@ class Fase7Test extends TestCase
 
         $this->artisan('db:seed', ['--class' => 'Database\Seeders\PermisoSeeder']);
 
-        $roles = ['Director', 'Subdirector', 'Coordinador', 'Docente Guia', 'Docente por Asignatura', 'Gestor de Usuarios', 'Alumno'];
-        foreach ($roles as $nombre) {
-            Rol::firstOrCreate(['nombre' => $nombre]);
-        }
-
-        $this->director = Usuario::factory()->create([
-            'rol_id' => Rol::where('nombre', 'Director')->first()->id,
-        ]);
+        $this->director = Usuario::factory()->create();
         $this->director->assignRole('Director');
 
-        $this->docenteAsignatura = Usuario::factory()->create([
-            'rol_id' => Rol::where('nombre', 'Docente por Asignatura')->first()->id,
-        ]);
+        $this->docenteAsignatura = Usuario::factory()->create();
         $this->docenteAsignatura->assignRole('Docente por Asignatura');
 
         $docenteModel = Docente::factory()->create(['usuario_id' => $this->docenteAsignatura->id]);
@@ -81,7 +71,6 @@ class Fase7Test extends TestCase
         ]);
     }
 
-    
     public function testdirector_puede_acceder_a_modulos_fase7(): void
     {
         $this->actingAs($this->director)
@@ -101,7 +90,6 @@ class Fase7Test extends TestCase
             ->assertOk();
     }
 
-    
     public function testdocente_asignatura_puede_registrar_avance(): void
     {
         $this->actingAs($this->docenteAsignatura)
@@ -119,7 +107,6 @@ class Fase7Test extends TestCase
         ]);
     }
 
-    
     public function testregla_de_reparacion_aprueba_desde_60(): void
     {
         $service = app(ReparacionService::class);
@@ -130,7 +117,6 @@ class Fase7Test extends TestCase
         $this->assertEquals('reprobado', $service->evaluarResultado(0));
     }
 
-    
     public function testreparacion_es_idempotente_por_matricula_asignatura(): void
     {
         $service = app(ReparacionService::class);
@@ -149,7 +135,6 @@ class Fase7Test extends TestCase
         $this->assertEquals(65.0, $registros->first()->nota_obtenida);
     }
 
-    
     public function testapoyo_padres_valida_que_cantidad_no_supere_total(): void
     {
         $this->actingAs($this->director)
@@ -167,7 +152,6 @@ class Fase7Test extends TestCase
         ]);
     }
 
-    
     public function testapoyo_padres_es_idempotente(): void
     {
         $this->actingAs($this->director)

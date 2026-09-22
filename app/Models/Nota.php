@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Nota extends Model
 {
     protected $table = 'nota';
-    protected $fillable = ['matricula_id', 'aula_asignatura_docente_id', 'corte_evaluativo_id', 'nota_cuantitativa', 'indicador_logro_id'];
+    protected $fillable = ['matricula_id', 'aula_asignatura_docente_id', 'corte_evaluativo_id', 'nota_cuantitativa', 'indicador_logro_id', 'updated_by'];
 
     public function matricula()
     {
@@ -27,5 +27,10 @@ class Nota extends Model
     public function corteEvaluativo()
     {
         return $this->belongsTo(CorteEvaluativo::class, 'corte_evaluativo_id');
+    }
+
+    public function updatedBy()
+    {
+        return $this->belongsTo(Usuario::class, 'updated_by');
     }
 }

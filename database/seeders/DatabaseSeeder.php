@@ -8,23 +8,21 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->call([
+$this->call([
             // 1. CATÁLOGOS Y ESTRUCTURA (Se queda)
-            RolSeeder::class,
             PermisoSeeder::class,
             ModalidadSeeder::class,
             AnioEscolarSeeder::class,
             GradoSeeder::class,
             AsignaturaSeeder::class,
             GrupoMateriaSeeder::class,
-            MallaCurricularSeeder::class, 
+            MallaCurricularSeeder::class,
             IndicadorLogroSeeder::class,
             CorteEvaluativoSeeder::class,
             BloqueHorarioSeeder::class,
 
             // 2. CUENTAS ADMINISTRATIVAS
-            UsuarioSeeder::class, 
-
+            UsuarioSeeder::class,
         ]);
     }
 }

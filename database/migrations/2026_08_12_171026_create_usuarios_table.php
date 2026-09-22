@@ -12,8 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('nombre_completo', 120);
             $table->string('email', 120)->unique();
-            $table->string('password'); // Laravel Auth usa este nombre por defecto
-            $table->foreignId('rol_id')->constrained('rol')->onDelete('restrict');
+            $table->string('password');
             $table->boolean('activo')->default(true);
             $table->timestamps();
         });

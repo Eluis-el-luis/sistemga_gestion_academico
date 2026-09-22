@@ -22,9 +22,11 @@ class NotaController extends Controller
         $this->notaService = $notaService;
     }
 
-    // 1. EL VISOR PRINCIPAL (Se mantiene casi igual, perfecto para navegación)
+    // 1. EL VISOR PRINCIPAL (Con autorización adecuada)
     public function index(Request $request)
     {
+        $this->authorize('viewAny', \App\Models\Nota::class);
+        
         $usuario = auth()->user();
         
         if ($usuario->hasRole(['Subdirector', 'Director', 'Coordinador', 'Gestor de Usuarios'])) {
@@ -159,7 +161,7 @@ class NotaController extends Controller
                 }
 
                 // 2. Auto-Suma Global en la tabla 'nota' (escalado a 0-100)
-                $this->notaService->registrarNotaFinal($matriculaId, $asignacion->id, $corteId, $sumaTotalAlumno, $totalPosible);
+                $this->notaService->registrarNotaFinal($matriculaId, $asignacion->id, $corteId, $sumaTotalAlumno, $totalPosible, auth()->id());
             }
         });
 
