@@ -16,10 +16,10 @@ class GrupoMateriaController extends Controller
      */
     public function index()
     {
-        // Solo Dirección y Subdirección gestionan las agrupaciones de materias
-        if (!auth()->user()->hasAnyRole(['Director', 'Subdirector'])) {
-            abort(403, 'No tiene permisos para gestionar las agrupaciones de materias.');
-        }
+        // Solo Dirección, Subdirección y gestor de usuarios gestionan las agrupaciones de materias
+        if (!auth()->user()->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
+        abort(403, 'No tiene permisos para gestionar las agrupaciones de materias.');
+    }
 
         $grupos = GrupoMateria::with('asignaturas')->orderBy('orden')->get();
         $asignaturas = Asignatura::orderBy('nombre')->get();

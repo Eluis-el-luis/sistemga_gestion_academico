@@ -30,6 +30,9 @@ class HorarioController extends Controller
                                 ->orderBy('hora_inicio')
                                 ->get();
 
+        // 1.5 Bloques para asignar (Filtramos los que son recreo/tiempo muerto)
+        $bloquesAsignables = $bloquesOficiales->where('es_recreo', false);
+
         // 2. Horarios (materias) ya programados para este aula.
         $horarios = Horario::with(['aulaAsignaturaDocente.asignatura', 'aulaAsignaturaDocente.docente.usuario', 'bloque'])
                     ->whereIn('aula_asignatura_docente_id', $asignaciones->pluck('id'))
@@ -42,18 +45,35 @@ class HorarioController extends Controller
             $asignacion->horas_restantes = $asignacion->horas_semanales - $asignacion->horas_programadas;
         }
 
-        // 4. Construir la matriz: filas = bloques oficiales (incluye recreos),
-        //    columnas = días. Cada celda es la materia asignada o null.
+        // --- NUEVO: INTELIGENCIA PARA LA INTERFAZ (Alpine.js) ---
+        // A) ¿Qué bloques ya están ocupados en ESTA aula por día?
+        $aulaOcupada = [];
+        foreach ($horarios as $h) {
+            $aulaOcupada[$h->dia_semana][] = $h->bloque_horario_id;
+        }
+
+        // B) ¿Qué bloques tienen ocupados LOS DOCENTES de esta aula (en todo el colegio)?
+        $docentesIds = $asignaciones->pluck('docente_id')->filter()->unique();
+        $horariosDocentes = Horario::whereHas('aulaAsignaturaDocente', function($query) use ($docentesIds) {
+            $query->whereIn('docente_id', $docentesIds);
+        })->get();
+        
+        $docentesOcupados = [];
+        foreach ($horariosDocentes as $hd) {
+            $docenteId = $hd->aulaAsignaturaDocente->docente_id;
+            $docentesOcupados[$docenteId][$hd->dia_semana][] = $hd->bloque_horario_id;
+        }
+        // --------------------------------------------------------
+
+        // 4. Construir la matriz
         $dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
         $diasBD = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
 
-        // Índice rápido: [bloque_id][dia_bd] => Horario
         $horariosIndex = [];
         foreach ($horarios as $h) {
             $horariosIndex[$h->bloque_horario_id][$h->dia_semana] = $h;
         }
 
-        // Estructura para la vista: lista de bloques con sus celdas por día
         $matriz = [];
         foreach ($bloquesOficiales as $bloque) {
             $fila = [
@@ -63,7 +83,6 @@ class HorarioController extends Controller
             foreach ($dias as $i => $dia) {
                 $diaBD = $diasBD[$i];
                 if ($bloque->es_recreo) {
-                    // El recreo es fijo, sin materia
                     $fila['dias'][$dia] = null;
                 } else {
                     $horario = $horariosIndex[$bloque->id][$diaBD] ?? null;
@@ -73,7 +92,10 @@ class HorarioController extends Controller
             $matriz[] = $fila;
         }
 
-        return view('academico.aulas.horarios.index', compact('aula', 'asignaciones', 'bloquesOficiales', 'matriz', 'dias'));
+        // Agregamos las nuevas variables al compact
+        return view('academico.aulas.horarios.index', compact(
+            'aula', 'asignaciones', 'bloquesOficiales', 'bloquesAsignables', 'matriz', 'dias', 'aulaOcupada', 'docentesOcupados'
+        ));
     }
 
     public function store(Request $request, Aula $aula)
