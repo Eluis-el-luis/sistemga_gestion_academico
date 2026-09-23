@@ -54,28 +54,29 @@ Route::middleware('auth')->group(function () {
         Route::resource('matriculas', MatriculaController::class);
         Route::patch('matriculas/{matricula}/retirar', [MatriculaController::class, 'retirar'])->name('matriculas.retirar');
         Route::patch('matriculas/{matricula}/reactivar', [MatriculaController::class, 'reactivar'])->name('matriculas.reactivar');
+        
         // Ruta para actualizar el límite de horas del grado desde la malla
         Route::put('malla/grado/{grado}/horas', [\App\Http\Controllers\MallaCurricularController::class, 'actualizarHorasGrado'])->name('malla.grado.horas');
 
         // --- GESTIÓN DE AULAS Y SUS NUEVOS ACCESOS DIRECTOS ---
         Route::resource('aulas', AulaController::class);
         Route::get('asignaciones', [AulaController::class, 'indexAsignaciones'])->name('asignaciones.index');
-        // NUEVA RUTA PARA LOS DETALLES DE ASIGNACIÓN:
         Route::get('asignaciones/{aula}', [AulaController::class, 'showAsignaciones'])->name('asignaciones.show');
         Route::get('gestor-horarios', [AulaController::class, 'indexHorarios'])->name('gestor-horarios.index');
-        
-        // ... tus rutas actuales de alumnos, matriculas y aulas ...
         
         Route::put('usuarios/{usuario}/reset-password', [\App\Http\Controllers\UsuarioController::class, 'resetPassword'])
              ->name('usuarios.reset-password');
         Route::resource('usuarios', \App\Http\Controllers\UsuarioController::class);
 
-        // NUEVO: Bandeja de Impresión de Boletines (Exclusivo Gestor/Dirección)
+        // Bandeja de Impresión de Boletines (Exclusivo Gestor/Dirección)
         Route::get('boletines/bandeja', [GestorBoletinController::class, 'bandeja'])->name('boletin.bandeja');
 
         Route::get('notas/evaluar/{asignacion}', [\App\Http\Controllers\NotaController::class, 'evaluar'])->name('notas.evaluar');
+        
+        // ASIGNATURAS EXTRAORDINARIAS DEL AULA
         Route::post('aulas/{aula}/asignaturas', [\App\Http\Controllers\AulaAsignaturaController::class, 'store'])->name('aulas.asignaturas.store');
         Route::put('aulas/{aula}/asignaturas/{asignatura}', [\App\Http\Controllers\AulaAsignaturaController::class, 'update'])->name('aulas.asignaturas.update');
+        Route::delete('aulas/{aula}/asignaturas/{asignacion}', [\App\Http\Controllers\AulaController::class, 'destroyAsignatura'])->name('aulas.asignaturas.destroy');
         
         // HORARIOS DEL AULA
         Route::get('aulas/{aula}/horarios', [\App\Http\Controllers\HorarioController::class, 'index'])->name('aulas.horarios.index');
@@ -110,10 +111,6 @@ Route::middleware('auth')->group(function () {
             Route::get('/aulas/{aula}', [\App\Http\Controllers\VisorHorarioController::class, 'horarioAula'])->name('aula.show');
         });
         // ----------------------------------------
-
-        Route::put('usuarios/{usuario}/reset-password', [\App\Http\Controllers\UsuarioController::class, 'resetPassword'])
-             ->name('usuarios.reset-password');
-        Route::resource('usuarios', \App\Http\Controllers\UsuarioController::class);
         
         // Panel Exclusivo del Maestro Guía
         Route::get('tutor/mis-alumnos', [\App\Http\Controllers\DocenteGuiaController::class, 'misAlumnos'])->name('tutor.mis-alumnos');

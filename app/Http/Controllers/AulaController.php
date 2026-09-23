@@ -7,6 +7,8 @@ use App\Http\Requests\StoreAulaRequest;
 use App\Services\AulaService; 
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Models\AulaAsignaturaDocente;
+
 
 class AulaController extends Controller
 {
@@ -27,6 +29,16 @@ class AulaController extends Controller
                      ->paginate(15);
     }
 
+    public function destroyAsignatura($aulaId, $asignacionId)
+    {
+        // La barra invertida (\) fuerza a Laravel a buscar en la raíz del proyecto
+        $asignacion = \App\Models\AulaAsignaturaDocente::findOrFail($asignacionId);
+        
+        $asignacion->delete();
+        
+        return back()->with('success', 'Asignatura eliminada de la carga horaria.');
+    }
+
     public function index()
     {
         $this->authorize('viewAny', Aula::class);
@@ -42,7 +54,7 @@ class AulaController extends Controller
         $aulas = $this->getAulasPaginadas();
         $contexto = 'asignacion'; 
 
-        return view('academico.aulas.index', compact('aulas', 'contexto'));
+        return view('academico.asignaciones.index', compact('aulas'));
     }
 
     public function indexHorarios()
@@ -190,6 +202,7 @@ class AulaController extends Controller
         $todosDocentes = \App\Models\Docente::with('usuario')->get();
         $contexto = 'asignacion'; 
 
-        return view('academico.aulas.show', compact('aula', 'asignaciones', 'todasAsignaturas', 'todosDocentes', 'contexto'));
+        // Fíjate que ya no necesitas enviarle la variable $contexto = 'asignacion'
+        return view('academico.asignaciones.show', compact('aula', 'asignaciones', 'todosDocentes', 'todasAsignaturas'));
     }
 }
