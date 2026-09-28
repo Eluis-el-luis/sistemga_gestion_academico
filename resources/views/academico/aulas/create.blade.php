@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center space-x-3">
-            <a href="{{ route('dashboard') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors" title="Volver atrás">
+            <a href="{{ route('academico.aulas.index') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors" title="Volver atrás">
                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </a>
             <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight tracking-tight">
@@ -101,7 +101,7 @@
                         </div>
 
                         <div class="flex items-center justify-end gap-6 mt-8 pt-6 border-t border-slate-100">
-                            <a href="{{ route('dashboard') }}" class="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">
+                            <a href="{{ route('academico.aulas.index') }}" class="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">
                                 Cancelar
                             </a>
                             <button type="submit" class="px-8 py-3.5 bg-[#e6ac27] text-white rounded-xl hover:bg-[#c48e1b] font-black text-sm shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#e6ac27] focus:ring-offset-2">

@@ -9,7 +9,6 @@ use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Models\AulaAsignaturaDocente;
 
-
 class AulaController extends Controller
 {
     use AuthorizesRequests;
@@ -39,31 +38,33 @@ class AulaController extends Controller
         return back()->with('success', 'Asignatura eliminada de la carga horaria.');
     }
 
+    // =========================================================================
+    // 1. GESTIÓN DE AULAS (Estructura)
+    // =========================================================================
+    
     public function index()
     {
         $this->authorize('viewAny', Aula::class);
         $aulas = $this->getAulasPaginadas();
-        $contexto = 'gestion'; 
 
-        return view('academico.aulas.index', compact('aulas', 'contexto'));
+        return view('academico.aulas.index', compact('aulas'));
     }
 
-    public function indexAsignaciones()
+    public function show(Aula $aula)
     {
-        $this->authorize('viewAny', Aula::class);
-        $aulas = $this->getAulasPaginadas();
-        $contexto = 'asignacion'; 
+        $this->authorize('update', $aula);
+        $aula->load(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario']);
 
-        return view('academico.asignaciones.index', compact('aulas'));
-    }
+        $asignaciones = \App\Models\AulaAsignaturaDocente::with(['asignatura', 'docente.usuario'])
+                            ->where('aula_id', $aula->id)
+                            ->get();
 
-    public function indexHorarios()
-    {
-        $this->authorize('viewAny', Aula::class); 
-        $aulas = $this->getAulasPaginadas();
-        $contexto = 'horarios'; 
+        $asignaturasYaAsignadas = $asignaciones->pluck('asignatura_id')->toArray();
+        $todasAsignaturas = \App\Models\Asignatura::whereNotIn('id', $asignaturasYaAsignadas)->get();
 
-        return view('academico.aulas.index', compact('aulas', 'contexto'));
+        $todosDocentes = \App\Models\Docente::with('usuario')->get();
+
+        return view('academico.aulas.show', compact('aula', 'asignaciones', 'todasAsignaturas', 'todosDocentes'));
     }
 
     public function create()
@@ -114,7 +115,6 @@ class AulaController extends Controller
 
         $modalidades = \App\Models\Modalidad::all();
         $grados = \App\Models\Grado::all();
-        // Tomamos el año escolar activo por defecto
         $anios = \App\Models\AnioEscolar::where('activo', true)->get();
         
         $docentesOcupados = Aula::where('anio_escolar_id', $aula->anio_escolar_id)
@@ -148,7 +148,6 @@ class AulaController extends Controller
 
         $aula->update($validated);
 
-        // Si cambió el grado, reemplazamos las asignaturas por las de la nueva malla
         if ($cambioGrado) {
             $this->aulaService->sincronizarMalla($aula);
         }
@@ -156,6 +155,7 @@ class AulaController extends Controller
         return redirect()->route('academico.aulas.index')
                          ->with('success', 'Aula actualizada exitosamente.');
     }
+
     public function destroy(\App\Models\Aula $aula)
     {
         $this->authorize('delete', $aula);
@@ -169,22 +169,17 @@ class AulaController extends Controller
         }
     }
 
-    public function show(Aula $aula)
+
+    // =========================================================================
+    // 2. GESTOR DE ASIGNACIONES (Módulo Independiente)
+    // =========================================================================
+
+    public function indexAsignaciones()
     {
-        $this->authorize('update', $aula);
-        $aula->load(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario']);
+        $this->authorize('viewAny', Aula::class);
+        $aulas = $this->getAulasPaginadas();
 
-        $asignaciones = \App\Models\AulaAsignaturaDocente::with(['asignatura', 'docente.usuario'])
-                            ->where('aula_id', $aula->id)
-                            ->get();
-
-        $asignaturasYaAsignadas = $asignaciones->pluck('asignatura_id')->toArray();
-        $todasAsignaturas = \App\Models\Asignatura::whereNotIn('id', $asignaturasYaAsignadas)->get();
-
-        $todosDocentes = \App\Models\Docente::with('usuario')->get();
-        $contexto = 'gestion'; 
-
-        return view('academico.aulas.show', compact('aula', 'asignaciones', 'todasAsignaturas', 'todosDocentes', 'contexto'));
+        return view('academico.asignaciones.index', compact('aulas'));
     }
 
     public function showAsignaciones(Aula $aula)
@@ -200,9 +195,22 @@ class AulaController extends Controller
         $todasAsignaturas = \App\Models\Asignatura::whereNotIn('id', $asignaturasYaAsignadas)->get();
 
         $todosDocentes = \App\Models\Docente::with('usuario')->get();
-        $contexto = 'asignacion'; 
 
-        // Fíjate que ya no necesitas enviarle la variable $contexto = 'asignacion'
         return view('academico.asignaciones.show', compact('aula', 'asignaciones', 'todosDocentes', 'todasAsignaturas'));
+    }
+
+
+    // =========================================================================
+    // 3. GESTOR DE HORARIOS
+    // =========================================================================
+
+    public function indexHorarios()
+    {
+        $this->authorize('viewAny', Aula::class); 
+        $aulas = $this->getAulasPaginadas();
+
+        // Nota para el futuro: Si decides separar la vista de horarios como hicimos con asignaciones, 
+        // solo tienes que crear la carpeta 'horarios' y cambiar esto a 'academico.horarios.index'
+        return view('academico.aulas.index', compact('aulas'));
     }
 }

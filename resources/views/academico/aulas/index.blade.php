@@ -13,6 +13,7 @@
             </div>
         </div>
     </x-slot>
+
     <div class="pb-12 pt-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
             
@@ -64,34 +65,29 @@
                             </div>
 
                             <div class="flex items-center gap-2 pt-4 border-t border-slate-100">
-                                
-                                @if($contexto === 'asignacion')
-                                    <a href="{{ route('academico.asignaciones.show', $aula->id) }}" class="flex-grow inline-flex justify-center items-center px-4 py-2 bg-[#FFFDF5] text-[#e6ac27] border border-[#e6ac27]/30 hover:bg-[#e6ac27] hover:text-white rounded-xl text-xs font-black transition-colors shadow-sm" title="Asignar Maestros">
-                                        Asignar Maestros
-                                    </a>
-                                @elseif($contexto === 'horarios')
-                                    <a href="{{ route('academico.aulas.horarios.index', $aula->id) }}" class="flex-grow inline-flex justify-center items-center px-4 py-2 bg-[#FFFDF5] text-[#e6ac27] border border-[#e6ac27]/30 hover:bg-[#e6ac27] hover:text-white rounded-xl text-xs font-black transition-colors shadow-sm" title="Armar Horario">
-                                        Armar Horario
-                                    </a>
-                                @elseif($contexto === 'gestion')
-                                    @can('update', $aula)
-                                        <a href="{{ route('academico.aulas.edit', $aula->id) }}" class="flex-1 flex justify-center items-center gap-2 py-2 bg-slate-50 text-amber-600 rounded-xl hover:bg-amber-50 border border-slate-200 hover:border-amber-200 shadow-sm transition-colors text-xs font-black" title="Editar Aula">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                                            Editar
-                                        </a>
-                                    @endcan
+                                <!-- Botón Ver Detalles (Estructura) -->
+                                <a href="{{ route('academico.aulas.show', $aula->id) }}" class="flex-1 flex justify-center items-center gap-2 py-2 bg-slate-50 text-blue-600 rounded-xl hover:bg-blue-50 border border-slate-200 hover:border-blue-200 shadow-sm transition-colors text-xs font-black" title="Ver Estructura">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                    Ver
+                                </a>
 
-                                    @can('delete', $aula)
-                                        <form action="{{ route('academico.aulas.destroy', $aula->id) }}" method="POST" class="flex-1 alerta-eliminar m-0">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="w-full flex justify-center items-center gap-2 py-2 bg-slate-50 text-rose-500 rounded-xl hover:bg-rose-50 border border-slate-200 hover:border-rose-200 shadow-sm transition-colors text-xs font-black" title="Eliminar Aula">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                                Borrar
-                                            </button>
-                                        </form>
-                                    @endcan
-                                @endif
+                                @can('update', $aula)
+                                    <a href="{{ route('academico.aulas.edit', $aula->id) }}" class="flex-1 flex justify-center items-center gap-2 py-2 bg-slate-50 text-amber-600 rounded-xl hover:bg-amber-50 border border-slate-200 hover:border-amber-200 shadow-sm transition-colors text-xs font-black" title="Editar Aula">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                        Editar
+                                    </a>
+                                @endcan
+
+                                @can('delete', $aula)
+                                    <form action="{{ route('academico.aulas.destroy', $aula->id) }}" method="POST" class="flex-1 alerta-eliminar m-0">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="w-full flex justify-center items-center gap-2 py-2 bg-slate-50 text-rose-500 rounded-xl hover:bg-rose-50 border border-slate-200 hover:border-rose-200 shadow-sm transition-colors text-xs font-black" title="Eliminar Aula">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                            Borrar
+                                        </button>
+                                    </form>
+                                @endcan
                             </div>
                         </div>
                     </div>
@@ -115,7 +111,6 @@
         </div>
     </div>
 
-    @if($contexto === 'gestion')
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -145,5 +140,4 @@
             @endif
         });
     </script>
-    @endif
 </x-app-layout>

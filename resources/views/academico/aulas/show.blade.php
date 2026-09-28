@@ -3,25 +3,20 @@
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div class="flex items-center gap-3">
-                <a href="{{ $contexto === 'asignacion' ? route('academico.asignaciones.index') : route('academico.aulas.index') }}" 
-                   class="text-slate-400 hover:text-[#e6ac27] transition-colors" title="Volver">
+                <a href="{{ route('academico.aulas.index') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors" title="Volver a Gestión de Aulas">
                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 </a>
                 <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">
-                    {{ $contexto === 'asignacion' ? 'Asignación de Maestros:' : 'Estructura:' }} 
-                    <span class="text-[#e6ac27]">{{ $aula->grado->nombre }} - {{ $aula->nombre }}</span>
+                    Estructura del Aula: <span class="text-[#e6ac27]">{{ $aula->grado->nombre }} - {{ $aula->nombre }}</span>
                 </h2>
             </div>
             
-            @if($contexto === 'gestion')
-                @can('horarios.ver')
-                <a href="{{ route('academico.aulas.horarios.index', $aula->id) }}" 
-                   class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-xl font-black text-sm shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    Armar Horario Semanal
-                </a>
-                @endcan
-            @endif
+            @can('horarios.ver')
+            <a href="{{ route('academico.aulas.horarios.index', $aula->id) }}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-xl font-black text-sm shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                Armar Horario Semanal
+            </a>
+            @endcan
         </div>
     </x-slot>
 
@@ -129,7 +124,6 @@
                                     @can('update', $aula)
                                     <td class="px-8 py-5 text-right">
                                         <div class="flex items-center justify-end gap-2">
-                                            <!-- Botón Asignar -->
                                             <button x-data 
                                                     x-on:click.prevent="$dispatch('abrir-modal-profesor', { 
                                                         url: '{{ route('academico.aulas.asignaturas.update', [$aula->id, $asignacion->id]) }}', 
@@ -141,7 +135,7 @@
                                                 Asignar
                                             </button>
 
-                                            <!-- Botón Eliminar (Desbloqueado temporalmente) -->
+                                            <!-- Botón Eliminar -->
                                             <form action="{{ route('academico.aulas.asignaturas.destroy', [$aula->id, $asignacion->id]) }}" method="POST" class="m-0 form-eliminar-extra">
                                                 @csrf
                                                 @method('DELETE')
@@ -169,9 +163,7 @@
         </div>
     </div>
 
-    <!-- ================= 3. MODALES ================= -->
-    
-    <!-- Modal: Agregar Materia Extra -->
+    <!-- Modales -->
     <x-modal name="modal-agregar-materia" focusable maxWidth="md">
         <form method="post" action="{{ route('academico.aulas.asignaturas.store', $aula->id) }}">
             @csrf
@@ -183,10 +175,6 @@
             </div>
             
             <div class="p-8 space-y-6">
-                <p class="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-200 font-medium">
-                    Añade una materia exclusiva para esta aula sin afectar la plantilla general del grado.
-                </p>
-
                 <div>
                     <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Asignatura <span class="text-red-500">*</span></label>
                     <select name="asignatura_id" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] sm:text-sm font-medium transition-colors" required>
@@ -204,30 +192,18 @@
             </div>
 
             <div class="bg-slate-50 px-8 py-5 flex justify-end gap-4 border-t border-slate-100 rounded-b-3xl">
-                <button type="button" x-on:click="$dispatch('close')" class="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">
-                    Cancelar
-                </button>
-                <button type="submit" class="px-6 py-2.5 bg-[#e6ac27] text-white rounded-xl hover:bg-[#c48e1b] font-black text-sm shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5">
-                    Guardar
-                </button>
+                <button type="button" x-on:click="$dispatch('close')" class="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">Cancelar</button>
+                <button type="submit" class="px-6 py-2.5 bg-[#e6ac27] text-white rounded-xl hover:bg-[#c48e1b] font-black text-sm shadow-md transition-all">Guardar</button>
             </div>
         </form>
     </x-modal>
 
-    <!-- Modal: Asignar Profesor (Con Ordenamiento Alfabético) -->
     <div x-data="{ urlAction: '', nombreMateria: '', docenteActual: '' }" 
-         @abrir-modal-profesor.window="
-            urlAction = $event.detail.url; 
-            nombreMateria = $event.detail.materia; 
-            docenteActual = $event.detail.docenteId; 
-            $dispatch('open-modal', 'modal-asignar-profesor')
-         ">
-        
+         @abrir-modal-profesor.window="urlAction = $event.detail.url; nombreMateria = $event.detail.materia; docenteActual = $event.detail.docenteId; $dispatch('open-modal', 'modal-asignar-profesor')">
         <x-modal name="modal-asignar-profesor" focusable maxWidth="md">
             <form method="post" x-bind:action="urlAction">
                 @csrf
                 @method('PUT')
-                
                 <div class="bg-[#FFFDF5] px-8 py-5 border-b border-[#e6ac27]/20">
                     <h2 class="text-lg font-black text-[#3d2c1d] flex items-center gap-2">
                         <svg class="w-5 h-5 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
@@ -236,43 +212,30 @@
                 </div>
 
                 <div class="p-8 space-y-6">
-                    <p class="text-sm font-medium text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-200 leading-relaxed">
-                        Selecciona el profesor que impartirá <strong x-text="nombreMateria" class="font-black text-[#e6ac27]"></strong> en esta sección.
+                    <p class="text-sm font-medium text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        Selecciona el profesor que impartirá <strong x-text="nombreMateria" class="font-black text-[#e6ac27]"></strong>.
                     </p>
-
                     <div>
                         <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Docente Disponible <span class="text-red-500">*</span></label>
                         <select name="docente_id" x-model="docenteActual" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] sm:text-sm font-medium transition-colors" required>
                             <option value="">Buscar profesor en la lista...</option>
-                            
-                            @php 
-                                // Preparamos la colección ordenada antes de imprimir el HTML
-                                $docentesOrdenados = collect($todosDocentes ?? [])->sortBy('usuario.nombre_completo'); 
-                            @endphp
-                            
+                            @php $docentesOrdenados = collect($todosDocentes ?? [])->sortBy('usuario.nombre_completo'); @endphp
                             @foreach($docentesOrdenados as $docente)
-                                <option value="{{ $docente->id }}">
-                                    {{ $docente->codigo_unico_persona }} - {{ $docente->usuario->nombre_completo ?? 'Sin Nombre' }}
-                                </option>
+                                <option value="{{ $docente->id }}">{{ $docente->codigo_unico_persona }} - {{ $docente->usuario->nombre_completo ?? 'Sin Nombre' }}</option>
                             @endforeach
-                            
                         </select>
                     </div>
                 </div>
 
                 <div class="bg-slate-50 px-8 py-5 flex justify-end gap-4 border-t border-slate-100 rounded-b-3xl">
-                    <button type="button" x-on:click="$dispatch('close')" class="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="px-6 py-2.5 bg-[#e6ac27] text-white rounded-xl hover:bg-[#c48e1b] font-black text-sm shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5">
-                        Confirmar
-                    </button>
+                    <button type="button" x-on:click="$dispatch('close')" class="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">Cancelar</button>
+                    <button type="submit" class="px-6 py-2.5 bg-[#e6ac27] text-white rounded-xl hover:bg-[#c48e1b] font-black text-sm shadow-md transition-all">Confirmar</button>
                 </div>
             </form>
         </x-modal>
     </div>
 
-    <!-- Script de confirmación para eliminar materias extras -->
+    <!-- Script de confirmación -->
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.form-eliminar-extra').forEach(form => {
@@ -280,7 +243,7 @@
                     e.preventDefault();
                     Swal.fire({
                         title: '¿Quitar materia?',
-                        text: "Esta asignatura se eliminará de la carga horaria de esta aula.",
+                        text: "Esta asignatura se eliminará de la carga horaria.",
                         icon: 'warning',
                         showCancelButton: true,
                         confirmButtonColor: '#e11d48',
@@ -288,9 +251,7 @@
                         confirmButtonText: 'Sí, quitar',
                         cancelButtonText: 'Cancelar',
                         customClass: { popup: 'rounded-3xl border border-slate-200' }
-                    }).then((result) => {
-                        if (result.isConfirmed) this.submit();
-                    });
+                    }).then((result) => { if (result.isConfirmed) this.submit(); });
                 });
             });
         });
