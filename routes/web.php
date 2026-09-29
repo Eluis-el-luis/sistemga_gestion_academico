@@ -151,6 +151,12 @@ Route::middleware('auth')->group(function () {
         Route::get('boletines/constancia/{matricula}', [\App\Http\Controllers\BoletinController::class, 'constancia'])->name('boletines.constancia');
         Route::get('boletines/{matricula}', [\App\Http\Controllers\BoletinController::class, 'show'])->name('boletines.show');
         Route::post('boletines/{matricula}/aprobar', [\App\Http\Controllers\BoletinController::class, 'aprobarBoletin'])->name('boletines.aprobar');
+
+        // PDF Boletines
+        Route::get('boletines/pdf/boletin/{matricula}', [\App\Http\Controllers\BoletinPdfController::class, 'boletin'])->name('boletines.pdf.boletin');
+        Route::get('boletines/pdf/constancia/{matricula}', [\App\Http\Controllers\BoletinPdfController::class, 'constancia'])->name('boletines.pdf.constancia');
+        Route::get('boletines/pdf/certificado/{matricula}', [\App\Http\Controllers\BoletinPdfController::class, 'certificado'])->name('boletines.pdf.certificado');
+        Route::post('boletines/pdf/masivo', [\App\Http\Controllers\BoletinPdfController::class, 'masivo'])->name('boletines.pdf.masivo');
         
         // Fase 7: Examen de Reparación
         Route::get('reparacion', [\App\Http\Controllers\ExamenReparacionController::class, 'index'])->name('reparacion.index');
