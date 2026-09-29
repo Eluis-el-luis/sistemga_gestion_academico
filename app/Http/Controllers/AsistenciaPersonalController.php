@@ -10,36 +10,42 @@ use Illuminate\Support\Facades\Auth;
 class AsistenciaPersonalController extends Controller
 {
     public function index(Request $request)
-{
-    /** @var \App\Models\Usuario $usuario */
-    $usuario = auth()->user();
+    {
+        try {
+            /** @var \App\Models\Usuario $usuario */
+            $usuario = auth()->user();
 
-    // 1. Obtener el mes a consultar (Por defecto: mes actual)
-    $mes = $request->get('mes', now()->timezone('America/Managua')->format('Y-m'));
-    
-    // Extraer año y mes numérico para la consulta SQL
-    $anio = date('Y', strtotime($mes));
-    $mesNumerico = date('m', strtotime($mes));
+            // 1. Obtener el mes a consultar (Por defecto: mes actual)
+            $mes = $request->get('mes', now()->timezone('America/Managua')->format('Y-m'));
+            
+            // Extraer año y mes numérico para la consulta SQL
+            $anio = date('Y', strtotime($mes));
+            $mesNumerico = date('m', strtotime($mes));
 
-    // 2. Traer el historial exclusivo del usuario logueado
-    $asistencias = \App\Models\AsistenciaPersonal::where('usuario_id', $usuario->id)
-        ->whereYear('fecha', $anio)
-        ->whereMonth('fecha', $mesNumerico)
-        ->orderBy('fecha', 'desc')
-        ->get();
+            // 2. Traer el historial exclusivo del usuario logueado
+            $asistencias = \App\Models\AsistenciaPersonal::where('usuario_id', $usuario->id)
+                ->whereYear('fecha', $anio)
+                ->whereMonth('fecha', $mesNumerico)
+                ->orderBy('fecha', 'desc')
+                ->get();
 
-    // 3. Calcular los KPIs de bolsillo
-    $totalPresentes = $asistencias->where('estado', 'Presente')->count();
-    $totalRetardos  = $asistencias->where('estado', 'Retardo')->count();
-    $totalAusencias = $asistencias->whereIn('estado', ['Ausente', 'Justificado'])->count();
+            // 3. Calcular los KPIs de bolsillo
+            $totalPresentes = $asistencias->where('estado', 'Presente')->count();
+            $totalRetardos  = $asistencias->where('estado', 'Retardo')->count();
+            $totalAusencias = $asistencias->whereIn('estado', ['Ausente', 'Justificado'])->count();
 
-    return view('academico.asistencia.personal.index', compact(
-        'asistencias', 
-        'totalPresentes', 
-        'totalRetardos', 
-        'totalAusencias'
-    ));
-}
+            return view('academico.asistencia.personal.index', compact(
+                'asistencias', 
+                'totalPresentes', 
+                'totalRetardos', 
+                'totalAusencias'
+            ));
+
+        } catch (\Exception $e) {
+            // CONTINGENCIA: Si falla el cálculo de fechas o la consulta a la BD
+            return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al cargar tu historial de asistencia. Por favor, intenta más tarde.');
+        }
+    }
 
     public function marcarLlegada(Request $request)
     {
@@ -48,19 +54,12 @@ class AsistenciaPersonalController extends Controller
         $fechaHoy = $ahora->toDateString();
         $horaActual = $ahora->format('H:i:s');
 
-        $asistenciaExistente = AsistenciaPersonal::where('usuario_id', $usuarioId)
-            ->where('fecha', $fechaHoy)
-            ->first();
-
-        if ($asistenciaExistente) {
-            return back()->with('error', 'Ya has registrado tu asistencia el día de hoy.');
-        }
-
         $horaOficial = Carbon::createFromTime(7, 0, 0, 'America/Managua');
         $limiteRetardo = $horaOficial->copy()->addHour(); // 8:00 AM
         $margenPresente = $horaOficial->copy()->addMinutes(15); // 7:15 AM
 
         // Si es más de las 7:15 AM, hacemos obligatoria la justificación
+        // VALIDACIÓN AFUERA DEL TRY-CATCH para mantener las alertas rojas del formulario
         if ($ahora->greaterThan($margenPresente)) {
             $request->validate([
                 'observaciones' => 'required|string|min:5|max:255'
@@ -69,26 +68,40 @@ class AsistenciaPersonalController extends Controller
             ]);
         }
 
-        if ($ahora->greaterThan($limiteRetardo)) {
-            $estado = 'Ausente'; // Marcó después del margen máximo
-            $mensaje = 'Has marcado fuera del margen permitido. Retardo grave registrado.';
-        } elseif ($ahora->greaterThan($margenPresente)) {
-            $estado = 'Retardo';
-            $mensaje = 'Entrada registrada con retardo. Justificación guardada.';
-        } else {
-            $estado = 'Presente';
-            $mensaje = 'Entrada registrada exitosamente a tiempo.';
+        try {
+            $asistenciaExistente = AsistenciaPersonal::where('usuario_id', $usuarioId)
+                ->where('fecha', $fechaHoy)
+                ->first();
+
+            if ($asistenciaExistente) {
+                return back()->with('error', 'Ya has registrado tu asistencia el día de hoy.');
+            }
+
+            if ($ahora->greaterThan($limiteRetardo)) {
+                $estado = 'Ausente'; // Marcó después del margen máximo
+                $mensaje = 'Has marcado fuera del margen permitido. Retardo grave registrado.';
+            } elseif ($ahora->greaterThan($margenPresente)) {
+                $estado = 'Retardo';
+                $mensaje = 'Entrada registrada con retardo. Justificación guardada.';
+            } else {
+                $estado = 'Presente';
+                $mensaje = 'Entrada registrada exitosamente a tiempo.';
+            }
+
+            AsistenciaPersonal::create([
+                'usuario_id' => $usuarioId,
+                'fecha' => $fechaHoy,
+                'hora_entrada' => $horaActual,
+                'turno' => $ahora->format('H') < 12 ? 'Matutino' : 'Vespertino',
+                'estado' => $estado,
+                'observaciones' => $request->observaciones ?? null,
+            ]);
+
+            return back()->with('success', $mensaje);
+
+        } catch (\Exception $e) {
+            // CONTINGENCIA: Si la base de datos se cae justo al momento de registrar la asistencia
+            return back()->withInput()->with('error', 'Ocurrió un error técnico al registrar tu asistencia. Por favor, notifica a administración.');
         }
-
-        AsistenciaPersonal::create([
-            'usuario_id' => $usuarioId,
-            'fecha' => $fechaHoy,
-            'hora_entrada' => $horaActual,
-            'turno' => $ahora->format('H') < 12 ? 'Matutino' : 'Vespertino',
-            'estado' => $estado,
-            'observaciones' => $request->observaciones ?? null,
-        ]);
-
-        return back()->with('success', $mensaje);
     }
 }
