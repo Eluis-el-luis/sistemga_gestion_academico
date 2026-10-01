@@ -22,6 +22,11 @@ class BloqueHorario extends Model
         'es_recreo'
     ];
 
+    // Agrega este bloque para castear los datos automáticamente
+    protected $casts = [
+        'es_recreo' => 'boolean',
+    ];
+
     public function modalidad()
     {
         return $this->belongsTo(Modalidad::class, 'modalidad_id');

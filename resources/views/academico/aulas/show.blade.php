@@ -1,33 +1,30 @@
 <x-app-layout>
+    <!-- ================= 1. CABECERA ================= -->
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div class="flex items-center gap-3">
-                <!-- Flecha de regreso dinámica -->
-                <a href="{{ $contexto === 'asignacion' ? route('academico.asignaciones.index') : route('academico.aulas.index') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors">
+                <a href="{{ route('academico.aulas.index') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors" title="Volver a Gestión de Aulas">
                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 </a>
                 <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">
-                    {{ $contexto === 'asignacion' ? 'Asignación de Maestros:' : 'Estructura:' }} 
-                    <span class="text-[#e6ac27]">{{ $aula->grado->nombre }} - {{ $aula->nombre }}</span>
+                    Estructura del Aula: <span class="text-[#e6ac27]">{{ $aula->grado->nombre }} - {{ $aula->nombre }}</span>
                 </h2>
             </div>
             
-            <!-- Botón de Horario (SOLO visible si estamos en Gestión) -->
-            @if($contexto === 'gestion')
-                @can('horarios.ver')
-                <a href="{{ route('academico.aulas.horarios.index', $aula->id) }}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-xl font-black text-sm shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5 focus:ring-2 focus:ring-offset-2 focus:ring-[#e6ac27]">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    Armar Horario Semanal
-                </a>
-                @endcan
-            @endif
+            @can('horarios.ver')
+            <a href="{{ route('academico.aulas.horarios.index', $aula->id) }}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-xl font-black text-sm shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                Armar Horario Semanal
+            </a>
+            @endcan
         </div>
     </x-slot>
 
+    <!-- ================= 2. CONTENIDO PRINCIPAL ================= -->
     <div class="pb-12 pt-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
             
-            <!-- TARJETA DE RESUMEN DEL AULA -->
+            <!-- Tarjeta de Resumen -->
             <div class="bg-white border border-slate-200 shadow-sm rounded-3xl overflow-hidden flex flex-col md:flex-row">
                 <div class="bg-[#FFFDF5] p-8 md:w-1/4 flex flex-col justify-center border-b md:border-b-0 md:border-r border-[#e6ac27]/20">
                     <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Periodo Lectivo</span>
@@ -36,6 +33,7 @@
                         {{ $aula->modalidad->nombre }}
                     </span>
                 </div>
+                
                 <div class="p-8 grid grid-cols-1 sm:grid-cols-3 gap-8 flex-grow">
                     <div>
                         <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Sección y Turno</p>
@@ -57,16 +55,17 @@
                 </div>
             </div>
 
-            <!-- TABLA DE ASIGNATURAS DEL AULA -->
+            <!-- Tabla de Carga Horaria -->
             <div class="bg-white overflow-hidden shadow-sm rounded-3xl border border-slate-200">
-                <div class="p-8 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white">
+                <div class="p-8 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <h3 class="text-xl font-black text-[#3d2c1d]">Carga Horaria y Docentes</h3>
                         <p class="text-sm font-medium text-slate-500 mt-1">Administra los profesores que impartirán clase a este grupo.</p>
                     </div>
                     
                     @can('update', $aula)
-                        <button x-data="" x-on:click.prevent="$dispatch('open-modal', 'modal-agregar-materia')" class="inline-flex items-center px-4 py-2 bg-white border border-slate-200 rounded-xl shadow-sm text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-[#e6ac27] transition-all">
+                        <button x-data x-on:click.prevent="$dispatch('open-modal', 'modal-agregar-materia')" 
+                                class="inline-flex items-center px-4 py-2 bg-white border border-slate-200 rounded-xl shadow-sm text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-[#e6ac27] transition-all">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                             Materia Extraordinaria
                         </button>
@@ -95,9 +94,11 @@
                                             <span class="mt-2 inline-flex px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest bg-purple-50 text-purple-700 border border-purple-200">Extracurricular</span>
                                         @endif
                                     </td>
+                                    
                                     <td class="px-6 py-5 text-center font-black text-slate-500 text-base">
                                         {{ number_format($asignacion->horas_semanales, 0) }}h
                                     </td>
+                                    
                                     <td class="px-6 py-5">
                                         @if($asignacion->docente_id)
                                             <div class="flex items-center gap-3">
@@ -113,6 +114,7 @@
                                             </span>
                                         @endif
                                     </td>
+                                    
                                     <td class="px-6 py-5 text-center">
                                         <span class="px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg border {{ $asignacion->activo ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' : 'bg-slate-100 text-slate-500 border-slate-200' }}">
                                             {{ $asignacion->activo ? 'Activa' : 'Inactiva' }}
@@ -121,23 +123,34 @@
                                     
                                     @can('update', $aula)
                                     <td class="px-8 py-5 text-right">
-                                        <button x-data="" 
-                                                x-on:click.prevent="$dispatch('abrir-modal-profesor', { 
-                                                    url: '{{ route('academico.aulas.asignaturas.update', [$aula->id, $asignacion->id]) }}', 
-                                                    materia: '{{ addslashes($asignacion->asignatura->nombre) }}',
-                                                    docenteId: '{{ $asignacion->docente_id ?? '' }}'
-                                                })" 
-                                                class="inline-flex items-center px-4 py-2 bg-white text-[#e6ac27] hover:bg-[#FFFDF5] border border-[#e6ac27]/30 rounded-xl text-xs font-black transition-all shadow-sm transform hover:-translate-y-0.5">
-                                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                                            Asignar
-                                        </button>
+                                        <div class="flex items-center justify-end gap-2">
+                                            <button x-data 
+                                                    x-on:click.prevent="$dispatch('abrir-modal-profesor', { 
+                                                        url: '{{ route('academico.aulas.asignaturas.update', [$aula->id, $asignacion->id]) }}', 
+                                                        materia: '{{ addslashes($asignacion->asignatura->nombre) }}',
+                                                        docenteId: '{{ $asignacion->docente_id ?? '' }}'
+                                                    })" 
+                                                    class="inline-flex items-center px-4 py-2 bg-white text-[#e6ac27] hover:bg-[#FFFDF5] border border-[#e6ac27]/30 rounded-xl text-xs font-black transition-all shadow-sm transform hover:-translate-y-0.5">
+                                                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                                                Asignar
+                                            </button>
+
+                                            <!-- Botón Eliminar -->
+                                            <form action="{{ route('academico.aulas.asignaturas.destroy', [$aula->id, $asignacion->id]) }}" method="POST" class="m-0 form-eliminar-extra">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="inline-flex items-center px-3 py-2 bg-white text-rose-400 hover:text-rose-600 hover:bg-rose-50 border border-rose-100 rounded-xl text-xs font-black transition-all shadow-sm transform hover:-translate-y-0.5" title="Quitar materia">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                </button>
+                                            </form>
+                                        </div>
                                     </td>
                                     @endcan
                                 </tr>
                             @empty
                                 <tr>
                                     <td colspan="5" class="px-6 py-16 text-center text-slate-500">
-                                        <svg class="mx-auto h-12 w-12 text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                                        <svg class="mx-auto h-12 w-12 text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477-4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
                                         <p class="font-black text-[#3d2c1d] text-lg">Sin materias asignadas</p>
                                         <p class="text-sm font-medium mt-1">Este grupo no heredó materias de la Malla Curricular oficial.</p>
                                     </td>
@@ -150,24 +163,18 @@
         </div>
     </div>
 
-    <!-- ================= MODALES (Alpine.js) ================= -->
-    
-    <!-- Modal 1: Agregar Materia Extra -->
+    <!-- Modales -->
     <x-modal name="modal-agregar-materia" focusable maxWidth="md">
         <form method="post" action="{{ route('academico.aulas.asignaturas.store', $aula->id) }}">
             @csrf
             <div class="bg-[#FFFDF5] px-8 py-5 border-b border-[#e6ac27]/20">
                 <h2 class="text-lg font-black text-[#3d2c1d] flex items-center gap-2">
                     <svg class="w-5 h-5 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                    {{ __('Materia Extraordinaria') }}
+                    Materia Extraordinaria
                 </h2>
             </div>
             
             <div class="p-8 space-y-6">
-                <p class="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-200 font-medium">
-                    Añade una materia exclusiva para esta aula sin afectar la plantilla general del grado.
-                </p>
-
                 <div>
                     <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Asignatura <span class="text-red-500">*</span></label>
                     <select name="asignatura_id" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] sm:text-sm font-medium transition-colors" required>
@@ -185,25 +192,18 @@
             </div>
 
             <div class="bg-slate-50 px-8 py-5 flex justify-end gap-4 border-t border-slate-100 rounded-b-3xl">
-                <button type="button" x-on:click="$dispatch('close')" class="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">
-                    Cancelar
-                </button>
-                <button type="submit" class="px-6 py-2.5 bg-[#e6ac27] text-white rounded-xl hover:bg-[#c48e1b] font-black text-sm shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5">
-                    Guardar
-                </button>
+                <button type="button" x-on:click="$dispatch('close')" class="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">Cancelar</button>
+                <button type="submit" class="px-6 py-2.5 bg-[#e6ac27] text-white rounded-xl hover:bg-[#c48e1b] font-black text-sm shadow-md transition-all">Guardar</button>
             </div>
         </form>
     </x-modal>
 
-    <!-- Modal 2: Asignar Profesor -->
     <div x-data="{ urlAction: '', nombreMateria: '', docenteActual: '' }" 
          @abrir-modal-profesor.window="urlAction = $event.detail.url; nombreMateria = $event.detail.materia; docenteActual = $event.detail.docenteId; $dispatch('open-modal', 'modal-asignar-profesor')">
-        
         <x-modal name="modal-asignar-profesor" focusable maxWidth="md">
             <form method="post" x-bind:action="urlAction">
                 @csrf
                 @method('PUT')
-                
                 <div class="bg-[#FFFDF5] px-8 py-5 border-b border-[#e6ac27]/20">
                     <h2 class="text-lg font-black text-[#3d2c1d] flex items-center gap-2">
                         <svg class="w-5 h-5 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
@@ -212,15 +212,15 @@
                 </div>
 
                 <div class="p-8 space-y-6">
-                    <p class="text-sm font-medium text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-200 leading-relaxed">
-                        Selecciona el profesor que impartirá <strong x-text="nombreMateria" class="font-black text-[#e6ac27]"></strong> en esta sección.
+                    <p class="text-sm font-medium text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        Selecciona el profesor que impartirá <strong x-text="nombreMateria" class="font-black text-[#e6ac27]"></strong>.
                     </p>
-
                     <div>
                         <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Docente Disponible <span class="text-red-500">*</span></label>
                         <select name="docente_id" x-model="docenteActual" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] sm:text-sm font-medium transition-colors" required>
                             <option value="">Buscar profesor en la lista...</option>
-                            @foreach($todosDocentes ?? [] as $docente)
+                            @php $docentesOrdenados = collect($todosDocentes ?? [])->sortBy('usuario.nombre_completo'); @endphp
+                            @foreach($docentesOrdenados as $docente)
                                 <option value="{{ $docente->id }}">{{ $docente->codigo_unico_persona }} - {{ $docente->usuario->nombre_completo ?? 'Sin Nombre' }}</option>
                             @endforeach
                         </select>
@@ -228,14 +228,32 @@
                 </div>
 
                 <div class="bg-slate-50 px-8 py-5 flex justify-end gap-4 border-t border-slate-100 rounded-b-3xl">
-                    <button type="button" x-on:click="$dispatch('close')" class="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="px-6 py-2.5 bg-[#e6ac27] text-white rounded-xl hover:bg-[#c48e1b] font-black text-sm shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5">
-                        Confirmar
-                    </button>
+                    <button type="button" x-on:click="$dispatch('close')" class="text-sm font-bold text-slate-400 hover:text-slate-800 transition-colors">Cancelar</button>
+                    <button type="submit" class="px-6 py-2.5 bg-[#e6ac27] text-white rounded-xl hover:bg-[#c48e1b] font-black text-sm shadow-md transition-all">Confirmar</button>
                 </div>
             </form>
         </x-modal>
     </div>
+
+    <!-- Script de confirmación -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.form-eliminar-extra').forEach(form => {
+                form.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    Swal.fire({
+                        title: '¿Quitar materia?',
+                        text: "Esta asignatura se eliminará de la carga horaria.",
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#e11d48',
+                        cancelButtonColor: '#94a3b8',
+                        confirmButtonText: 'Sí, quitar',
+                        cancelButtonText: 'Cancelar',
+                        customClass: { popup: 'rounded-3xl border border-slate-200' }
+                    }).then((result) => { if (result.isConfirmed) this.submit(); });
+                });
+            });
+        });
+    </script>
 </x-app-layout>

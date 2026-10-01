@@ -8,7 +8,7 @@ class Docente extends Model
 {
     use HasFactory, SoftDeletes;
     protected $table = 'docente';
-    protected $fillable = ['usuario_id', 'codigo_unico_persona', 'sexo', 'es_coordinador', 'modalidad_coordina_id'];
+    protected $fillable = ['usuario_id', 'codigo_unico_persona', 'sexo', 'modalidad_id', 'es_coordinador', 'modalidad_coordina_id'];
 
 
     public function usuario()

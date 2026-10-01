@@ -15,7 +15,6 @@ use App\Models\IndicadorLogro;
 use App\Models\Matricula;
 use App\Models\Modalidad;
 use App\Models\Nota;
-use App\Models\Rol;
 use App\Models\Usuario;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,20 +36,12 @@ class IdempotenciaTest extends TestCase
         parent::setUp();
 
         $this->artisan('db:seed', ['--class' => 'Database\Seeders\PermisoSeeder']);
-        
-        // Crear roles de catálogo directamente
-        $roles = ['Director', 'Subdirector', 'Coordinador', 'Docente Guia', 'Docente por Asignatura', 'Gestor de Usuarios', 'Alumno'];
-        foreach ($roles as $nombre) {
-            Rol::firstOrCreate(['nombre' => $nombre]);
-        }
 
-        $rolDocenteAsignatura = Rol::where('nombre', 'Docente por Asignatura')->first()->id;
-        $this->docenteAsignatura = Usuario::factory()->create(['rol_id' => $rolDocenteAsignatura]);
+        $this->docenteAsignatura = Usuario::factory()->create();
         $this->docenteAsignatura->assignRole('Docente por Asignatura');
 
         $docenteModel = \App\Models\Docente::factory()->create(['usuario_id' => $this->docenteAsignatura->id]);
 
-        // Crear estructura académica mínima
         $modalidad = Modalidad::factory()->create(['nombre' => 'Científico Humanista']);
         $grado = Grado::factory()->create(['nombre' => '1ro Secundaria', 'modalidad_id' => $modalidad->id]);
         $anio = AnioEscolar::factory()->create(['nombre' => '2026', 'activo' => true]);
@@ -81,7 +72,6 @@ class IdempotenciaTest extends TestCase
             'anio_escolar_id' => $anio->id,
         ]);
 
-        // Crear actividad evaluativa asociada (necesaria para el nuevo flujo de notas)
         $this->actividad = \App\Models\ActividadEvaluativa::factory()->create([
             'aula_asignatura_docente_id' => $this->asignacion->id,
             'corte_evaluativo_id' => $this->corte->id,
@@ -89,19 +79,16 @@ class IdempotenciaTest extends TestCase
             'puntaje_maximo' => 100,
         ]);
 
-        // Crear bloque horario para la modalidad (necesario para asistencia por asignatura)
         BloqueHorario::factory()->create([
             'modalidad_id' => $modalidad->id,
             'es_recreo' => false,
         ]);
     }
 
-    
     public function testnota_updateOrCreate_es_idempotente(): void
     {
         $this->actingAs($this->docenteAsignatura);
 
-        // Primera creación (formato nuevo: notas[matricula_id][actividad_id])
         $response1 = $this->post(route('academico.notas.store', $this->asignacion), [
             'corte_evaluativo_id' => $this->corte->id,
             'notas' => [
@@ -119,7 +106,6 @@ class IdempotenciaTest extends TestCase
         $this->assertEquals(85, $nota1->nota_cuantitativa);
         $this->assertEquals(1, Nota::count());
 
-        // Segunda actualización (mismo key) - debe actualizar, no duplicar
         $response2 = $this->post(route('academico.notas.store', $this->asignacion), [
             'corte_evaluativo_id' => $this->corte->id,
             'notas' => [
@@ -138,7 +124,6 @@ class IdempotenciaTest extends TestCase
         $this->assertEquals(1, Nota::count(), 'Solo debe existir un registro (idempotencia)');
     }
 
-    
     public function testasistencia_asignatura_updateOrCreate_es_idempotente(): void
     {
         $this->actingAs($this->docenteAsignatura);
@@ -146,7 +131,6 @@ class IdempotenciaTest extends TestCase
         $bloque = BloqueHorario::where('es_recreo', false)->first();
         $fecha = Carbon::today()->toDateString();
 
-        // Primera creación
         $response1 = $this->post(route('academico.asistencia.asignatura.store', $this->asignacion), [
             'fecha' => $fecha,
             'matricula_id' => $this->matricula->id,
@@ -164,7 +148,6 @@ class IdempotenciaTest extends TestCase
         $this->assertEquals('Fuga', $incidencia1->estado_incidencia);
         $this->assertEquals(1, AsistenciaAsignatura::count());
 
-        // Segunda actualización (mismo key) - debe actualizar, no duplicar
         $response2 = $this->post(route('academico.asistencia.asignatura.store', $this->asignacion), [
             'fecha' => $fecha,
             'matricula_id' => $this->matricula->id,

@@ -96,7 +96,7 @@
                         <label class="inline-flex items-center cursor-pointer bg-amber-50 px-5 py-3 rounded-xl border border-amber-200/60 hover:bg-amber-100 transition-colors shadow-sm w-full md:w-auto">
                             <input type="hidden" name="es_recreo" value="0">
                             <input type="checkbox" name="es_recreo" value="1" x-model="form.es_recreo" class="rounded border-amber-300 text-amber-500 shadow-sm focus:ring-amber-500 w-5 h-5">
-                            <span class="ml-3 text-[11px] font-black text-amber-700 uppercase tracking-widest">Marcar como Receso / Libre</span>
+                            <span class="ml-3 text-[11px] font-black text-amber-700 uppercase tracking-widest">Tiempo Libre</span>
                         </label>
                         
                         <button type="submit" class="w-full md:w-auto bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black py-3 px-8 rounded-xl shadow-md shadow-[#e6ac27]/20 transition-all transform hover:-translate-y-0.5 text-sm flex items-center justify-center gap-2">

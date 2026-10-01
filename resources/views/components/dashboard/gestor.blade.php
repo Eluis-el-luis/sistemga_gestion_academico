@@ -42,4 +42,16 @@
             <span class="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Bandeja de Recepción</span>
         </div>
     </a>
+
+    <!-- 5. Preconfiguracion de Boletines -->
+    <a href="{{ url('academico/grupo-materia') }}" class="group bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] transition-all flex items-center gap-4 cursor-pointer">
+        <div class="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
+            <!-- Icono de Colección/Archivos -->
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+        </div>
+        <div>
+            <span class="block font-black text-sm text-[#3d2c1d]">Grupos de Materias</span>
+            <span class="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Configuración Boletines</span>
+        </div>
+    </a>
 </div>

@@ -26,10 +26,9 @@
 
     <body class="font-sans antialiased text-[#3d2c1d] bg-slate-50 dark:bg-slate-900 dark:text-slate-200 transition-colors duration-300" 
       x-data="{ 
-          sidebarOpen: localStorage.getItem('sidebarOpen') !== null ? localStorage.getItem('sidebarOpen') === 'true' : window.innerWidth >= 1024,
+          sidebarOpen: false,
           showTopBtnGlobal: false 
       }" 
-      x-init="$watch('sidebarOpen', val => localStorage.setItem('sidebarOpen', val))"
       @resize.window="if(window.innerWidth < 1024) sidebarOpen = false" 
       @scroll.window="showTopBtnGlobal = (window.pageYOffset > 150)">
         
@@ -43,8 +42,7 @@
              @if($mostrarSidebar) :class="sidebarOpen ? 'lg:pl-64' : 'lg:pl-20'" @endif>
             
             <!-- TOPBAR GLOBAL -->
-            <nav class="sticky top-0 z-30 bg-white dark:bg-slate-800 border-b border-slate-200/60 dark:border-slate-700 shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 transition-colors duration-300">                
-                <div class="flex items-center gap-4 lg:gap-6">
+                <nav class="sticky top-0 z-50 bg-white dark:bg-slate-800 border-b border-slate-200/60 dark:border-slate-700 shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 transition-colors duration-300">                <div class="flex items-center gap-4 lg:gap-6">
                     <!-- Botón Hamburguesa -->
                     @if($mostrarSidebar)
                         <button @click="sidebarOpen = !sidebarOpen" class="text-slate-500 hover:text-[#e6ac27] bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-700 hover:bg-amber-50 p-2 rounded-lg transition-colors focus:outline-none">

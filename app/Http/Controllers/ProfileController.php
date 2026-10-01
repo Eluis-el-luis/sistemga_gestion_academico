@@ -16,9 +16,17 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
-        return view('profile.edit', [
-            'user' => $request->user(),
-        ]);
+        try {
+            return view('profile.edit', [
+                'user' => $request->user(),
+            ]);
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA: Si falla al cargar la vista de perfil
+            return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al cargar los datos de tu perfil.');
+        }
     }
 
     /**
@@ -26,15 +34,26 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        // La validación del ProfileUpdateRequest ya se ejecuta de forma segura antes de entrar aquí
+        try {
+            $user = $request->user();
+            $user->fill($request->validated());
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+            if ($user->isDirty('email')) {
+                $user->email_verified_at = null;
+            }
+
+            $user->save();
+
+            return Redirect::route('profile.edit')->with('status', 'profile-updated');
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA: Si la base de datos rechaza la actualización del perfil
+            return Redirect::route('profile.edit')->with('error', 'Hubo un error técnico al intentar actualizar tu información. Inténtalo de nuevo.');
         }
-
-        $request->user()->save();
-
-        return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
 
     /**
@@ -42,19 +61,29 @@ class ProfileController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        // La validación de la contraseña actual se mantiene afuera para que los errores lleguen al formulario
         $request->validateWithBag('userDeletion', [
             'password' => ['required', 'current_password'],
         ]);
 
-        $user = $request->user();
+        try {
+            $user = $request->user();
 
-        Auth::logout();
+            Auth::logout();
 
-        $user->delete();
+            $user->delete();
 
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
-        return Redirect::to('/');
+            return Redirect::to('/');
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA: Si ocurre un fallo crítico al eliminar la cuenta en cascada
+            return Redirect::route('profile.edit')->with('error', 'No se pudo eliminar la cuenta debido a un error del servidor. Por favor, contacta a soporte.');
+        }
     }
 }

@@ -54,28 +54,29 @@ Route::middleware('auth')->group(function () {
         Route::resource('matriculas', MatriculaController::class);
         Route::patch('matriculas/{matricula}/retirar', [MatriculaController::class, 'retirar'])->name('matriculas.retirar');
         Route::patch('matriculas/{matricula}/reactivar', [MatriculaController::class, 'reactivar'])->name('matriculas.reactivar');
+        
         // Ruta para actualizar el límite de horas del grado desde la malla
         Route::put('malla/grado/{grado}/horas', [\App\Http\Controllers\MallaCurricularController::class, 'actualizarHorasGrado'])->name('malla.grado.horas');
 
         // --- GESTIÓN DE AULAS Y SUS NUEVOS ACCESOS DIRECTOS ---
         Route::resource('aulas', AulaController::class);
         Route::get('asignaciones', [AulaController::class, 'indexAsignaciones'])->name('asignaciones.index');
-        // NUEVA RUTA PARA LOS DETALLES DE ASIGNACIÓN:
         Route::get('asignaciones/{aula}', [AulaController::class, 'showAsignaciones'])->name('asignaciones.show');
         Route::get('gestor-horarios', [AulaController::class, 'indexHorarios'])->name('gestor-horarios.index');
-        
-        // ... tus rutas actuales de alumnos, matriculas y aulas ...
         
         Route::put('usuarios/{usuario}/reset-password', [\App\Http\Controllers\UsuarioController::class, 'resetPassword'])
              ->name('usuarios.reset-password');
         Route::resource('usuarios', \App\Http\Controllers\UsuarioController::class);
 
-        // NUEVO: Bandeja de Impresión de Boletines (Exclusivo Gestor/Dirección)
+        // Bandeja de Impresión de Boletines (Exclusivo Gestor/Dirección)
         Route::get('boletines/bandeja', [GestorBoletinController::class, 'bandeja'])->name('boletin.bandeja');
 
         Route::get('notas/evaluar/{asignacion}', [\App\Http\Controllers\NotaController::class, 'evaluar'])->name('notas.evaluar');
+        
+        // ASIGNATURAS EXTRAORDINARIAS DEL AULA
         Route::post('aulas/{aula}/asignaturas', [\App\Http\Controllers\AulaAsignaturaController::class, 'store'])->name('aulas.asignaturas.store');
         Route::put('aulas/{aula}/asignaturas/{asignatura}', [\App\Http\Controllers\AulaAsignaturaController::class, 'update'])->name('aulas.asignaturas.update');
+        Route::delete('aulas/{aula}/asignaturas/{asignacion}', [\App\Http\Controllers\AulaController::class, 'destroyAsignatura'])->name('aulas.asignaturas.destroy');
         
         // HORARIOS DEL AULA
         Route::get('aulas/{aula}/horarios', [\App\Http\Controllers\HorarioController::class, 'index'])->name('aulas.horarios.index');
@@ -85,7 +86,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('malla', \App\Http\Controllers\MallaCurricularController::class)
         ->only(['index', 'store', 'destroy']);
         
-        //prematricula
+        // Prematrícula
         Route::get('prematricula', [PrematriculaController::class, 'index'])->name('prematricula.index');
         Route::post('prematricula/{matricula}/promover', [PrematriculaController::class, 'promover'])->name('prematricula.promover');
         Route::post('prematricula/{matricula}/remitir', [PrematriculaController::class, 'remitir'])->name('prematricula.remitir');
@@ -101,7 +102,7 @@ Route::middleware('auth')->group(function () {
         Route::post('bloques/generar-masivo', [\App\Http\Controllers\BloqueHorarioController::class, 'generarMasivo'])->name('bloques.generar-masivo');
         Route::delete('bloques/jornada/eliminar', [\App\Http\Controllers\BloqueHorarioController::class, 'destroyJornada'])->name('bloques.jornada.destroy');
         
-        // --- VISOR DE HORARIOS (Solo Lectura) ---
+        // --- VISOR DE HORARIOS (Solo Lectura - Dirección/Subdirección) ---
         Route::prefix('visor-horarios')->name('visor.')->group(function () {
             Route::get('/', [\App\Http\Controllers\VisorHorarioController::class, 'index'])->name('index');
             Route::get('/docentes', [\App\Http\Controllers\VisorHorarioController::class, 'docentes'])->name('docentes');
@@ -110,15 +111,12 @@ Route::middleware('auth')->group(function () {
             Route::get('/aulas/{aula}', [\App\Http\Controllers\VisorHorarioController::class, 'horarioAula'])->name('aula.show');
         });
         // ----------------------------------------
-
-        Route::put('usuarios/{usuario}/reset-password', [\App\Http\Controllers\UsuarioController::class, 'resetPassword'])
-             ->name('usuarios.reset-password');
-        Route::resource('usuarios', \App\Http\Controllers\UsuarioController::class);
         
         // Panel Exclusivo del Maestro Guía
         Route::get('tutor/mis-alumnos', [\App\Http\Controllers\DocenteGuiaController::class, 'misAlumnos'])->name('tutor.mis-alumnos');
         Route::get('tutor/rendimiento', [\App\Http\Controllers\DocenteGuiaController::class, 'rendimiento'])->name('tutor.rendimiento');
-
+        Route::get('tutor/mi-horario', [\App\Http\Controllers\DocenteGuiaController::class, 'miHorario'])->name('tutor.horario');
+        
         // Fase 5: Calificaciones
         Route::get('notas', [\App\Http\Controllers\NotaController::class, 'index'])->name('notas.index');
         Route::get('notas/planilla/{asignacion}', [\App\Http\Controllers\NotaController::class, 'create'])->name('notas.create');
@@ -154,6 +152,12 @@ Route::middleware('auth')->group(function () {
         Route::get('boletines/constancia/{matricula}', [\App\Http\Controllers\BoletinController::class, 'constancia'])->name('boletines.constancia');
         Route::get('boletines/{matricula}', [\App\Http\Controllers\BoletinController::class, 'show'])->name('boletines.show');
         Route::post('boletines/{matricula}/aprobar', [\App\Http\Controllers\BoletinController::class, 'aprobarBoletin'])->name('boletines.aprobar');
+
+        // PDF Boletines
+        Route::get('boletines/pdf/boletin/{matricula}', [\App\Http\Controllers\BoletinPdfController::class, 'boletin'])->name('boletines.pdf.boletin');
+        Route::get('boletines/pdf/constancia/{matricula}', [\App\Http\Controllers\BoletinPdfController::class, 'constancia'])->name('boletines.pdf.constancia');
+        Route::get('boletines/pdf/certificado/{matricula}', [\App\Http\Controllers\BoletinPdfController::class, 'certificado'])->name('boletines.pdf.certificado');
+        Route::post('boletines/pdf/masivo', [\App\Http\Controllers\BoletinPdfController::class, 'masivo'])->name('boletines.pdf.masivo');
         
         // Fase 7: Examen de Reparación
         Route::get('reparacion', [\App\Http\Controllers\ExamenReparacionController::class, 'index'])->name('reparacion.index');

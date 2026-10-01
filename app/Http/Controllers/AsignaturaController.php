@@ -17,9 +17,18 @@ class AsignaturaController extends Controller
             abort(403, 'No tienes permiso para modificar el catálogo del currículo.');
         }
 
-        $asignaturas = Asignatura::orderBy('nombre', 'asc')->get();
-        
-        return view('academico.asignaturas.index', compact('asignaturas'));
+        try {
+            $asignaturas = Asignatura::orderBy('nombre', 'asc')->get();
+            
+            return view('academico.asignaturas.index', compact('asignaturas'));
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA: Si falla la conexión a la base de datos al cargar el catálogo
+            return redirect()->route('dashboard')->with('error', 'Ocurrió un error inesperado al cargar el catálogo de asignaturas.');
+        }
     }
 
     public function store(Request $request)
@@ -27,6 +36,7 @@ class AsignaturaController extends Controller
         // Limpiamos espacios vacíos accidentales al inicio o al final
         $request->merge(['nombre' => trim($request->nombre)]);
 
+        // Validación AFUERA del try-catch para no interferir con las advertencias rojas de la vista
         $request->validate([
             'nombre' => [
                 'required',
@@ -42,15 +52,25 @@ class AsignaturaController extends Controller
             ]
         ]);
 
-        Asignatura::create(['nombre' => $request->nombre]);
+        try {
+            Asignatura::create(['nombre' => $request->nombre]);
 
-        return back()->with('success', 'Asignatura registrada correctamente.');
+            return back()->with('success', 'Asignatura registrada correctamente.');
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA: Si el servidor falla justo al momento de hacer el INSERT
+            return back()->withInput()->with('error', 'Hubo un problema técnico al registrar la asignatura. Por favor, intenta de nuevo.');
+        }
     }
 
     public function update(Request $request, Asignatura $asignatura)
     {
         $request->merge(['nombre' => trim($request->nombre)]);
 
+        // Validación AFUERA del try-catch
         $request->validate([
             'nombre' => [
                 'required',
@@ -69,9 +89,18 @@ class AsignaturaController extends Controller
             ]
         ]);
 
-        $asignatura->update(['nombre' => $request->nombre]);
+        try {
+            $asignatura->update(['nombre' => $request->nombre]);
 
-        return back()->with('success', 'Asignatura actualizada correctamente.');
+            return back()->with('success', 'Asignatura actualizada correctamente.');
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA: Si falla el UPDATE en base de datos
+            return back()->withInput()->with('error', 'Ocurrió un problema al intentar actualizar el nombre de la asignatura.');
+        }
     }
 
     public function destroy(Asignatura $asignatura)
@@ -79,8 +108,17 @@ class AsignaturaController extends Controller
         try {
             $asignatura->delete();
             return back()->with('success', 'Asignatura eliminada del catálogo.');
+            
         } catch (\Illuminate\Database\QueryException $e) {
+            // EXCEPCIÓN ESPECÍFICA: Atrapa problemas de integridad referencial (llaves foráneas)
             return back()->with('error', 'No puedes eliminar esta asignatura porque ya tiene calificaciones o está asignada a un docente.');
+            
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA GENERAL: Para cualquier otro tipo de fallo en el sistema
+            return back()->with('error', 'Ocurrió un error inesperado al intentar eliminar la asignatura.');
         }
     }
 }

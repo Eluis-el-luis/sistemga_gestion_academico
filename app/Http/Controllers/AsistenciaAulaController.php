@@ -19,48 +19,57 @@ class AsistenciaAulaController extends Controller
      */
     public function create(Request $request)
     {
-        // Validamos que tenga el permiso base de Spatie (El Docente Guía lo tiene)
-        $this->authorize('create', AsistenciaAula::class);
+        try {
+            // Validamos que tenga el permiso base de Spatie (El Docente Guía lo tiene)
+            $this->authorize('create', AsistenciaAula::class);
 
-        $usuario = auth()->user();
-        $docente = $usuario->docente;
+            $usuario = auth()->user();
+            $docente = $usuario->docente;
 
-        if (!$docente) {
-            return redirect()->route('dashboard')->with('error', 'Su usuario no tiene un perfil de docente asociado.');
+            if (!$docente) {
+                return redirect()->route('dashboard')->with('error', 'Su usuario no tiene un perfil de docente asociado.');
+            }
+
+            // Buscamos el aula activa donde este maestro es el guía
+            $aula = Aula::where('docente_guia_id', $docente->id)
+                        ->whereHas('anioEscolar', function($q) {
+                            $q->where('activo', true);
+                        })->first();
+
+            if (!$aula) {
+                return redirect()->route('dashboard')->with('error', 'No tiene un aula asignada como Docente Guía en el ciclo actual.');
+            }
+
+            // Capturamos la fecha solicitada (por defecto, hoy)
+            $fecha = $request->query('fecha', Carbon::today()->toDateString());
+
+            // Traemos a los alumnos matriculados y activos en esta aula
+            $matriculas = Matricula::with('alumno')
+                ->where('aula_id', $aula->id)
+                ->where('estado', 'activo')
+                ->get();
+
+            // Traemos las asistencias de esa fecha (si ya las habían pasado temprano)
+            // Usamos keyBy para que sea fácil buscarlas en la vista por el ID de la matrícula
+            $asistenciasPrevias = AsistenciaAula::whereIn('matricula_id', $matriculas->pluck('id'))
+                ->where('fecha', $fecha)
+                ->get()
+                ->keyBy('matricula_id');
+                
+            $incidenciasHoy = \App\Models\AsistenciaAsignatura::with(['asignatura'])
+                ->whereIn('matricula_id', $matriculas->pluck('id'))
+                ->where('fecha', $fecha)
+                ->get();
+
+            return view('academico.asistencia.aula.create', compact('aula', 'matriculas', 'fecha', 'asistenciasPrevias', 'incidenciasHoy'));
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA: Protege contra errores en formato de fecha o relaciones rotas en la BD
+            return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar la planilla de asistencia. Por favor, intenta de nuevo.');
         }
-
-        // Buscamos el aula activa donde este maestro es el guía
-        $aula = Aula::where('docente_guia_id', $docente->id)
-                    ->whereHas('anioEscolar', function($q) {
-                        $q->where('activo', true);
-                    })->first();
-
-        if (!$aula) {
-            return redirect()->route('dashboard')->with('error', 'No tiene un aula asignada como Docente Guía en el ciclo actual.');
-        }
-
-        // Capturamos la fecha solicitada (por defecto, hoy)
-        $fecha = $request->query('fecha', Carbon::today()->toDateString());
-
-        // Traemos a los alumnos matriculados y activos en esta aula
-        $matriculas = Matricula::with('alumno')
-            ->where('aula_id', $aula->id)
-            ->where('estado', 'activo')
-            ->get();
-
-        // Traemos las asistencias de esa fecha (si ya las habían pasado temprano)
-        // Usamos keyBy para que sea fácil buscarlas en la vista por el ID de la matrícula
-        $asistenciasPrevias = AsistenciaAula::whereIn('matricula_id', $matriculas->pluck('id'))
-            ->where('fecha', $fecha)
-            ->get()
-            ->keyBy('matricula_id');
-            
-        $incidenciasHoy = \App\Models\AsistenciaAsignatura::with(['asignatura'])
-            ->whereIn('matricula_id', $matriculas->pluck('id'))
-            ->where('fecha', $fecha)
-            ->get();
-
-        return view('academico.asistencia.aula.create', compact('aula', 'matriculas', 'fecha', 'asistenciasPrevias', 'incidenciasHoy'));
     }
 
     /**
@@ -68,47 +77,57 @@ class AsistenciaAulaController extends Controller
      */
     public function store(GuardarAsistenciaAulaRequest $request)
     {
-        $this->authorize('create', AsistenciaAula::class);
-
-        $usuario = auth()->user();
-        $docente = $usuario->docente;
-
-        if (!$docente) {
-            return back()->with('error', 'Su usuario no tiene un perfil de docente asociado.');
-        }
-
-        $aula = Aula::where('docente_guia_id', $docente->id)
-                    ->whereHas('anioEscolar', function($q) { $q->where('activo', true); })
-                    ->first();
-
-        if (!$aula) {
-            return back()->with('error', 'No tiene un aula asignada como Docente Guía en el ciclo actual.');
-        }
-
+        // Los datos ya fueron validados estrictamente por GuardarAsistenciaAulaRequest
         $datos = $request->validated();
         $fecha = $datos['fecha'];
 
-        $matriculaIdsValidos = Matricula::where('aula_id', $aula->id)
-            ->where('estado', 'activo')
-            ->pluck('id')
-            ->toArray();
+        try {
+            $this->authorize('create', AsistenciaAula::class);
 
-        foreach ($datos['asistencias'] as $asistencia) {
-            if (!in_array($asistencia['matricula_id'], $matriculaIdsValidos)) {
-                return back()->with('error', 'Intento de registrar asistencia para matrícula no autorizada.');
+            $usuario = auth()->user();
+            $docente = $usuario->docente;
+
+            if (!$docente) {
+                return back()->with('error', 'Su usuario no tiene un perfil de docente asociado.');
             }
 
-            AsistenciaAula::updateOrCreate(
-                [
-                    'matricula_id' => $asistencia['matricula_id'], 
-                    'fecha' => $fecha
-                ],
-                [
-                    'estado_asistencia' => $asistencia['estado_asistencia']
-                ]
-            );
-        }
+            $aula = Aula::where('docente_guia_id', $docente->id)
+                        ->whereHas('anioEscolar', function($q) { $q->where('activo', true); })
+                        ->first();
 
-        return back()->with('success', 'Asistencia del aula registrada/actualizada exitosamente para la fecha: ' . Carbon::parse($fecha)->format('d/m/Y'));
+            if (!$aula) {
+                return back()->with('error', 'No tiene un aula asignada como Docente Guía en el ciclo actual.');
+            }
+
+            $matriculaIdsValidos = Matricula::where('aula_id', $aula->id)
+                ->where('estado', 'activo')
+                ->pluck('id')
+                ->toArray();
+
+            foreach ($datos['asistencias'] as $asistencia) {
+                if (!in_array($asistencia['matricula_id'], $matriculaIdsValidos)) {
+                    return back()->with('error', 'Intento de registrar asistencia para matrícula no autorizada.');
+                }
+
+                AsistenciaAula::updateOrCreate(
+                    [
+                        'matricula_id' => $asistencia['matricula_id'], 
+                        'fecha' => $fecha
+                    ],
+                    [
+                        'estado_asistencia' => $asistencia['estado_asistencia']
+                    ]
+                );
+            }
+
+            return back()->with('success', 'Asistencia del aula registrada/actualizada exitosamente para la fecha: ' . Carbon::parse($fecha)->format('d/m/Y'));
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA: Atrapa errores en el foreach, caídas de BD o problemas de inserción
+            return back()->with('error', 'Hubo un problema al guardar la asistencia masiva. Verifica que la red esté estable y vuelve a intentarlo.');
+        }
     }
 }

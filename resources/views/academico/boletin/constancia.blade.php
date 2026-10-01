@@ -1,13 +1,21 @@
 <x-app-layout>
-    <x-slot name="header">
+<x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">Registro Académico / Constancia de Notas</h2>
-            <div class="flex gap-3">
+            <div class="flex gap-2 flex-wrap">
                 <a href="{{ route('academico.boletines.index') }}" class="text-stone-500 hover:text-stone-700 font-bold text-sm">← Volver</a>
-                <button onclick="window.print()" class="bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black px-4 py-2 rounded-xl shadow-md text-sm">Imprimir / PDF</button>
+
+                <a href="{{ route('academico.boletines.pdf.constancia', $matricula->id) }}" class="bg-[#2c5f8a] hover:bg-[#1a3c5e] text-white font-black px-4 py-2 rounded-xl shadow-md text-sm flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    PDF Constancia
+                </a>
+
+                <button onclick="window.print()" class="bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black px-4 py-2 rounded-xl shadow-md text-sm flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H8v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    Imprimir
+                </button>
             </div>
         </div>
-    </x-slot>
 
     <div class="pb-12 pt-6 max-w-5xl mx-auto sm:px-6 lg:px-8">
         <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm print:border-0 print:shadow-none">

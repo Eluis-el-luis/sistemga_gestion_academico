@@ -11,7 +11,6 @@ use App\Models\Docente;
 use App\Models\Grado;
 use App\Models\Matricula;
 use App\Models\Modalidad;
-use App\Models\Rol;
 use App\Models\Usuario;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -29,22 +28,12 @@ class ReporteTest extends TestCase
 
         $this->artisan('db:seed', ['--class' => 'Database\Seeders\PermisoSeeder']);
 
-        $roles = ['Director', 'Subdirector', 'Coordinador', 'Docente Guia', 'Docente por Asignatura', 'Gestor de Usuarios', 'Alumno'];
-        foreach ($roles as $nombre) {
-            Rol::firstOrCreate(['nombre' => $nombre]);
-        }
-
-        $this->director = Usuario::factory()->create([
-            'rol_id' => Rol::where('nombre', 'Director')->first()->id,
-        ]);
+        $this->director = Usuario::factory()->create();
         $this->director->assignRole('Director');
 
-        $this->docenteAsignatura = Usuario::factory()->create([
-            'rol_id' => Rol::where('nombre', 'Docente por Asignatura')->first()->id,
-        ]);
+        $this->docenteAsignatura = Usuario::factory()->create();
         $this->docenteAsignatura->assignRole('Docente por Asignatura');
 
-        // Estructura mínima
         $modalidad = Modalidad::factory()->create(['nombre' => 'Primaria Regular']);
         $grado = Grado::factory()->create(['nombre' => '1ro', 'modalidad_id' => $modalidad->id]);
         $anio = AnioEscolar::factory()->create(['nombre' => '2026', 'activo' => true]);
@@ -75,7 +64,6 @@ class ReporteTest extends TestCase
         ]);
     }
 
-    
     public function testdirector_puede_acceder_centro_reportes(): void
     {
         $this->actingAs($this->director)
@@ -83,7 +71,6 @@ class ReporteTest extends TestCase
             ->assertOk();
     }
 
-    
     public function testdirector_puede_ver_todos_los_reportes(): void
     {
         $rutas = [
@@ -109,7 +96,6 @@ class ReporteTest extends TestCase
         }
     }
 
-    
     public function testdocente_por_asignatura_no_puede_acceder_reportes(): void
     {
         $this->actingAs($this->docenteAsignatura)

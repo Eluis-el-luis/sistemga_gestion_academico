@@ -27,21 +27,18 @@
                     <h3 class="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3 mb-6">Credenciales de Acceso</h3>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- Nombre Completo -->
                         <div>
                             <label for="name" class="block text-sm font-bold text-slate-700 mb-1">Nombre Completo <span class="text-red-500">*</span></label>
                             <input type="text" id="name" name="nombre_completo" value="{{ old('nombre_completo') }}" required autofocus class="block w-full rounded-xl border-slate-200 shadow-sm focus:border-[#e6ac27] focus:ring-[#e6ac27] sm:text-sm transition-colors bg-slate-50/50" placeholder="Ej. Juan Pérez">
                             @error('nombre_completo') <span class="text-red-500 text-xs font-bold mt-1 block">{{ $message }}</span> @enderror
                         </div>
 
-                        <!-- Correo Electrónico -->
                         <div>
                             <label for="email" class="block text-sm font-bold text-slate-700 mb-1">Correo Institucional <span class="text-red-500">*</span></label>
                             <input type="email" id="email" name="email" value="{{ old('email') }}" required class="block w-full rounded-xl border-slate-200 shadow-sm focus:border-[#e6ac27] focus:ring-[#e6ac27] sm:text-sm transition-colors bg-slate-50/50" placeholder="usuario@colegio.edu.ni">
                             @error('email') <span class="text-red-500 text-xs font-bold mt-1 block">{{ $message }}</span> @enderror
                         </div>
 
-                        <!-- Contraseña Generada -->
                         <div x-data="{ 
                                 password: '{{ old('password', 'colegio2026') }}', 
                                 show: false,
@@ -88,7 +85,7 @@
                     @error('roles') <span class="text-red-500 text-xs font-bold mt-2 block">{{ $message }}</span> @enderror
                 </div>
 
-                <!-- TARJETA 3: DATOS DOCENTES (Se muestra dinámicamente con Alpine) -->
+                <!-- TARJETA 3: DATOS DOCENTES -->
                 <div x-show="isDocente" x-transition.duration.300ms class="bg-[#FFFDF5] rounded-3xl p-8 shadow-sm border border-[#e6ac27]/30" style="display: none;">
                     <h3 class="text-lg font-bold text-[#3d2c1d] border-b border-[#e6ac27]/20 pb-3 mb-6 flex items-center gap-2">
                         <svg class="w-6 h-6 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0v6"></path></svg>
@@ -109,9 +106,23 @@
                             </select>
                         </div>
                         
-                        <div x-show="isCoordinador" x-transition class="md:col-span-2 mt-2" style="display: none;">
+                        <!-- NUEVO SECTOR: Modalidad Base -->
+                        <div>
+                            <label class="block text-sm font-bold text-[#3d2c1d] mb-1">Modalidad Base</label>
+                            <select name="modalidad_id" class="w-full rounded-xl border-slate-300 shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] sm:text-sm bg-white transition-colors">
+                                <option value="">Asignación General...</option>
+                                @foreach($modalidades ?? [] as $mod)
+                                    <option value="{{ $mod->id }}" {{ old('modalidad_id') == $mod->id ? 'selected' : '' }}>
+                                        {{ $mod->nombre }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('modalidad_id') <span class="text-red-500 text-xs font-bold mt-1 block">{{ $message }}</span> @enderror
+                        </div>
+
+                        <div x-show="isCoordinador" x-transition style="display: none;">
                             <label class="block text-sm font-bold text-[#3d2c1d] mb-1">Modalidad que Coordina <span class="text-red-500">*</span></label>
-                            <select name="modalidad_coordina_id" :required="isCoordinador" class="w-full md:w-1/2 rounded-xl border-slate-300 shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] sm:text-sm bg-white transition-colors">
+                            <select name="modalidad_coordina_id" :required="isCoordinador" class="w-full rounded-xl border-slate-300 shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] sm:text-sm bg-white transition-colors">
                                 <option value="">Seleccione el Nivel Académico...</option>
                                 @foreach($modalidades ?? [] as $mod)
                                     <option value="{{ $mod->id }}" {{ old('modalidad_coordina_id') == $mod->id ? 'selected' : '' }}>

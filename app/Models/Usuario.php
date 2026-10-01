@@ -14,18 +14,11 @@ class Usuario extends Authenticatable implements MustVerifyEmail
     use HasApiTokens, HasFactory, HasRoles, Notifiable, SoftDeletes;
 
     protected $table = 'usuario';
-    protected $fillable = ['nombre_completo', 'email', 'password', 'rol_id', 'activo', 'email_verified_at'];
+    protected $fillable = ['nombre_completo', 'email', 'password', 'activo', 'email_verified_at'];
     protected $hidden = ['password', 'remember_token'];
 
     protected $guard_name = 'web';
 
-    // Relación: Un usuario pertenece a un rol
-    public function rol()
-    {
-        return $this->belongsTo(Rol::class, 'rol_id');
-    }
-
-    // Relación: Un usuario puede ser un docente
     public function docente()
     {
         return $this->hasOne(Docente::class, 'usuario_id');

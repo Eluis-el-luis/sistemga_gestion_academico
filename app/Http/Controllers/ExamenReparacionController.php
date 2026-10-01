@@ -27,41 +27,50 @@ class ExamenReparacionController extends Controller
      */
     public function index(Request $request)
     {
-        $this->authorize('viewAny', ExamenReparacion::class);
+        try {
+            $this->authorize('viewAny', ExamenReparacion::class);
 
-        $usuario = auth()->user();
-        $anioActivo = AnioEscolar::where('activo', true)->first();
+            $usuario = auth()->user();
+            $anioActivo = AnioEscolar::where('activo', true)->first();
 
-        // Grados con promoción automática (no requieren examen de reparación)
-        $gradosAutoPromovidos = [1, 2, 3, 4, 5];
+            // Grados con promoción automática (no requieren examen de reparación)
+            $gradosAutoPromovidos = [1, 2, 3, 4, 5];
 
-        $matriculasRaw = Matricula::with(['alumno', 'aula.grado'])
-            ->when($anioActivo, fn ($q) => $q->where('anio_escolar_id', $anioActivo->id))
-            ->where('estado', 'activo')
-            ->whereHas('aula', function ($q) use ($gradosAutoPromovidos) {
-                $q->whereNotIn('grado_id', $gradosAutoPromovidos);
-            })
-            ->when($usuario->docente && !$usuario->hasRole(['Director', 'Subdirector']), function ($q) use ($usuario) {
-                $q->whereHas('aula', fn ($q2) => $q2->where('docente_guia_id', $usuario->docente->id));
-            })
-            ->get();
-
-        $matriculas = $matriculasRaw->map(function ($matricula) {
-            // Notas reprobadas (nota anual < 60) con su asignatura
-            $matricula->clases_reprobadas = \App\Models\Nota::with('aulaAsignaturaDocente.asignatura')
-                ->where('matricula_id', $matricula->id)
-                ->whereNotNull('nota_cuantitativa')
-                ->where('nota_cuantitativa', '<', 60)
+            $matriculasRaw = Matricula::with(['alumno', 'aula.grado'])
+                ->when($anioActivo, fn ($q) => $q->where('anio_escolar_id', $anioActivo->id))
+                ->where('estado', 'activo')
+                ->whereHas('aula', function ($q) use ($gradosAutoPromovidos) {
+                    $q->whereNotIn('grado_id', $gradosAutoPromovidos);
+                })
+                ->when($usuario->docente && !$usuario->hasRole(['Director', 'Subdirector']), function ($q) use ($usuario) {
+                    $q->whereHas('aula', fn ($q2) => $q2->where('docente_guia_id', $usuario->docente->id));
+                })
                 ->get();
 
-            return $matricula;
-        })
-        ->filter(function ($matricula) {
-            return $matricula->clases_reprobadas->count() > 0;
-        })
-        ->values();
+            $matriculas = $matriculasRaw->map(function ($matricula) {
+                // Notas reprobadas (nota anual < 60) con su asignatura
+                $matricula->clases_reprobadas = \App\Models\Nota::with('aulaAsignaturaDocente.asignatura')
+                    ->where('matricula_id', $matricula->id)
+                    ->whereNotNull('nota_cuantitativa')
+                    ->where('nota_cuantitativa', '<', 60)
+                    ->get();
 
-        return view('academico.reparacion.index', compact('matriculas'));
+                return $matricula;
+            })
+            ->filter(function ($matricula) {
+                return $matricula->clases_reprobadas->count() > 0;
+            })
+            ->values();
+
+            return view('academico.reparacion.index', compact('matriculas'));
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA: Si las iteraciones fallan por datos inconsistentes en la base de datos
+            return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al cargar el listado de alumnos en reparación. Por favor, intenta de nuevo.');
+        }
     }
 
     /**
@@ -69,8 +78,7 @@ class ExamenReparacionController extends Controller
      */
     public function store(Request $request)
     {
-        $this->authorize('create', ExamenReparacion::class);
-
+        // Validación AFUERA del try-catch para mantener activos los mensajes del formulario
         $request->validate([
             'matricula_id' => 'required|exists:matricula,id',
             'asignatura_id' => 'required|exists:asignatura,id',
@@ -78,17 +86,28 @@ class ExamenReparacionController extends Controller
             'fecha' => 'required|date',
         ]);
 
-        $matricula = Matricula::findOrFail($request->matricula_id);
-        $asignatura = Asignatura::findOrFail($request->asignatura_id);
+        try {
+            $this->authorize('create', ExamenReparacion::class);
 
-        $this->reparacionService->registrar(
-            $matricula,
-            $asignatura,
-            (float) $request->nota_obtenida,
-            $request->fecha
-        );
+            $matricula = Matricula::findOrFail($request->matricula_id);
+            $asignatura = Asignatura::findOrFail($request->asignatura_id);
 
-        return back()->with('success', 'Examen de reparación registrado correctamente.');
+            $this->reparacionService->registrar(
+                $matricula,
+                $asignatura,
+                (float) $request->nota_obtenida,
+                $request->fecha
+            );
+
+            return back()->with('success', 'Examen de reparación registrado correctamente.');
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA: Si el ReparacionService falla o la BD rechaza los datos
+            return back()->withInput()->with('error', 'Hubo un error técnico al registrar la nota de reparación. Verifica los datos e intenta nuevamente.');
+        }
     }
 
     /**
@@ -96,9 +115,18 @@ class ExamenReparacionController extends Controller
      */
     public function destroy(ExamenReparacion $examen)
     {
-        $this->authorize('delete', $examen);
-        $examen->delete();
+        try {
+            $this->authorize('delete', $examen);
+            $examen->delete();
 
-        return back()->with('success', 'Examen de reparación eliminado.');
+            return back()->with('success', 'Examen de reparación eliminado.');
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA: Si la BD bloquea la eliminación
+            return back()->with('error', 'No se pudo eliminar el examen de reparación. Es posible que existan dependencias protegidas.');
+        }
     }
 }

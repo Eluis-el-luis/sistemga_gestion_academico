@@ -73,10 +73,21 @@
                                     <td class="p-5 text-right">
                                         @if($aula->estado_impresion === 'Autorizado' || $aula->estado_impresion === 'Impreso')
                                             <div class="flex justify-end gap-2">
-                                                <button class="px-4 py-2 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-2">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H8v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                                                    Generar PDF
-                                                </button>
+                                                <a href="{{ route('academico.boletines.pdf.masivo') }}?aula_id={{ $aula->id }}&corte_evaluativo_id={{ $corteActivo->id }}&tipo=boletin" class="px-4 py-2 bg-[#1a3c5e] hover:bg-[#2c5f8a] text-white rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-2">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                                    PDF Boletines
+                                                </a>
+
+                                                <a href="{{ route('academico.boletines.pdf.masivo') }}?aula_id={{ $aula->id }}&corte_evaluativo_id={{ $corteActivo->id }}&tipo=constancia" class="px-4 py-2 bg-[#2c5f8a] hover:bg-[#1a3c5e] text-white rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-2">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                                    PDF Constancias
+                                                </a>
+
+                                                <a href="{{ route('academico.boletines.pdf.masivo') }}?aula_id={{ $aula->id }}&corte_evaluativo_id={{ $corteActivo->id }}&tipo=certificado" class="px-4 py-2 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-2">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                                    PDF Certificados
+                                                </a>
+
                                                 @if($aula->estado_impresion === 'Autorizado')
                                                     <button class="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-black transition-all" title="Devolver al Maestro">
                                                         Devolver

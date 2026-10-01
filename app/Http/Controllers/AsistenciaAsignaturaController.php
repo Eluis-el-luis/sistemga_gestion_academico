@@ -20,43 +20,50 @@ class AsistenciaAsignaturaController extends Controller
      */
     public function create(Request $request, AulaAsignaturaDocente $asignacion)
     {
-        $this->authorize('gestionarAsistencia', $asignacion);
+        try {
+            $this->authorize('gestionarAsistencia', $asignacion);
 
-        $fecha = $request->query('fecha', Carbon::today()->toDateString());
+            $fecha = $request->query('fecha', Carbon::today()->toDateString());
 
-        // 1. Alumnos matriculados en esta aula
-        $matriculas = Matricula::with('alumno')
-            ->where('aula_id', $asignacion->aula_id)
-            ->where('estado', 'activo')
-            ->get();
+            // 1. Alumnos matriculados en esta aula
+            $matriculas = Matricula::with('alumno')
+                ->where('aula_id', $asignacion->aula_id)
+                ->where('estado', 'activo')
+                ->get();
 
-        // 2. Asistencia matutina del Guía (Para saber si el alumno reportó enfermedad temprano)
-        $asistenciaGuia = AsistenciaAula::whereIn('matricula_id', $matriculas->pluck('id'))
-            ->where('fecha', $fecha)
-            ->get()
-            ->keyBy('matricula_id');
+            // 2. Asistencia matutina del Guía (Para saber si el alumno reportó enfermedad temprano)
+            $asistenciaGuia = AsistenciaAula::whereIn('matricula_id', $matriculas->pluck('id'))
+                ->where('fecha', $fecha)
+                ->get()
+                ->keyBy('matricula_id');
 
-        // 3. Incidencias previas reportadas por ESTE maestro en ESTA clase hoy
-        $incidenciasPrevias = AsistenciaAsignatura::with('bloqueHorario')
-            ->whereIn('matricula_id', $matriculas->pluck('id'))
-            ->where('asignatura_id', $asignacion->asignatura_id)
-            ->where('fecha', $fecha)
-            ->get()
-            ->groupBy('matricula_id');
+            // 3. Incidencias previas reportadas por ESTE maestro en ESTA clase hoy
+            $incidenciasPrevias = AsistenciaAsignatura::with('bloqueHorario')
+                ->whereIn('matricula_id', $matriculas->pluck('id'))
+                ->where('asignatura_id', $asignacion->asignatura_id)
+                ->where('fecha', $fecha)
+                ->get()
+                ->groupBy('matricula_id');
 
-        
+            // 4. Bloques horarios de esta modalidad/turno/jornada (excluyendo recreos) para que el maestro elija la hora
+            $bloques = BloqueHorario::where('modalidad_id', $asignacion->aula->modalidad_id)
+                ->where('turno', $asignacion->aula->turno)
+                ->where('tipo_jornada', 'Regular')
+                ->where('es_recreo', false)
+                ->orderBy('hora_inicio')
+                ->get();
 
-        // 4. Bloques horarios de esta modalidad/turno/jornada (excluyendo recreos) para que el maestro elija la hora
-        $bloques = BloqueHorario::where('modalidad_id', $asignacion->aula->modalidad_id)
-            ->where('turno', $asignacion->aula->turno)
-            ->where('tipo_jornada', 'Regular')
-            ->where('es_recreo', false)
-            ->orderBy('hora_inicio')
-            ->get();
+            return view('academico.asistencia.asignatura.create', compact(
+                'asignacion', 'matriculas', 'fecha', 'asistenciaGuia', 'incidenciasPrevias', 'bloques'
+            ));
 
-        return view('academico.asistencia.asignatura.create', compact(
-            'asignacion', 'matriculas', 'fecha', 'asistenciaGuia', 'incidenciasPrevias', 'bloques'
-        ));
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA: Protege contra fechas mal formateadas o relaciones de base de datos rotas
+            return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar la planilla de asistencia. Por favor, intenta de nuevo.');
+        }
     }
 
     /**
@@ -64,8 +71,7 @@ class AsistenciaAsignaturaController extends Controller
      */
     public function store(Request $request, AulaAsignaturaDocente $asignacion)
     {
-        $this->authorize('gestionarAsistencia', $asignacion);
-
+        // Se valida AFUERA del try-catch para mantener las alertas rojas del formulario
         $request->validate([
             'fecha' => 'required|date',
             'matricula_id' => 'required|exists:matricula,id',
@@ -75,39 +81,51 @@ class AsistenciaAsignaturaController extends Controller
             'observacion' => 'nullable|string|max:255',
         ]);
 
-        // Validar que la matrícula pertenezca al aula de esta asignación
-        $perteneceAula = Matricula::where('id', $request->matricula_id)
-            ->where('aula_id', $asignacion->aula_id)
-            ->where('estado', 'activo')
-            ->exists();
-        if (!$perteneceAula) {
-            return back()->with('error', 'El estudiante no pertenece a esta aula o no está activo.');
+        try {
+            $this->authorize('gestionarAsistencia', $asignacion);
+
+            // Validar que la matrícula pertenezca al aula de esta asignación
+            $perteneceAula = Matricula::where('id', $request->matricula_id)
+                ->where('aula_id', $asignacion->aula_id)
+                ->where('estado', 'activo')
+                ->exists();
+                
+            if (!$perteneceAula) {
+                return back()->with('error', 'El estudiante no pertenece a esta aula o no está activo.');
+            }
+
+            // Validar que el bloque corresponda a modalidad, turno y jornada del aula
+            $bloque = BloqueHorario::findOrFail($request->bloque_horario_id);
+            if ($bloque->modalidad_id !== $asignacion->aula->modalidad_id
+                || $bloque->turno !== $asignacion->aula->turno
+                || $bloque->tipo_jornada !== 'Regular'
+                || $bloque->es_recreo) {
+                return back()->with('error', 'El bloque de tiempo seleccionado no corresponde a esta asignatura.');
+            }
+
+            // Guardamos o actualizamos (Evita que el maestro registre dos fugas para el mismo niño en el mismo bloque)
+            AsistenciaAsignatura::updateOrCreate(
+                [
+                    'matricula_id' => $request->matricula_id,
+                    'asignatura_id' => $asignacion->asignatura_id,
+                    'bloque_horario_id' => $request->bloque_horario_id,
+                    'fecha' => $request->fecha,
+                ],
+                [
+                    'estado_incidencia' => $request->estado_incidencia,
+                    'observacion' => $request->observacion,
+                ]
+            );
+
+            return back()->with('success', 'Incidencia registrada exitosamente.');
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA: Protege contra errores al guardar en la base de datos
+            return back()->with('error', 'Hubo un problema al guardar la incidencia en la base de datos. Por favor, verifica la información e intenta de nuevo.');
         }
-
-        // Validar que el bloque corresponda a modalidad, turno y jornada del aula
-        $bloque = BloqueHorario::findOrFail($request->bloque_horario_id);
-        if ($bloque->modalidad_id !== $asignacion->aula->modalidad_id
-            || $bloque->turno !== $asignacion->aula->turno
-            || $bloque->tipo_jornada !== 'Regular'
-            || $bloque->es_recreo) {
-            return back()->with('error', 'El bloque de tiempo seleccionado no corresponde a esta asignatura.');
-        }
-
-        // Guardamos o actualizamos (Evita que el maestro registre dos fugas para el mismo niño en el mismo bloque)
-        AsistenciaAsignatura::updateOrCreate(
-            [
-                'matricula_id' => $request->matricula_id,
-                'asignatura_id' => $asignacion->asignatura_id,
-                'bloque_horario_id' => $request->bloque_horario_id,
-                'fecha' => $request->fecha,
-            ],
-            [
-                'estado_incidencia' => $request->estado_incidencia,
-                'observacion' => $request->observacion,
-            ]
-        );
-
-        return back()->with('success', 'Incidencia registrada exitosamente.');
     }
 
     /**
@@ -115,14 +133,23 @@ class AsistenciaAsignaturaController extends Controller
      */
     public function destroy(AulaAsignaturaDocente $asignacion, AsistenciaAsignatura $incidencia)
     {
-        $this->authorize('gestionarAsistencia', $asignacion);
+        try {
+            $this->authorize('gestionarAsistencia', $asignacion);
 
-        // Verificar que la incidencia pertenezca a ESTA asignación
-        if ($incidencia->asignatura_id !== $asignacion->asignatura_id) {
-            return back()->with('error', 'La incidencia no pertenece a esta asignatura.');
+            // Verificar que la incidencia pertenezca a ESTA asignación
+            if ($incidencia->asignatura_id !== $asignacion->asignatura_id) {
+                return back()->with('error', 'La incidencia no pertenece a esta asignatura.');
+            }
+
+            $incidencia->delete();
+            return back()->with('success', 'Incidencia eliminada. El estudiante vuelve a contar como presente en este bloque.');
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            // CONTINGENCIA: Si la base de datos bloquea la eliminación
+            return back()->with('error', 'No se pudo eliminar la incidencia. Es posible que el sistema la esté protegiendo por reglas internas.');
         }
-
-        $incidencia->delete();
-        return back()->with('success', 'Incidencia eliminada. El estudiante vuelve a contar como presente en este bloque.');
     }
 }

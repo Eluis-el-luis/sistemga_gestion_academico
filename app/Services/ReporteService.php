@@ -411,11 +411,22 @@ class ReporteService
                 ->get();
 
             $aulaIds = $aulas->pluck('id');
-            $matriculas = Matricula::with('alumno')
+
+            // MI (Matrícula Inicial): TODAS las matrículas del año/grado (incluye retirados)
+            $matriculasMI = Matricula::with('alumno')
+                ->whereIn('aula_id', $aulaIds)
+                ->where('anio_escolar_id', $anio?->id)
+                ->get();
+
+            // MA (Matrícula Actual): Solo matrículas ACTIVAS
+            $matriculasMA = Matricula::with('alumno')
                 ->whereIn('aula_id', $aulaIds)
                 ->where('anio_escolar_id', $anio?->id)
                 ->where('estado', 'activo')
                 ->get();
+
+            // Para el resto del reporte usamos matrículas activas (MA)
+            $matriculas = $matriculasMA;
 
             // Asignaciones (para contar docentes por grado)
             $asignaciones = AulaAsignaturaDocente::whereIn('aula_id', $aulaIds)
@@ -424,8 +435,10 @@ class ReporteService
             $totalDocentes = $asignaciones->whereNotNull('docente_id')->pluck('docente_id')->unique()->count();
 
             // MI / MA por sexo
-            $miAs = $matriculas->where('alumno.sexo', 'M')->count();
-            $miF = $matriculas->where('alumno.sexo', 'F')->count();
+            $miAs = $matriculasMI->where('alumno.sexo', 'M')->count();
+            $miF = $matriculasMI->where('alumno.sexo', 'F')->count();
+            $maAs = $matriculasMA->where('alumno.sexo', 'M')->count();
+            $maF = $matriculasMA->where('alumno.sexo', 'F')->count();
 
             // Clasificar alumnos por nº de asignaturas reprobadas
             $aprobadosTodasAs = 0; $aprobadosTodasF = 0;
@@ -467,8 +480,8 @@ class ReporteService
                 'modalidad' => $grado->modalidad->nombre ?? '',
                 'mi_as' => $miAs,
                 'mi_f' => $miF,
-                'ma_as' => $miAs,
-                'ma_f' => $miF,
+                'ma_as' => $maAs,
+                'ma_f' => $maF,
                 'aprobados_todas_as' => $aprobadosTodasAs,
                 'aprobados_todas_f' => $aprobadosTodasF,
                 'aplazados_1_as' => $aplazados1As,
@@ -479,7 +492,7 @@ class ReporteService
                 'aplazados_3_f' => $aplazados3F,
                 'total_docentes' => $totalDocentes,
                 'porcentaje_aprobados' => $totalEvaluados > 0 ? round((($aprobadosTodasAs + $aprobadosTodasF) / $totalEvaluados) * 100, 1) : 0,
-                'porcentaje_retencion' => ($miAs + $miF) > 0 ? 100.0 : 0.0,
+'porcentaje_retencion' => ($miAs + $miF) > 0 ? round((($maAs + $maF) / ($miAs + $miF)) * 100, 1) : 0.0,
             ];
         }
 

@@ -14,7 +14,7 @@ class NotaService
      * escalando los puntos obtenidos a la escala 0-100 según el total posible
      * del corte (suma de puntajes máximos de sus actividades).
      */
-    public function registrarNotaFinal(int $matriculaId, int $asignacionId, int $corteId, float $suma, ?float $totalPosible = null): ?Nota
+    public function registrarNotaFinal(int $matriculaId, int $asignacionId, int $corteId, float $suma, ?float $totalPosible = null, ?int $updatedBy = null): ?Nota
     {
         $nota = $this->escalarNota($suma, $totalPosible);
 
@@ -30,6 +30,7 @@ class NotaService
             [
                 'nota_cuantitativa' => $nota,
                 'indicador_logro_id' => $indicadorId,
+                'updated_by' => $updatedBy,
             ]
         );
     }
