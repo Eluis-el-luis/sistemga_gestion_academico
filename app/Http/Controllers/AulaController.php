@@ -37,6 +37,9 @@ class AulaController extends Controller
             
             return back()->with('success', 'Asignatura eliminada de la carga horaria.');
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA
             return back()->with('error', 'No se pudo eliminar la asignatura. Es posible que el registro ya no exista o haya un problema de conexión.');
         }
@@ -54,6 +57,9 @@ class AulaController extends Controller
 
             return view('academico.aulas.index', compact('aulas'));
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar el listado de aulas.');
         }
     }
@@ -75,6 +81,9 @@ class AulaController extends Controller
 
             return view('academico.aulas.show', compact('aula', 'asignaciones', 'todasAsignaturas', 'todosDocentes'));
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return redirect()->route('academico.aulas.index')->with('error', 'No se pudo cargar la estructura de esta aula. Intenta de nuevo.');
         }
     }
@@ -99,6 +108,9 @@ class AulaController extends Controller
 
             return view('academico.aulas.create', compact('modalidades', 'grados', 'anios', 'docentes'));
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return redirect()->route('academico.aulas.index')->with('error', 'Ocurrió un problema al abrir el formulario de apertura de aulas.');
         }
     }
@@ -127,6 +139,9 @@ class AulaController extends Controller
             return redirect()->route('academico.aulas.index')
                              ->with('success', 'Aula creada exitosamente. Las asignaturas de la malla curricular han sido asignadas automáticamente.');
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return back()->withInput()->with('error', 'Hubo un error inesperado al intentar crear el aula y asignar la malla curricular. Verifica los datos.');
         }
     }
@@ -151,6 +166,9 @@ class AulaController extends Controller
 
             return view('academico.aulas.edit', compact('aula', 'modalidades', 'grados', 'anios', 'docentes'));
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return redirect()->route('academico.aulas.index')->with('error', 'No se pudo cargar la información para editar esta aula.');
         }
     }
@@ -183,6 +201,9 @@ class AulaController extends Controller
             return redirect()->route('academico.aulas.index')
                              ->with('success', 'Aula actualizada exitosamente.');
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return back()->withInput()->with('error', 'Ocurrió un problema al intentar actualizar el aula en la base de datos.');
         }
     }
@@ -196,6 +217,9 @@ class AulaController extends Controller
             return redirect()->route('academico.aulas.index')
                              ->with('success', 'Aula eliminada correctamente junto con sus asignaturas y matrículas.');
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // Este catch funciona perfecto como contingencia general y de integridad de BD
             return back()->with('error', 'No se pudo eliminar el aula. Asegúrate de que no existan registros protegidos asociados a ella.');
         }
@@ -214,6 +238,9 @@ class AulaController extends Controller
 
             return view('academico.asignaciones.index', compact('aulas'));
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return redirect()->route('dashboard')->with('error', 'Hubo un error al intentar cargar el panel de asignaciones.');
         }
     }
@@ -235,6 +262,9 @@ class AulaController extends Controller
 
             return view('academico.asignaciones.show', compact('aula', 'asignaciones', 'todosDocentes', 'todasAsignaturas'));
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return redirect()->route('academico.asignaciones.index')->with('error', 'No pudimos cargar los detalles de asignación para esta aula.');
         }
     }
@@ -253,6 +283,9 @@ class AulaController extends Controller
             // Apuntamos a la nueva vista exclusiva de horarios
             return view('academico.gestor-horarios.index', compact('aulas'));
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error inesperado al intentar abrir el Gestor de Horarios.');
         }
     }

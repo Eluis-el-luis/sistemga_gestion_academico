@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (!Schema::hasColumn('usuario', 'rol_id')) {
+            return;
+        }
+
         Schema::table('usuario', function (Blueprint $table) {
             $table->dropForeign(['rol_id']);
             $table->dropColumn('rol_id');

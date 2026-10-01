@@ -21,6 +21,9 @@ class ProfileController extends Controller
                 'user' => $request->user(),
             ]);
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla al cargar la vista de perfil
             return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al cargar los datos de tu perfil.');
         }
@@ -45,6 +48,9 @@ class ProfileController extends Controller
             return Redirect::route('profile.edit')->with('status', 'profile-updated');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la base de datos rechaza la actualización del perfil
             return Redirect::route('profile.edit')->with('error', 'Hubo un error técnico al intentar actualizar tu información. Inténtalo de nuevo.');
         }
@@ -73,6 +79,9 @@ class ProfileController extends Controller
             return Redirect::to('/');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si ocurre un fallo crítico al eliminar la cuenta en cascada
             return Redirect::route('profile.edit')->with('error', 'No se pudo eliminar la cuenta debido a un error del servidor. Por favor, contacta a soporte.');
         }

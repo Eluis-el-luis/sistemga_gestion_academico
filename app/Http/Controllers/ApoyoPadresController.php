@@ -40,6 +40,9 @@ class ApoyoPadresController extends Controller
             return view('academico.apoyo-padres.index', compact('aulas', 'aulaSeleccionada', 'registros'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la consulta de base de datos o permisos
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al intentar cargar el módulo de Apoyo de Padres. Por favor, intenta de nuevo.');
         }
@@ -79,6 +82,9 @@ class ApoyoPadresController extends Controller
             return back()->with('success', 'Registro de apoyo de padres guardado correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la base de datos falla al intentar guardar
             return back()->withInput()->with('error', 'Hubo un problema al guardar el registro en la base de datos. Verifica la información e intenta de nuevo.');
         }
@@ -97,6 +103,9 @@ class ApoyoPadresController extends Controller
             return back()->with('success', 'Registro de apoyo de padres eliminado.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla el borrado por algún problema interno de BD
             return back()->with('error', 'No se pudo eliminar el registro. Es posible que el sistema esté protegiendo datos asociados.');
         }

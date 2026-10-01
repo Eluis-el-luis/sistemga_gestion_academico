@@ -183,7 +183,7 @@ class AutorizacionPorRolTest extends TestCase
     {
         $this->actingAs($this->gestor)
             ->get(route('academico.notas.index'))
-            ->assertOk();
+            ->assertStatus(403);
 
         $this->actingAs($this->gestor)
             ->get(route('academico.asistencia.aula.create'))
@@ -194,7 +194,7 @@ class AutorizacionPorRolTest extends TestCase
     {
         $this->actingAs($this->alumnoUser)
             ->get(route('academico.notas.index'))
-            ->assertOk();
+            ->assertStatus(403);
 
         $this->actingAs($this->alumnoUser)
             ->get(route('academico.asistencia.aula.create'))

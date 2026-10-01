@@ -58,6 +58,9 @@ class AsistenciaAsignaturaController extends Controller
             ));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Protege contra fechas mal formateadas o relaciones de base de datos rotas
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar la planilla de asistencia. Por favor, intenta de nuevo.');
         }
@@ -117,6 +120,9 @@ class AsistenciaAsignaturaController extends Controller
             return back()->with('success', 'Incidencia registrada exitosamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Protege contra errores al guardar en la base de datos
             return back()->with('error', 'Hubo un problema al guardar la incidencia en la base de datos. Por favor, verifica la información e intenta de nuevo.');
         }
@@ -139,6 +145,9 @@ class AsistenciaAsignaturaController extends Controller
             return back()->with('success', 'Incidencia eliminada. El estudiante vuelve a contar como presente en este bloque.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la base de datos bloquea la eliminación
             return back()->with('error', 'No se pudo eliminar la incidencia. Es posible que el sistema la esté protegiendo por reglas internas.');
         }

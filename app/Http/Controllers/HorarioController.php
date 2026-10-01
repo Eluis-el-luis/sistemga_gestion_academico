@@ -99,6 +99,9 @@ class HorarioController extends Controller
             ));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la construcción de la matriz falla por datos corruptos
             return redirect()->route('academico.aulas.index')->with('error', 'Ocurrió un error inesperado al intentar cargar el horario de esta aula. Verifica que la configuración de bloques y asignaturas esté completa.');
         }
@@ -175,6 +178,9 @@ class HorarioController extends Controller
             return back()->with('success', 'Clase asignada al horario correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la base de datos rechaza la inserción
             return back()->withInput()->with('error', 'Ocurrió un error técnico al intentar guardar el horario. Verifica los datos e intenta nuevamente.');
         }
@@ -188,6 +194,9 @@ class HorarioController extends Controller
             return back()->with('success', 'Bloque de horario eliminado.');
             
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la base de datos protege el registro
             return back()->with('error', 'No se pudo eliminar el bloque del horario. Es posible que haya conflictos en la base de datos.');
         }

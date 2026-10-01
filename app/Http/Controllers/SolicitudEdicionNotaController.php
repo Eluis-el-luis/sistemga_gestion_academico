@@ -41,6 +41,9 @@ class SolicitudEdicionNotaController extends Controller
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
             return redirect()->route('dashboard')->with('error', $e->getMessage());
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la consulta a la base de datos falla
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar el buzón de solicitudes de edición.');
         }
@@ -76,6 +79,9 @@ class SolicitudEdicionNotaController extends Controller
             DB::rollBack();
             return back()->with('error', $e->getMessage());
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             DB::rollBack();
             // CONTINGENCIA: Si la transacción falla
             return back()->with('error', 'No se pudo aprobar la solicitud debido a un problema técnico. El cambio fue cancelado.');
@@ -101,6 +107,9 @@ class SolicitudEdicionNotaController extends Controller
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
             return back()->with('error', $e->getMessage());
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si el update falla
             return back()->with('error', 'Ocurrió un error técnico al intentar rechazar la solicitud.');
         }

@@ -43,6 +43,9 @@ class AulaAsignaturaController extends Controller
             return back()->with('success', 'Materia extra agregada correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la base de datos falla al intentar hacer el INSERT
             return back()->withInput()->with('error', 'Ocurrió un problema técnico al intentar agregar la materia extra. Intenta nuevamente.');
         }
@@ -67,6 +70,9 @@ class AulaAsignaturaController extends Controller
             return back()->with('success', 'Profesor asignado correctamente a la materia.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la base de datos falla al ejecutar el UPDATE
             return back()->with('error', 'Hubo un problema al asignar el profesor. Es posible que haya un fallo de conexión. Intenta de nuevo.');
         }

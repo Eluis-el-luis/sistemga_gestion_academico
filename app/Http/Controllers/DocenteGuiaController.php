@@ -81,6 +81,9 @@ class DocenteGuiaController extends Controller
             ));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Protege ante errores matemáticos o consultas rotas (ej. maestro sin perfil asignado)
             return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al cargar el listado de tus alumnos. Por favor, intenta de nuevo.');
         }
@@ -123,6 +126,9 @@ class DocenteGuiaController extends Controller
             return view('academico.docente-guia.rendimiento', compact('aula', 'rendimientoAula', 'cortes', 'corteId'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si el servicio de reportes falla o la base de datos no responde
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error inesperado al procesar las estadísticas de rendimiento de tu aula.');
         }

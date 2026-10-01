@@ -54,6 +54,9 @@ class MatriculaController extends Controller
             return view('academico.matriculas.index', compact('matriculas', 'aniosEscolares', 'aulas', 'anioActivo'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla alguna relación o la consulta con ILIKE
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al intentar cargar el listado de matrículas.');
         }
@@ -82,6 +85,9 @@ class MatriculaController extends Controller
             return view('academico.matriculas.create', compact('alumnos', 'aulas', 'anios', 'alumnoSeleccionado'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la carga del formulario de inscripción
             return redirect()->route('academico.matriculas.index')->with('error', 'No se pudo abrir el formulario de matrícula.');
         }
@@ -101,6 +107,9 @@ class MatriculaController extends Controller
                              ->with('success', 'Matrícula procesada exitosamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la base de datos rechaza la creación de la matrícula
             return back()->withInput()->with('error', 'Ocurrió un problema técnico al procesar la matrícula en la base de datos.');
         }
@@ -116,6 +125,9 @@ class MatriculaController extends Controller
             return redirect()->route('academico.matriculas.index')->with('success', 'Estudiante retirado correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla el cambio de estado
             return back()->with('error', 'No se pudo actualizar el estado del estudiante a retirado.');
         }
@@ -131,6 +143,9 @@ class MatriculaController extends Controller
             return redirect()->route('academico.matriculas.index')->with('success', 'Matrícula reactivada correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la base de datos rechaza la reactivación
             return back()->with('error', 'No se pudo reactivar la matrícula debido a un error de conexión.');
         }
@@ -146,6 +161,9 @@ class MatriculaController extends Controller
             return redirect()->route('academico.matriculas.index')->with('success', 'Matrícula eliminada (borrado lógico).');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si el registro tiene dependencias que impiden borrarlo
             return back()->with('error', 'No se pudo eliminar la matrícula. Es posible que el sistema la proteja por tener calificaciones asociadas.');
         }

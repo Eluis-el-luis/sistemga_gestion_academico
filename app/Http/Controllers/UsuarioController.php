@@ -67,6 +67,9 @@ class UsuarioController extends Controller
             return view('academico.usuarios.index', compact('usuarios', 'modalidades'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla alguna relación o la consulta de filtrado
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar el listado de usuarios del sistema.');
         }
@@ -99,6 +102,9 @@ class UsuarioController extends Controller
             return view('academico.usuarios.create', compact('roles', 'modalidades'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla al cargar el formulario de creación
             return redirect()->route('academico.usuarios.index')->with('error', 'No se pudo abrir el formulario de registro de usuario.');
         }
@@ -128,6 +134,9 @@ class UsuarioController extends Controller
             return view('academico.usuarios.edit', compact('usuario', 'roles', 'modalidades'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla al cargar la edición
             return redirect()->route('academico.usuarios.index')->with('error', 'No se pudo cargar la información del usuario para su edición.');
         }
@@ -194,6 +203,9 @@ class UsuarioController extends Controller
                              ->with('success', 'Personal registrado y accesos configurados correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             DB::rollBack();
             // CONTINGENCIA: Si falla la inserción en la base de datos
             return back()->withInput()->with('error', 'Ocurrió un error técnico al registrar al usuario. El proceso fue cancelado por seguridad.');
@@ -262,6 +274,9 @@ class UsuarioController extends Controller
                              ->with('success', 'Perfil y accesos actualizados correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             DB::rollBack();
             // CONTINGENCIA: Si falla el update
             return back()->withInput()->with('error', 'Ocurrió un problema técnico al actualizar la información del usuario.');
@@ -279,6 +294,9 @@ class UsuarioController extends Controller
             return redirect()->route('academico.usuarios.index')->with('success', $mensaje);
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la base de datos bloquea el cambio de estado
             return back()->with('error', 'No se pudo cambiar el estado de activación del usuario.');
         }
@@ -302,6 +320,9 @@ class UsuarioController extends Controller
                              ->with('success', 'Contraseña de ' . ($usuario->nombre_completo ?? $usuario->name) . ' restablecida exitosamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla el reseteo de contraseña
             return back()->with('error', 'No se pudo restablecer la contraseña debido a un error del servidor.');
         }

@@ -52,6 +52,9 @@ class AvanceContenidoController extends Controller
             ));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla alguna consulta al armar el panel
             return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al cargar el panel de avance de contenidos. Por favor, intenta nuevamente.');
         }
@@ -96,6 +99,9 @@ class AvanceContenidoController extends Controller
             return back()->with('success', 'Avance de contenidos registrado correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la base de datos rechaza la inserción
             return back()->withInput()->with('error', 'Hubo un error técnico al intentar guardar el avance. Verifica los datos e intenta de nuevo.');
         }
@@ -113,6 +119,9 @@ class AvanceContenidoController extends Controller
             return back()->with('success', 'Registro de avance eliminado.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la BD bloquea la eliminación
             return back()->with('error', 'No se pudo eliminar el registro de avance. Es posible que el sistema lo esté protegiendo.');
         }

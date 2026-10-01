@@ -49,6 +49,9 @@ class ActividadEvaluativaController extends Controller
             ));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la carga de la vista o la BD
             return back()->with('error', 'Lo sentimos, hubo un problema técnico al cargar las actividades evaluativas. Por favor, inténtalo de nuevo.');
         }
@@ -97,6 +100,9 @@ class ActividadEvaluativaController extends Controller
             return back()->with('success', 'Actividad guardada correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la creación en la base de datos
             return back()->with('error', 'Ocurrió un error inesperado al intentar guardar la actividad. Verifica los datos e intenta nuevamente.');
         }
@@ -141,6 +147,9 @@ class ActividadEvaluativaController extends Controller
             return back()->with('success', 'Actividad actualizada correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la actualización
             return back()->with('error', 'Lo sentimos, hubo un problema al actualizar esta actividad. Por favor, inténtalo de nuevo.');
         }
@@ -165,6 +174,9 @@ class ActividadEvaluativaController extends Controller
             return back()->with('success', 'Actividad eliminada y notas recalculadas.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si hay un problema de base de datos o de integridad referencial
             return back()->with('error', 'Hubo un error al intentar eliminar la actividad. Es posible que el sistema esté protegiendo datos asociados.');
         }

@@ -30,6 +30,9 @@ class BloqueHorarioController extends Controller
             return view('academico.bloques.index', compact('modalidades', 'bloques'));
             
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la consulta a la BD falla
             return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al intentar cargar la configuración de bloques horarios.');
         }
@@ -79,6 +82,9 @@ class BloqueHorarioController extends Controller
             return back()->with('success', 'Bloque de horario oficial agregado correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Falla de inserción en la tabla
             return back()->withInput()->with('error', 'Hubo un error técnico al intentar guardar el bloque horario. Inténtalo nuevamente.');
         }
@@ -99,6 +105,9 @@ class BloqueHorarioController extends Controller
             return back()->with('success', 'Bloque eliminado del horario oficial.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Evita errores graves si el bloque está protegido por reglas de integridad en BD
             return back()->with('error', 'No se pudo eliminar el bloque horario. Es posible que existan datos asociados a él.');
         }
@@ -152,6 +161,9 @@ class BloqueHorarioController extends Controller
             return back()->with('success', count($nuevosBloques) . ' bloques clonados exitosamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             DB::rollBack(); // Si hay error a la mitad, cancelamos todo para no ensuciar la base de datos
             return back()->with('error', 'Ocurrió un problema al clonar los bloques horarios. El proceso fue cancelado por seguridad.');
         }
@@ -222,6 +234,9 @@ class BloqueHorarioController extends Controller
             return back()->with('success', 'Estructura horaria generada automáticamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             DB::rollBack(); // Si fallan los cálculos matemáticos de hora, revertimos todo
             return back()->withInput()->with('error', 'Ocurrió un error matemático al generar los bloques horarios. Revisa las horas ingresadas.');
         }
@@ -248,6 +263,9 @@ class BloqueHorarioController extends Controller
             return back()->with('success', 'La jornada completa ha sido eliminada.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Por si hay restricciones de BD al intentar un borrado masivo
             return back()->with('error', 'No se pudo eliminar la jornada completa. Asegúrate de no tener clases asignadas a estos bloques.');
         }

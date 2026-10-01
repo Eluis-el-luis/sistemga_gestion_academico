@@ -89,6 +89,9 @@ class PrematriculaController extends Controller
             return view('academico.prematricula.index', compact('aula', 'matriculas'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si el cálculo de auditoría de notas o las consultas fallan
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar el panel de pre-matrícula y auditoría.');
         }
@@ -145,6 +148,9 @@ class PrematriculaController extends Controller
             return back()->with('success', 'Alumno promovido automáticamente a ' . $proximoGrado->nombre . ' - Sección "' . $nombreSeccion . '".');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             DB::rollBack();
             // CONTINGENCIA: Si la promoción falla en algún punto de la transacción
             return back()->with('error', 'Ocurrió un error técnico al procesar la promoción automática. El proceso fue cancelado por seguridad.');
@@ -160,6 +166,9 @@ class PrematriculaController extends Controller
             return back()->with('success', 'El expediente ha sido bloqueado y remitido a Dirección.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la remisión del expediente
             return back()->with('error', 'No se pudo remitir el expediente debido a un problema técnico.');
         }

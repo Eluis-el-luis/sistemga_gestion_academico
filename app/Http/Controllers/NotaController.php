@@ -55,6 +55,9 @@ class NotaController extends Controller
             return view('academico.notas.index', compact('asignaciones', 'modoSupervision', 'grados', 'aulas', 'gradoSeleccionadoId', 'aulaSeleccionadaId'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la carga del panel principal de calificaciones
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al intentar cargar el panel de notas. Por favor, intenta de nuevo.');
         }
@@ -112,6 +115,9 @@ class NotaController extends Controller
             ));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la planilla colapsa por falta de datos o relaciones rotas
             return redirect()->route('academico.notas.index')->with('error', 'Ocurrió un error al cargar la planilla de calificaciones.');
         }
@@ -180,6 +186,9 @@ class NotaController extends Controller
             return back()->with('success', 'Calificaciones actualizadas. La auto-suma se ha calculado exitosamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la transacción de base de datos falla o el NotaService truena
             return back()->withInput()->with('error', 'Hubo un error técnico al guardar las calificaciones. El proceso fue revertido por seguridad.');
         }
@@ -209,6 +218,9 @@ class NotaController extends Controller
             return back()->with('success', 'Calificaciones cerradas de forma permanente. Ya no pueden ser editadas.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la BD rechaza el cierre
             return back()->with('error', 'No se pudo cerrar el parcial de forma permanente. Intenta nuevamente.');
         }
@@ -266,6 +278,9 @@ class NotaController extends Controller
             ));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si ocurre un error al cargar la vista de evaluación
             return redirect()->route('academico.notas.index')->with('error', 'Ocurrió un problema al cargar el módulo de evaluación.');
         }
@@ -307,6 +322,9 @@ class NotaController extends Controller
             return back()->with('success', 'Solicitud enviada. La Subdirección revisará tu petición pronto.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla el guardado de la solicitud de desbloqueo
             return back()->withInput()->with('error', 'Ocurrió un error técnico al enviar la solicitud de desbloqueo.');
         }

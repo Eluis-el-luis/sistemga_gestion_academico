@@ -50,6 +50,9 @@ class BoletinPdfController extends Controller
 
             return $pdf->download($filename);
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA
             return back()->with('error', 'No se pudo generar el boletín en PDF. Verifica los datos e intenta de nuevo.');
         }
@@ -77,6 +80,9 @@ class BoletinPdfController extends Controller
 
             return $pdf->download($filename);
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA
             return back()->with('error', 'No se pudo generar la constancia de notas en PDF. Verifica los datos e intenta de nuevo.');
         }
@@ -109,6 +115,9 @@ class BoletinPdfController extends Controller
 
             return $pdf->download($filename);
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA
             return back()->with('error', 'No se pudo generar el certificado de notas en PDF. Verifica los datos e intenta de nuevo.');
         }
@@ -158,6 +167,9 @@ class BoletinPdfController extends Controller
                     $filename = $this->getPdfFilename($matricula, $request->tipo, $corteId);
                     $zip->addFromString($filename, $pdfContent);
                 } catch (\Exception $e) {
+                    if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                        throw $e;
+                    }
                     \Log::error("Error generando PDF para {$matricula->alumno->nombre_completo}: " . $e->getMessage());
                 }
             }
@@ -166,6 +178,9 @@ class BoletinPdfController extends Controller
 
             return response()->download($tempPath)->deleteFileAfterSend(true);
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA
             return back()->with('error', 'Ocurrió un error al generar los PDFs masivos. Verifica la sección e intenta de nuevo.');
         }

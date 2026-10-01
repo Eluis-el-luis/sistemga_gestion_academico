@@ -65,6 +65,9 @@ class ExamenReparacionController extends Controller
             return view('academico.reparacion.index', compact('matriculas'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si las iteraciones fallan por datos inconsistentes en la base de datos
             return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al cargar el listado de alumnos en reparación. Por favor, intenta de nuevo.');
         }
@@ -99,6 +102,9 @@ class ExamenReparacionController extends Controller
             return back()->with('success', 'Examen de reparación registrado correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si el ReparacionService falla o la BD rechaza los datos
             return back()->withInput()->with('error', 'Hubo un error técnico al registrar la nota de reparación. Verifica los datos e intenta nuevamente.');
         }
@@ -116,6 +122,9 @@ class ExamenReparacionController extends Controller
             return back()->with('success', 'Examen de reparación eliminado.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la BD bloquea la eliminación
             return back()->with('error', 'No se pudo eliminar el examen de reparación. Es posible que existan dependencias protegidas.');
         }

@@ -28,6 +28,9 @@ class MallaCurricularController extends Controller
             return view('academico.malla.index', compact('grados', 'asignaturas'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la carga de las relaciones
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error inesperado al intentar cargar la Malla Curricular.');
         }
@@ -75,6 +78,9 @@ class MallaCurricularController extends Controller
             return back()->with('success', 'Asignatura agregada a la plantilla oficial con éxito.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Falla de inserción
             return back()->withInput()->with('error', 'Ocurrió un problema técnico al intentar agregar la asignatura a la malla.');
         }
@@ -91,6 +97,9 @@ class MallaCurricularController extends Controller
             return back()->with('success', 'Asignatura removida de la plantilla oficial exitosamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Protege ante borrados bloqueados por la BD
             return back()->with('error', 'No se pudo remover la asignatura. Es posible que esté en uso por clases activas en este grado.');
         }
@@ -112,6 +121,9 @@ class MallaCurricularController extends Controller
             return back()->with('success', "Límite de horas para {$grado->nombre} actualizado a {$request->horas_maximas_semanales}h.");
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return back()->withInput()->with('error', 'Hubo un error al intentar actualizar el límite de horas.');
         }
     }
@@ -144,6 +156,9 @@ class MallaCurricularController extends Controller
             return back()->with('success', 'Horas de la materia actualizadas correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return back()->withInput()->with('error', 'Ocurrió un problema técnico al editar las horas de esta materia.');
         }
     }
@@ -205,6 +220,9 @@ class MallaCurricularController extends Controller
             return back()->with('success', count($materiasInsertar) . ' materias clonadas exitosamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             DB::rollBack();
             // CONTINGENCIA: Si falla la clonación, se cancela todo
             return back()->with('error', 'Ocurrió un error inesperado durante la clonación. El proceso ha sido cancelado por seguridad para proteger sus datos.');

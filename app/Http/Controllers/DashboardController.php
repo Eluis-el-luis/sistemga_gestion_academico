@@ -60,6 +60,9 @@ class DashboardController extends Controller
             $totalPersonal = 0;
             $horarios = collect();
             $diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+            // Mapeo BD (sin tilde) -> presentación (con tilde) para indexar la matriz horaria
+            $diasBD = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
+            $diaDisplay = array_combine($diasBD, $diasSemana);
             $dbMetricas = []; 
             $aulaGuia = null; 
             $esDocenteGuia = false;
@@ -105,7 +108,7 @@ class DashboardController extends Controller
                 }
 
                 foreach ($horariosRaw as $horario) {
-                    $dia = $horario->dia_semana;
+                    $dia = $diaDisplay[$horario->dia_semana] ?? $horario->dia_semana;
                     $hora = $horario->bloqueHorario->hora_inicio;
 
                     $matrizHorario[$dia][$hora] = [
@@ -173,6 +176,9 @@ class DashboardController extends Controller
             ));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA SUPREMA: Si el dashboard falla, renderizamos la vista con variables vacías seguras y mandamos alerta.
             return view('dashboard', [
                 'avisos' => collect(), 'totalMatriculados' => 0, 'totalPersonal' => 0,
@@ -292,6 +298,9 @@ class DashboardController extends Controller
                 'puntualidad'           => ['titulo' => 'Puntualidad en Horario de Entrada (%)', 'datos' => $puntualidad],
             ];
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // Si el cálculo falla, devolvemos un array vacío seguro
             return [];
         }
@@ -331,6 +340,9 @@ class DashboardController extends Controller
 
             return redirect()->route('dashboard')->with('success', 'Aviso publicado correctamente.');
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return back()->withInput()->with('error', 'Hubo un error al intentar publicar el aviso.');
         }
     }
@@ -349,6 +361,9 @@ class DashboardController extends Controller
 
             return redirect()->route('dashboard')->with('success', 'Aviso actualizado correctamente.');
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return back()->withInput()->with('error', 'Ocurrió un problema al actualizar el aviso.');
         }
     }
@@ -364,6 +379,9 @@ class DashboardController extends Controller
             DB::table('aviso')->where('id', $id)->delete();
             return redirect()->route('dashboard')->with('success', 'Aviso eliminado del sistema.');
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return back()->with('error', 'No se pudo eliminar el aviso.');
         }
     }

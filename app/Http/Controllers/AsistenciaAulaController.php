@@ -64,6 +64,9 @@ class AsistenciaAulaController extends Controller
             return view('academico.asistencia.aula.create', compact('aula', 'matriculas', 'fecha', 'asistenciasPrevias', 'incidenciasHoy'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Protege contra errores en formato de fecha o relaciones rotas en la BD
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar la planilla de asistencia. Por favor, intenta de nuevo.');
         }
@@ -120,6 +123,9 @@ class AsistenciaAulaController extends Controller
             return back()->with('success', 'Asistencia del aula registrada/actualizada exitosamente para la fecha: ' . Carbon::parse($fecha)->format('d/m/Y'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Atrapa errores en el foreach, caídas de BD o problemas de inserción
             return back()->with('error', 'Hubo un problema al guardar la asistencia masiva. Verifica que la red esté estable y vuelve a intentarlo.');
         }

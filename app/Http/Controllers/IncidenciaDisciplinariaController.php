@@ -28,6 +28,9 @@ class IncidenciaDisciplinariaController extends Controller
             return view('academico.disciplina.index', compact('incidencias'));
             
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la consulta personalizada con orderByRaw falla en la BD
             return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al cargar el buzón de incidencias disciplinarias.');
         }
@@ -64,6 +67,9 @@ class IncidenciaDisciplinariaController extends Controller
             return back()->with('success', 'Incidencia reportada exitosamente al Coordinador.');
             
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la base de datos rechaza la creación
             return back()->withInput()->with('error', 'Hubo un error técnico al reportar la incidencia. Verifica los datos e intenta nuevamente.');
         }
@@ -90,6 +96,9 @@ class IncidenciaDisciplinariaController extends Controller
             return back()->with('success', 'Estado de la incidencia actualizado correctamente.');
             
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla el UPDATE
             return back()->withInput()->with('error', 'No se pudo actualizar el estado de la incidencia debido a un fallo de conexión.');
         }

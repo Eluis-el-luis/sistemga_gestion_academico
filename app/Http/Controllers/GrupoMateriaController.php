@@ -28,6 +28,9 @@ class GrupoMateriaController extends Controller
 
             return view('academico.grupo-materia.index', compact('grupos', 'asignaturas'));
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la conexión a BD al cargar los grupos
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar la gestión de agrupaciones.');
         }
@@ -56,6 +59,9 @@ class GrupoMateriaController extends Controller
 
             return back()->with('success', 'Grupo de materias creado correctamente.');
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return back()->withInput()->with('error', 'Ocurrió un problema técnico al crear el grupo.');
         }
     }
@@ -83,6 +89,9 @@ class GrupoMateriaController extends Controller
 
             return back()->with('success', 'Grupo actualizado correctamente.');
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return back()->withInput()->with('error', 'No se pudo actualizar el grupo en la base de datos.');
         }
     }
@@ -103,6 +112,9 @@ class GrupoMateriaController extends Controller
 
             return back()->with('success', 'Grupo eliminado. Las materias asociadas quedaron sin grupo.');
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return back()->with('error', 'No se pudo eliminar el grupo. Compruebe que no existan dependencias protegidas.');
         }
     }
@@ -133,6 +145,9 @@ class GrupoMateriaController extends Controller
             return back()->with('success', 'Asignación de materias a grupos actualizada correctamente.');
             
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             DB::rollBack();
             return back()->with('error', 'Hubo un problema al aplicar las asignaciones masivas. Ningún cambio fue guardado por seguridad.');
         }

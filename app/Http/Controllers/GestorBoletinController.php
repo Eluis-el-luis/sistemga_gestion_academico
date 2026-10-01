@@ -57,6 +57,9 @@ class GestorBoletinController extends Controller
             return view('academico.boletin.bandeja', compact('aulas', 'cortes', 'corteActivo', 'anioActivo'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Protege contra fallos en las consultas internas y de mapeo
             return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al intentar cargar la bandeja de impresión de boletines. Por favor, intenta nuevamente.');
         }

@@ -17,6 +17,9 @@ class VisorHorarioController extends Controller
         try {
             return view('academico.visor.index');
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla al cargar la vista principal del visor
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar el visor de horarios.');
         }
@@ -39,6 +42,9 @@ class VisorHorarioController extends Controller
             return view('academico.visor.docentes', compact('docentes'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la consulta o el ordenamiento de docentes
             return redirect()->route('dashboard')->with('error', 'No se pudo cargar el listado de docentes para el visor.');
         }
@@ -85,6 +91,9 @@ class VisorHorarioController extends Controller
             return view('academico.visor.horario_docente', compact('docente', 'matriz', 'dias'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la construcción de la matriz horaria del docente
             return redirect()->route('academico.visor.docentes')->with('error', 'Ocurrió un error al cargar el horario individual del docente.');
         }
@@ -104,6 +113,9 @@ class VisorHorarioController extends Controller
             return view('academico.visor.aulas', compact('aulas'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la consulta de aulas
             return redirect()->route('dashboard')->with('error', 'No se pudo cargar el listado de aulas para el visor.');
         }
@@ -155,6 +167,9 @@ class VisorHorarioController extends Controller
             return view('academico.visor.horario_aula', compact('aula', 'matriz', 'dias'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla al armar la matriz del aula
             return redirect()->route('academico.visor.aulas')->with('error', 'Ocurrió un error al cargar el horario de esta aula.');
         }

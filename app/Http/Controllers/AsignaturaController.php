@@ -23,6 +23,9 @@ class AsignaturaController extends Controller
             return view('academico.asignaturas.index', compact('asignaturas'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la conexión a la base de datos al cargar el catálogo
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error inesperado al cargar el catálogo de asignaturas.');
         }
@@ -55,6 +58,9 @@ class AsignaturaController extends Controller
             return back()->with('success', 'Asignatura registrada correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si el servidor falla justo al momento de hacer el INSERT
             return back()->withInput()->with('error', 'Hubo un problema técnico al registrar la asignatura. Por favor, intenta de nuevo.');
         }
@@ -89,6 +95,9 @@ class AsignaturaController extends Controller
             return back()->with('success', 'Asignatura actualizada correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla el UPDATE en base de datos
             return back()->withInput()->with('error', 'Ocurrió un problema al intentar actualizar el nombre de la asignatura.');
         }
@@ -105,6 +114,9 @@ class AsignaturaController extends Controller
             return back()->with('error', 'No puedes eliminar esta asignatura porque ya tiene calificaciones o está asignada a un docente.');
             
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA GENERAL: Para cualquier otro tipo de fallo en el sistema
             return back()->with('error', 'Ocurrió un error inesperado al intentar eliminar la asignatura.');
         }

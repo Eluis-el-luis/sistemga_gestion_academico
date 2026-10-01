@@ -25,6 +25,9 @@ class CorteEvaluativoController extends Controller
             return view('academico.cortes.index', compact('cortes', 'anioActivo'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la conexión a la base de datos al buscar el año activo
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al intentar cargar la configuración de los cortes evaluativos.');
         }
@@ -58,6 +61,9 @@ class CorteEvaluativoController extends Controller
             return back()->with('success', 'Parámetros del corte evaluativo actualizados correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la base de datos rechaza la actualización
             return back()->withInput()->with('error', 'Hubo un problema técnico al intentar actualizar los parámetros del corte. Por favor, intenta de nuevo.');
         }

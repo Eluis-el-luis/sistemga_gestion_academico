@@ -42,6 +42,9 @@ class AsistenciaPersonalController extends Controller
             ));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla el cálculo de fechas o la consulta a la BD
             return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al cargar tu historial de asistencia. Por favor, intenta más tarde.');
         }
@@ -100,6 +103,9 @@ class AsistenciaPersonalController extends Controller
             return back()->with('success', $mensaje);
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si la base de datos se cae justo al momento de registrar la asistencia
             return back()->withInput()->with('error', 'Ocurrió un error técnico al registrar tu asistencia. Por favor, notifica a administración.');
         }

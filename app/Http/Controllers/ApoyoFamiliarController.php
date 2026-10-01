@@ -63,6 +63,9 @@ class ApoyoFamiliarController extends Controller
             return view('academico.apoyo_familiar.index', compact('aula', 'matriculas', 'corteActivo', 'promedioAula', 'totalEvaluados'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Protege contra errores de cálculo, fechas o relaciones de BD rotas
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar las evaluaciones de Apoyo Familiar. Por favor, inténtalo de nuevo.');
         }
@@ -102,6 +105,9 @@ class ApoyoFamiliarController extends Controller
             return back()->with('success', 'Evaluaciones guardadas.'); 
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Revierte la BD a su estado anterior si un updateOrInsert falla
             DB::rollBack();
             return back()->with('error', 'Ocurrió un problema al intentar guardar las evaluaciones en la base de datos.');

@@ -76,6 +76,9 @@ class BoletinController extends Controller
             return view('academico.boletin.index', compact('aulas', 'aulaSeleccionada', 'aulaActual', 'matriculas', 'todosAprobados'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si fallan las relaciones de base de datos al armar el panel
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar el panel de boletines. Por favor, intenta nuevamente.');
         }
@@ -126,6 +129,9 @@ class BoletinController extends Controller
             return back()->with('success', 'Boletín verificado y guardado en la caja del aula correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Protege el updateOrCreate y las validaciones de conteo de notas
             return back()->with('error', 'Hubo un problema al intentar validar y aprobar el boletín. Verifica los datos e intenta de nuevo.');
         }
@@ -272,6 +278,9 @@ class BoletinController extends Controller
             ));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si hay fallos matemáticos, servicios no disponibles o datos vacíos
             return back()->with('error', 'Ocurrió un error al generar el boletín. Es posible que falten datos de calificaciones o asistencia para procesar el documento.');
         }
@@ -329,6 +338,9 @@ class BoletinController extends Controller
             return view('academico.boletin.constancia', compact('matricula', 'cortes', 'filas', 'promedioGeneral'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si el servicio de notas falla o el alumno no tiene el historial completo
             return back()->with('error', 'No se pudo generar la constancia de notas. Verifica que el estudiante tenga un historial académico válido.');
         }

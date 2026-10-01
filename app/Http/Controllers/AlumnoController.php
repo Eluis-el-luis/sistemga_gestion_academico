@@ -84,6 +84,9 @@ class AlumnoController extends Controller
             return view('academico.alumnos.index', compact('alumnos', 'modalidades', 'grados', 'aulas'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si falla la consulta o carga de catálogos
             return redirect()->route('dashboard')->with('error', 'Lo sentimos, no pudimos cargar el listado de alumnos. Por favor, intenta nuevamente.');
         }
@@ -96,6 +99,9 @@ class AlumnoController extends Controller
         try {
             return view('academico.alumnos.create');
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return redirect()->route('academico.alumnos.index')->with('error', 'No se pudo abrir el formulario de registro.');
         }
     }
@@ -114,6 +120,9 @@ class AlumnoController extends Controller
                              ->with('success', 'Expediente del alumno registrado con éxito. El Docente Guía ya puede proceder con su matrícula en el aula correspondiente.');
                              
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Falla al guardar en la base de datos (ej. CUP duplicado en BD que no atrapó el validador)
             return back()->withInput()->with('error', 'Ocurrió un error inesperado al intentar guardar el expediente. Revisa los datos e intenta nuevamente.');
         }
@@ -129,6 +138,9 @@ class AlumnoController extends Controller
             return view('academico.alumnos.show', compact('alumno'));
             
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return redirect()->route('academico.alumnos.index')->with('error', 'No pudimos cargar los detalles de este alumno. Es posible que los datos estén corruptos.');
         }
     }
@@ -140,6 +152,9 @@ class AlumnoController extends Controller
         try {
             return view('academico.alumnos.edit', compact('alumno'));
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return redirect()->route('academico.alumnos.index')->with('error', 'No se pudo abrir el formulario de edición para este alumno.');
         }
     }
@@ -157,6 +172,9 @@ class AlumnoController extends Controller
                              ->with('success', 'Datos del alumno actualizados correctamente.');
                              
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return back()->withInput()->with('error', 'Hubo un problema al actualizar los datos del alumno en la base de datos.');
         }
     }
@@ -172,6 +190,9 @@ class AlumnoController extends Controller
                              ->with('success', 'Alumno eliminado del sistema.');
                              
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Muy útil aquí por si el alumno ya tiene matrículas, notas, etc. y la BD bloquea el borrado
             return back()->with('error', 'No se puede eliminar este alumno. Es probable que tenga matrículas o calificaciones asociadas que lo protegen.');
         }
@@ -204,6 +225,9 @@ class AlumnoController extends Controller
             return view('academico.alumnos.mis-alumnos', compact('aula', 'alumnos'));
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             // CONTINGENCIA: Si el usuario no tiene perfil de docente u ocurre otro error
             return redirect()->route('dashboard')->with('error', 'Hubo un problema al intentar cargar tu lista de alumnos.');
         }
