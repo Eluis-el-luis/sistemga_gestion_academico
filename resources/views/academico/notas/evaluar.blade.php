@@ -2,8 +2,10 @@
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-                <h2 class="text-xl font-black text-[#3d2c1d] tracking-tight flex items-center gap-2">
-                    <a href="{{ route('academico.notas.index') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors">
+                <h2 class="text-xl font-black text-[#3d2c1d] dark:text-white tracking-tight flex items-center gap-2">
+                    <a href="{{ auth()->user()->hasAnyRole(['Director', 'Subdirector']) ? route('academico.notas.index', ['grado_id' => $asignacion->aula->grado_id, 'aula_id' => $asignacion->aula_id]) : route('dashboard') }}" 
+                       class="text-slate-400 hover:text-[#e6ac27] transition-colors" 
+                       title="Volver">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                     </a>
                     Registro de Calificaciones
@@ -13,7 +15,24 @@
                 </p>
             </div>
 
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center gap-3">
+                @if(!$estaBloqueado)
+                    @php
+                        $puntosFaltantes = ($pesoAcumulado - $sumaAcumulado) + ($pesoExamen - $sumaExamen);
+                    @endphp
+                    <!-- Único botón unificado para configurar actividades -->
+                    <a href="{{ route('academico.notas.actividades.index', ['asignacion' => $asignacion->id, 'corte_id' => $corteSeleccionado]) }}" 
+                       class="inline-flex items-center gap-2 px-4 py-2 bg-[#3d2c1d] hover:bg-stone-800 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-sm transition-all">
+                        <svg class="w-4 h-4 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                        <span>Configurar Actividades</span>
+                        @if($puntosFaltantes > 0)
+                            <span class="ml-1 px-2 py-0.5 bg-[#e6ac27]/20 text-[#e6ac27] rounded-md text-[10px]">
+                                Faltan {{ $puntosFaltantes }} pts
+                            </span>
+                        @endif
+                    </a>
+                @endif
+
                 <form action="{{ route('academico.notas.evaluar', $asignacion->id) }}" method="GET" class="flex items-center gap-3">
                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Parcial:</label>
                     <select name="corte_evaluativo_id" onchange="this.form.submit()" class="border-slate-200 bg-white rounded-xl focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm text-[#3d2c1d] font-bold shadow-sm cursor-pointer">
@@ -31,16 +50,20 @@
     <div class="py-6 min-h-screen bg-slate-50 relative">
         <div class="max-w-[95%] mx-auto sm:px-6 lg:px-8 space-y-6">
 
-            <!-- GUÍA DE PESOS -->
+            <!-- GUÍA DE PESOS (Limpia y sin botones duplicados) -->
             @if($corteActivo)
-            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                 <div>
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Peso Acumulado</p>
-                    <p class="text-xl font-black text-[#3d2c1d]">{{ $sumaAcumulado }} / {{ $pesoAcumulado }} pts</p>
+                    <p class="text-xl font-black {{ $sumaAcumulado == $pesoAcumulado ? 'text-emerald-600' : 'text-amber-600' }}">
+                        {{ $sumaAcumulado }} / {{ $pesoAcumulado }} pts
+                    </p>
                 </div>
                 <div>
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Peso Examen</p>
-                    <p class="text-xl font-black text-[#3d2c1d]">{{ $sumaExamen }} / {{ $pesoExamen }} pts</p>
+                    <p class="text-xl font-black {{ $sumaExamen == $pesoExamen ? 'text-emerald-600' : 'text-amber-600' }}">
+                        {{ $sumaExamen }} / {{ $pesoExamen }} pts
+                    </p>
                 </div>
                 <div>
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado</p>
@@ -62,7 +85,7 @@
                 <div class="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm text-center">
                     <h3 class="text-xl font-black text-[#3d2c1d] mb-2">No hay actividades configuradas</h3>
                     <p class="text-sm text-slate-500 max-w-md mx-auto mb-6">Debes configurar la distribución de puntos antes de ingresar calificaciones.</p>
-                    <a href="{{ route('academico.notas.actividades.index', $asignacion->id) }}" class="inline-block px-8 py-3 bg-[#e6ac27] hover:bg-amber-500 text-[#3d2c1d] font-black rounded-xl shadow-md transition-all">
+                    <a href="{{ route('academico.notas.actividades.index', ['asignacion' => $asignacion->id, 'corte_id' => $corteSeleccionado]) }}" class="inline-block px-8 py-3 bg-[#e6ac27] hover:bg-amber-500 text-[#3d2c1d] font-black rounded-xl shadow-md transition-all">
                         Configurar Actividades
                     </a>
                 </div>
@@ -141,7 +164,10 @@
 
                         @if(!$estaBloqueado)
                         <div class="p-6 flex justify-end gap-3 border-t border-slate-100">
-                            <a href="{{ route('academico.notas.index') }}" class="px-5 py-2.5 text-sm font-bold text-[#3d2c1d] border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">Cancelar</a>
+                            <a href="{{ auth()->user()->hasAnyRole(['Director', 'Subdirector']) ? route('academico.notas.index', ['grado_id' => $asignacion->aula->grado_id, 'aula_id' => $asignacion->aula_id]) : route('dashboard') }}" 
+                               class="px-5 py-2.5 text-sm font-bold text-[#3d2c1d] border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                                Cancelar
+                            </a>
                             <button type="submit" class="inline-flex items-center gap-2 px-6 py-2.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white text-sm font-black rounded-xl shadow-sm transition-transform transform hover:-translate-y-0.5">
                                 Guardar Calificaciones
                             </button>

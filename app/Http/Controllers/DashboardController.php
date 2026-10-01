@@ -101,8 +101,9 @@ class DashboardController extends Controller
                     })
                     ->get();
 
-                $bloques = $horariosRaw->pluck('bloqueHorario')->unique('id')->sortBy('hora_inicio')->values();
-                
+                    // Cambia ->unique('id') por ->unique('hora_inicio')
+                    $bloques = $horariosRaw->pluck('bloqueHorario')->unique('hora_inicio')->sortBy('hora_inicio')->values();
+                    
                 if($bloques->count() > 0) {
                     $esquemaActivo = $bloques->first()->tipo_jornada ?? 'Regular';
                 }

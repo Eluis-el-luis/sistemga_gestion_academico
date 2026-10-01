@@ -1,4 +1,7 @@
 <x-app-layout>
+    @php
+        $esDirectiva = ($modoSupervision ?? false) && auth()->user()->hasAnyRole(['Director', 'Subdirector']);
+    @endphp
     <x-slot name="header">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div class="flex items-center gap-4">
@@ -7,16 +10,16 @@
                 </a>
                 <div>
                     <h2 class="font-black text-2xl text-[#3d2c1d] dark:text-white leading-tight">
-                        {{ $modoSupervision ?? false ? 'Supervisión de Evaluaciones' : 'Centro de Calificaciones' }}
+                        {{ $esDirectiva ? 'Supervisión de Evaluaciones' : 'Centro de Calificaciones' }}
                     </h2>
                     <p class="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
-                        {{ $modoSupervision ?? false ? 'Monitorea el progreso de configuración de todos los docentes.' : 'Selecciona una clase para configurar o evaluar.' }}
+                        {{ $esDirectiva ? 'Monitorea el progreso de configuración de todos los docentes.' : 'Selecciona una de tus clases asignadas para evaluar o configurar actividades.' }}
                     </p>
                 </div>
             </div>
             
-            @if($modoSupervision ?? false)
-                <!-- BOTÓN EXCLUSIVO PARA SUBDIRECCIÓN -->
+            @if($esDirectiva)
+                <!-- BOTÓN EXCLUSIVO PARA DIRECCIÓN Y SUBDIRECCIÓN -->
                 <a href="{{ route('academico.cortes.index') }}" class="hidden md:inline-flex items-center gap-2 bg-[#3d2c1d] dark:bg-slate-800 hover:bg-stone-800 dark:hover:bg-slate-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-sm transition-transform transform hover:-translate-y-0.5 text-sm border border-transparent dark:border-slate-700">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                     Definir Criterios Base
@@ -28,8 +31,8 @@
     <div class="py-10 bg-[#FFFDF5] dark:bg-slate-900 min-h-screen">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
-            <!-- Filtro Inteligente (Solo Supervisión) -->
-            @if($modoSupervision ?? false)
+            <!-- Filtro Inteligente (Exclusivo Dirección / Subdirección) -->
+            @if($esDirectiva)
                 <div class="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
                     <form method="GET" action="{{ route('academico.notas.index') }}" class="grid grid-cols-1 md:grid-cols-12 gap-5 items-end">
                         <div class="md:col-span-5">
@@ -68,7 +71,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
                 @forelse($asignaciones as $asignacion_item)
                     <!-- TARJETA DE ASIGNATURA -->
-                    <a href="{{ route('academico.notas.actividades.index', $asignacion_item->id) }}" class="group bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm hover:border-[#e6ac27] dark:hover:border-[#e6ac27] hover:shadow-md transition-all relative overflow-hidden flex flex-col justify-between cursor-pointer h-full">
+                    <a href="{{ $esDirectiva ? route('academico.notas.actividades.index', $asignacion_item->id) : route('academico.notas.evaluar', $asignacion_item->id) }}" class="group bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm hover:border-[#e6ac27] dark:hover:border-[#e6ac27] hover:shadow-md transition-all relative overflow-hidden flex flex-col justify-between cursor-pointer h-full">
                         <div class="absolute top-0 right-0 w-28 h-full bg-gradient-to-l from-[#e6ac27]/5 dark:from-[#e6ac27]/10 to-transparent pointer-events-none"></div>
                         
                         <div class="relative z-10">
@@ -79,7 +82,7 @@
                                 {{ $asignacion_item->asignatura->nombre ?? '' }}
                             </h4>
 
-                            @if($modoSupervision ?? false)
+                            @if($esDirectiva)
                                 <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-3 uppercase tracking-widest flex items-center gap-1.5">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                                     {{ $asignacion_item->docente->usuario->nombre_completo ?? 'SIN DOCENTE' }}
@@ -89,7 +92,7 @@
                         
                         <!-- CTA -->
                         <div class="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 relative z-10 flex items-center justify-between text-sm font-black text-[#e6ac27]">
-                            <span>Configurar Actividades</span>
+                            <span>{{ $esDirectiva ? 'Auditar Actividades' : 'Evaluar / Configurar' }}</span>
                             <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
                         </div>
                     </a>
@@ -107,7 +110,7 @@
         </div>
     </div>
 
-    @if($modoSupervision ?? false)
+    @if($esDirectiva)
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 const gradoSelect = document.getElementById('filtro_grado');

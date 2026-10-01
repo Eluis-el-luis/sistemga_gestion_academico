@@ -30,7 +30,7 @@ class NotaController extends Controller
             
             $usuario = auth()->user();
             
-            if ($usuario->hasRole(['Subdirector', 'Director', 'Coordinador', 'Gestor de Usuarios'])) {
+            if ($usuario->hasRole(['Subdirector', 'Director'])) {
                 $modoSupervision = true;
                 $grados = \App\Models\Grado::with('modalidad')->orderBy('modalidad_id', 'asc')->orderBy('id', 'asc')->get();
                 $aulas = \App\Models\Aula::with('grado')->get();

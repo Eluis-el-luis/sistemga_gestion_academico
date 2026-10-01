@@ -1,14 +1,20 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center gap-4">
-            <!-- Flecha de Regreso con Memoria de Filtro -->
-            <a href="{{ route('academico.notas.index', ['grado_id' => $asignacion->aula->grado_id, 'aula_id' => $asignacion->aula_id]) }}" class="text-slate-400 hover:text-[#e6ac27] dark:hover:text-[#e6ac27] transition-colors mr-2" title="Volver al Centro de Calificaciones">
+            <!-- Flecha de Regreso Inteligente según Rol -->
+            @php
+                $esDirectiva = auth()->user()->hasAnyRole(['Director', 'Subdirector']);
+                $rutaRetorno = $esDirectiva
+                    ? route('academico.notas.index', ['grado_id' => $asignacion->aula->grado_id, 'aula_id' => $asignacion->aula_id])
+                    : route('academico.notas.evaluar', ['asignacion' => $asignacion->id, 'corte_evaluativo_id' => $corteSeleccionado]);
+            @endphp
+            <a href="{{ $rutaRetorno }}" class="text-slate-400 hover:text-[#e6ac27] dark:hover:text-[#e6ac27] transition-colors mr-2" title="Volver">
                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </a>
             
             <div>
                 <h2 class="font-black text-2xl text-[#3d2c1d] dark:text-white leading-tight">
-                    {{ $modoSupervision ? 'Auditoría de Actividades:' : 'Configurar Actividades:' }} 
+                    {{ $esDirectiva ? 'Auditoría de Actividades:' : 'Configurar Actividades:' }} 
                     <span class="text-[#e6ac27]">{{ $asignacion->asignatura->nombre }}</span>
                 </h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mt-1 font-bold flex flex-wrap items-center gap-2">
@@ -38,9 +44,9 @@
                     </select>
                 </form>
                 
-                <!-- Botón para ir a Calificar -->
-                @if($corteActivo && $sumaAcumulados == $corteActivo->peso_acumulado && $sumaExamen == $corteActivo->peso_examen)
-                    <a href="{{ route('academico.notas.create', ['asignacion' => $asignacion->id, 'corte_evaluativo_id' => $corteSeleccionado]) }}" class="w-full md:w-auto bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black py-3 px-6 rounded-xl shadow-sm transition-transform transform hover:-translate-y-0.5 flex justify-center items-center gap-2">
+                <!-- Botón para ir a Calificar Planilla (apunta a evaluar) -->
+                @if($corteActivo && $actividades->isNotEmpty())
+                    <a href="{{ route('academico.notas.evaluar', ['asignacion' => $asignacion->id, 'corte_evaluativo_id' => $corteSeleccionado]) }}" class="w-full md:w-auto bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black py-3 px-6 rounded-xl shadow-sm transition-transform transform hover:-translate-y-0.5 flex justify-center items-center gap-2">
                         Ir a Calificar Planilla 
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
                     </a>
