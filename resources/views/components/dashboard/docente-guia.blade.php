@@ -1,12 +1,29 @@
 @hasanyrole('Docente Guia')
 <div x-show="rolActivo === 'Docente Guia'" x-transition.opacity style="display: none;" class="space-y-6">
     
-    <!-- Encabezado de Contexto -->
-    <div class="flex items-center justify-between mb-2 px-2">
+    <!-- Encabezado de Contexto con Botón de Horario (Opción B) -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2 px-2">
         <div>
-            <h3 class="text-xl font-black text-[#3d2c1d]">Tutoría Activa: <span class="text-[#e6ac27]">{{ $aulaGuia?->grado?->nombre ?? 'Sin Grado' }} - Sección "{{ $aulaGuia?->nombre ?? 'N/A' }}"</span></h3>
+            <h3 class="text-xl font-black text-[#3d2c1d]">
+                Tutoría Activa: <span class="text-[#e6ac27]">{{ $aulaGuia?->grado?->nombre ?? 'Sin Grado' }} - Sección "{{ $aulaGuia?->nombre ?? 'N/A' }}"</span>
+            </h3>
             <p class="text-sm text-slate-500 font-medium mt-1">Panel de control y seguimiento integral del grupo asignado.</p>
         </div>
+
+        @if($aulaGuia)
+            @php
+                $rutaHorarioGuia = Route::has('academico.tutor.horario') 
+                    ? route('academico.tutor.horario') 
+                    : (Route::has('academico.docente-guia.horario') ? route('academico.docente-guia.horario') : '#');
+            @endphp
+            <a href="{{ $rutaHorarioGuia }}" 
+               class="inline-flex items-center gap-2.5 px-5 py-2.5 bg-[#3d2c1d] hover:bg-stone-800 text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-sm transition-all transform hover:-translate-y-0.5 self-start sm:self-auto shrink-0">
+                <svg class="w-4 h-4 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                Ver Horario del Aula
+            </a>
+        @endif
     </div>
 
     <!-- 4 Accesos Rápidos Operativos -->

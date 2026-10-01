@@ -2,12 +2,27 @@
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center gap-3">
-                <a href="{{ route('academico.visor.aulas') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors" title="Volver al Directorio">
+                @php
+                    $rutaVolver = ($desdeGuia ?? false)
+                        ? route('dashboard', ['tab' => 'Docente Guia'])
+                        : route('academico.visor.aulas');
+                    $tituloVolver = ($desdeGuia ?? false)
+                        ? 'Volver al Módulo Docente Guía'
+                        : 'Volver al Directorio';
+                @endphp
+                <a href="{{ $rutaVolver }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors" title="{{ $tituloVolver }}">
                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z"></path></svg>
                 </a>
-                <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">
-                    Horario: <span class="text-[#e6ac27]">{{ $aula->grado->nombre }} - {{ $aula->nombre }}</span>
-                </h2>
+                <div>
+                    <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">
+                        Horario: <span class="text-[#e6ac27]">{{ $aula->grado->nombre }} - Sección "{{ $aula->nombre }}"</span>
+                    </h2>
+                    @if($aula->docenteGuia && $aula->docenteGuia->usuario)
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                            Docente Guía: {{ $aula->docenteGuia->usuario->nombre_completo }}
+                        </p>
+                    @endif
+                </div>
             </div>
             <div class="flex items-center gap-3">
                 <span class="inline-flex items-center px-4 py-2 bg-slate-100 border border-slate-200 rounded-xl font-black text-xs uppercase tracking-widest text-slate-600 shadow-sm">

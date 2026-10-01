@@ -42,7 +42,6 @@ class DocenteGuiaController extends Controller
 
                 if ($notas->count() > 0) {
                     $alumno->promedio_global = round($notas->avg('nota_cuantitativa'), 2);
-                    // Asumimos que la nota mínima para aprobar es 60
                     $alumno->clases_reprobadas = $notas->where('nota_cuantitativa', '<', 60)->count(); 
                 } else {
                     $alumno->promedio_global = 0;
@@ -81,10 +80,6 @@ class DocenteGuiaController extends Controller
             ));
 
         } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Protege ante errores matemáticos o consultas rotas (ej. maestro sin perfil asignado)
             return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al cargar el listado de tus alumnos. Por favor, intenta de nuevo.');
         }
     }
@@ -97,7 +92,6 @@ class DocenteGuiaController extends Controller
         try {
             $usuario = auth()->user();
 
-            // UX: Reemplazamos abort(403) por una redirección amigable
             if (!$usuario->hasRole('Docente Guia')) {
                 return redirect()->route('dashboard')->with('error', 'Solo el Docente Guía puede acceder a la analítica de rendimiento de su aula.');
             }
@@ -117,8 +111,6 @@ class DocenteGuiaController extends Controller
             }
 
             $corteId = $request->query('corte_evaluativo_id');
-            
-            // Esta llamada al servicio queda protegida por si hay datos vacíos que rompan la lógica interna
             $rendimientoAula = app(\App\Services\ReporteService::class)->rendimientoAula($aula, $corteId ? (int) $corteId : null);
 
             $cortes = \App\Models\CorteEvaluativo::where('anio_escolar_id', $aula->anio_escolar_id)->orderBy('numero')->get();
@@ -126,11 +118,74 @@ class DocenteGuiaController extends Controller
             return view('academico.docente-guia.rendimiento', compact('aula', 'rendimientoAula', 'cortes', 'corteId'));
 
         } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si el servicio de reportes falla o la base de datos no responde
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error inesperado al procesar las estadísticas de rendimiento de tu aula.');
+        }
+    }
+
+    /**
+     * Horario exclusivo del aula asignada al Docente Guía (reutiliza la vista limpia sin exponer otras aulas).
+     */
+    public function miHorario()
+    {
+        try {
+            $usuario = auth()->user();
+
+            if (!$usuario->hasRole('Docente Guia')) {
+                return redirect()->route('dashboard')->with('error', 'Solo el Docente Guía puede consultar el horario de tutoría.');
+            }
+
+            $docente = Docente::where('usuario_id', $usuario->id)->first();
+            if (!$docente) {
+                return redirect()->route('dashboard')->with('error', 'No se encontró su perfil de docente.');
+            }
+
+            // Busca estrictamente el aula activa asignada a este Docente Guía
+            $aula = Aula::with(['grado', 'modalidad', 'docenteGuia.usuario'])
+                ->where('docente_guia_id', $docente->id)
+                ->whereHas('anioEscolar', fn ($q) => $q->where('activo', true))
+                ->first();
+
+            if (!$aula) {
+                return redirect()->route('dashboard')->with('error', 'No tiene un aula asignada como Maestro Guía en el ciclo activo.');
+            }
+
+            $asignaciones = \App\Models\AulaAsignaturaDocente::where('aula_id', $aula->id)->pluck('id');
+
+            $horarios = \App\Models\Horario::with(['bloque', 'aulaAsignaturaDocente.asignatura', 'aulaAsignaturaDocente.docente.usuario'])
+                ->whereIn('aula_asignatura_docente_id', $asignaciones)
+                ->get();
+
+            $bloques = \App\Models\BloqueHorario::where('modalidad_id', $aula->modalidad_id)
+                ->where('turno', $aula->turno)
+                ->where('tipo_jornada', 'Regular')
+                ->orderBy('hora_inicio')
+                ->get();
+
+            $dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+            $diasBD = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
+
+            $horariosIndex = [];
+            foreach ($horarios as $h) {
+                $horariosIndex[$h->bloque_horario_id][$h->dia_semana] = $h;
+            }
+
+            $matriz = [];
+            foreach ($bloques as $bloque) {
+                $fila = ['bloque' => $bloque, 'dias' => []];
+                foreach ($dias as $i => $dia) {
+                    $diaBD = $diasBD[$i];
+                    $fila['dias'][$dia] = $bloque->es_recreo ? null : ($horariosIndex[$bloque->id][$diaBD] ?? null);
+                }
+                $matriz[] = $fila;
+            }
+
+            // Activa el retorno directo a la pestaña Docente Guía del Dashboard
+            $desdeGuia = true;
+
+            return view('academico.visor.horario_aula', compact('aula', 'matriz', 'dias', 'desdeGuia'));
+
+        } catch (\Exception $e) {
+            return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al cargar el horario de tu aula.');
         }
     }
 }

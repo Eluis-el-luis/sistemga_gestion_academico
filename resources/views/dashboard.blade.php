@@ -4,8 +4,12 @@
 @php
     $hora = now()->timezone('America/Managua')->hour;
     $saludo = $hora < 12 ? 'Buenos días' : ($hora < 18 ? 'Buenas tardes' : 'Buenas noches');
-    $rolPorDefecto = auth()->user()->roles->first()->name ?? 'Usuario';
     $nombreLimpio = explode(' ', trim(Auth::user()->nombre_completo ?? Auth::user()->name))[0];
+    
+    $rolesPermitidos = ['Director', 'Subdirector', 'Gestor de Usuarios', 'Coordinador', 'Secretaria', 'Docente Guia', 'Docente por Asignatura'];
+    $rolesDashboard = auth()->user()->roles->filter(fn($rol) => in_array($rol->name, $rolesPermitidos));
+    $nombresRolesUsuario = $rolesDashboard->pluck('name')->values()->toArray();
+    $rolPorDefecto = $nombresRolesUsuario[0] ?? 'Usuario';
     
     $ultimoAvisoId = $avisos->first()->id ?? 0;
 
@@ -102,7 +106,30 @@
         </div>
     </x-slot>
 
-    <div class="py-6 min-h-screen relative bg-slate-50" x-data="{ rolActivo: '{{ $rolPorDefecto }}' }">
+    <!-- CONTENEDOR PRINCIPAL CON MEMORIA DE PESTAÑA POR USUARIO -->
+    <div class="py-6 min-h-screen relative bg-slate-50" 
+         x-data="{ 
+             rolesValidos: {{ \Illuminate\Support\Js::from($nombresRolesUsuario) }},
+             rolPorDefecto: '{{ $rolPorDefecto }}',
+             rolUrl: '{{ request('tab') }}',
+             rolActivo: '{{ $rolPorDefecto }}',
+             init() {
+                 let guardado = localStorage.getItem('rolActivo_{{ Auth::id() }}');
+                 if (this.rolUrl && this.rolesValidos.includes(this.rolUrl)) {
+                     this.rolActivo = this.rolUrl;
+                     localStorage.setItem('rolActivo_{{ Auth::id() }}', this.rolUrl);
+                 } else if (guardado && this.rolesValidos.includes(guardado)) {
+                     this.rolActivo = guardado;
+                 } else {
+                     this.rolActivo = this.rolPorDefecto;
+                     localStorage.setItem('rolActivo_{{ Auth::id() }}', this.rolPorDefecto);
+                 }
+             },
+             cambiarRol(nuevoRol) {
+                 this.rolActivo = nuevoRol;
+                 localStorage.setItem('rolActivo_{{ Auth::id() }}', nuevoRol);
+             }
+         }">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
             @unless(auth()->user()->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios']))
@@ -159,13 +186,8 @@
             @endunless
 
             <div class="flex space-x-2 border-b border-slate-200 overflow-x-auto pb-px">
-                @php
-                    $rolesPermitidos = ['Director', 'Subdirector', 'Gestor de Usuarios', 'Coordinador', 'Secretaria', 'Docente Guia', 'Docente por Asignatura'];
-                    $rolesDashboard = auth()->user()->roles->filter(fn($rol) => in_array($rol->name, $rolesPermitidos));
-                @endphp
-                
                 @foreach($rolesDashboard as $rol)
-                    <button @click="rolActivo = '{{ $rol->name }}'"
+                    <button @click="cambiarRol('{{ $rol->name }}')"
                             :class="rolActivo === '{{ $rol->name }}' ? 'border-[#e6ac27] text-[#3d2c1d] font-black bg-white shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-bold'"
                             class="px-6 py-3 border-b-4 text-sm transition-all whitespace-nowrap rounded-t-xl">
                         Módulo: {{ $rol->name }}

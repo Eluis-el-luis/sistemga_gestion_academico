@@ -86,7 +86,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('malla', \App\Http\Controllers\MallaCurricularController::class)
         ->only(['index', 'store', 'destroy']);
         
-        //prematricula
+        // Prematrícula
         Route::get('prematricula', [PrematriculaController::class, 'index'])->name('prematricula.index');
         Route::post('prematricula/{matricula}/promover', [PrematriculaController::class, 'promover'])->name('prematricula.promover');
         Route::post('prematricula/{matricula}/remitir', [PrematriculaController::class, 'remitir'])->name('prematricula.remitir');
@@ -102,7 +102,7 @@ Route::middleware('auth')->group(function () {
         Route::post('bloques/generar-masivo', [\App\Http\Controllers\BloqueHorarioController::class, 'generarMasivo'])->name('bloques.generar-masivo');
         Route::delete('bloques/jornada/eliminar', [\App\Http\Controllers\BloqueHorarioController::class, 'destroyJornada'])->name('bloques.jornada.destroy');
         
-        // --- VISOR DE HORARIOS (Solo Lectura) ---
+        // --- VISOR DE HORARIOS (Solo Lectura - Dirección/Subdirección) ---
         Route::prefix('visor-horarios')->name('visor.')->group(function () {
             Route::get('/', [\App\Http\Controllers\VisorHorarioController::class, 'index'])->name('index');
             Route::get('/docentes', [\App\Http\Controllers\VisorHorarioController::class, 'docentes'])->name('docentes');
@@ -115,7 +115,8 @@ Route::middleware('auth')->group(function () {
         // Panel Exclusivo del Maestro Guía
         Route::get('tutor/mis-alumnos', [\App\Http\Controllers\DocenteGuiaController::class, 'misAlumnos'])->name('tutor.mis-alumnos');
         Route::get('tutor/rendimiento', [\App\Http\Controllers\DocenteGuiaController::class, 'rendimiento'])->name('tutor.rendimiento');
-
+        Route::get('tutor/mi-horario', [\App\Http\Controllers\DocenteGuiaController::class, 'miHorario'])->name('tutor.horario');
+        
         // Fase 5: Calificaciones
         Route::get('notas', [\App\Http\Controllers\NotaController::class, 'index'])->name('notas.index');
         Route::get('notas/planilla/{asignacion}', [\App\Http\Controllers\NotaController::class, 'create'])->name('notas.create');
