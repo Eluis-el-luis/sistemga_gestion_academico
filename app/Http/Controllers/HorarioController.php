@@ -24,6 +24,11 @@ class HorarioController extends Controller
                                 ->where('aula_id', $aula->id)
                                 ->get();
 
+            // Catálogos para gestionar docentes y materias extraordinarias desde esta misma vista
+            $asignaturasYaAsignadas = $asignaciones->pluck('asignatura_id')->toArray();
+            $todasAsignaturas = \App\Models\Asignatura::whereNotIn('id', $asignaturasYaAsignadas)->orderBy('nombre')->get();
+            $todosDocentes = \App\Models\Docente::with('usuario')->get();
+
             // 1. Bloques oficiales de ESTA aula (modalidad + turno + jornada Regular).
             $bloquesOficiales = BloqueHorario::where('modalidad_id', $aula->modalidad_id)
                                     ->where('turno', $aula->turno)
@@ -46,7 +51,7 @@ class HorarioController extends Controller
                 $asignacion->horas_restantes = $asignacion->horas_semanales - $asignacion->horas_programadas;
             }
 
-            // --- NUEVO: INTELIGENCIA PARA LA INTERFAZ (Alpine.js) ---
+            // --- INTELIGENCIA PARA LA INTERFAZ (Alpine.js) ---
             // A) ¿Qué bloques ya están ocupados en ESTA aula por día?
             $aulaOcupada = [];
             foreach ($horarios as $h) {
@@ -64,7 +69,6 @@ class HorarioController extends Controller
                 $docenteId = $hd->aulaAsignaturaDocente->docente_id;
                 $docentesOcupados[$docenteId][$hd->dia_semana][] = $hd->bloque_horario_id;
             }
-            // --------------------------------------------------------
 
             // 4. Construir la matriz
             $dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
@@ -93,23 +97,18 @@ class HorarioController extends Controller
                 $matriz[] = $fila;
             }
 
-            // Agregamos las nuevas variables al compact
             return view('academico.aulas.horarios.index', compact(
-                'aula', 'asignaciones', 'bloquesOficiales', 'bloquesAsignables', 'matriz', 'dias', 'aulaOcupada', 'docentesOcupados'
+                'aula', 'asignaciones', 'bloquesOficiales', 'bloquesAsignables', 'matriz', 'dias',
+                'aulaOcupada', 'docentesOcupados', 'todasAsignaturas', 'todosDocentes'
             ));
 
         } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si la construcción de la matriz falla por datos corruptos
-            return redirect()->route('academico.aulas.index')->with('error', 'Ocurrió un error inesperado al intentar cargar el horario de esta aula. Verifica que la configuración de bloques y asignaturas esté completa.');
+            return redirect()->route('academico.gestor-horarios.index')->with('error', 'Ocurrió un error inesperado al intentar cargar el horario de esta aula.');
         }
     }
 
     public function store(Request $request, Aula $aula)
     {
-        // Validación AFUERA del try-catch para los errores de formulario
         $request->validate([
             'aula_asignatura_docente_id' => 'required|exists:aula_asignatura_docente,id',
             'dia_semana' => 'required|in:Lunes,Martes,Miercoles,Jueves,Viernes',
@@ -119,15 +118,12 @@ class HorarioController extends Controller
         try {
             $this->authorize('horarios.gestionar');
 
-            // 1. Obtener la asignación solicitada para saber quién es el maestro
             $asignacion = AulaAsignaturaDocente::with('aula.grado')->findOrFail($request->aula_asignatura_docente_id);
 
-            // 1.5 Escudo de Pertinencia: la asignación debe pertenecer a ESTA aula
             if ($asignacion->aula_id !== $aula->id) {
                 return back()->with('error', 'La materia seleccionada no pertenece a esta aula.');
             }
 
-            // 1.6 Escudo de Bloque: el bloque debe pertenecer a la modalidad, turno y jornada del aula
             $bloque = BloqueHorario::findOrFail($request->bloque_horario_id);
             if ($bloque->modalidad_id !== $aula->modalidad_id || $bloque->turno !== $aula->turno) {
                 return back()->with('error', 'El bloque de tiempo no pertenece a la modalidad o turno de esta aula.');
@@ -139,12 +135,10 @@ class HorarioController extends Controller
                 return back()->with('error', 'No se puede asignar una materia en un bloque de recreo.');
             }
 
-            // 2. Escudo de Integridad: ¿Tiene profesor asignado?
             if (!$asignacion->docente_id) {
                 return back()->with('error', 'No puedes asignar un horario a una materia que aún no tiene profesor titular.');
             }
 
-            // 3. Escudo Choque de Aula: ¿El aula ya tiene clase a esta hora?
             $choqueAula = Horario::whereHas('aulaAsignaturaDocente', function($query) use ($aula) {
                 $query->where('aula_id', $aula->id);
             })
@@ -156,8 +150,7 @@ class HorarioController extends Controller
                 return back()->with('error', '¡Choque de Aula! Ya hay una materia asignada a esta sección en ese día y hora.');
             }
 
-            // 4. Escudo Choque de Docente: ¿El profesor está en otra aula a esta hora?
-            $choqueDocente = Horario::with('aulaAsignaturaDocente.aula.grado') // Cargamos la relación para el mensaje de error
+            $choqueDocente = Horario::with('aulaAsignaturaDocente.aula.grado')
             ->whereHas('aulaAsignaturaDocente', function($query) use ($asignacion) {
                 $query->where('docente_id', $asignacion->docente_id);
             })
@@ -172,17 +165,12 @@ class HorarioController extends Controller
                 return back()->with('error', "¡Choque de Maestro! El docente ya imparte clases en {$gradoOcupado} - {$aulaOcupada} durante ese bloque.");
             }
 
-            // 5. Vía Libre: Guardar
             Horario::create($request->only(['aula_asignatura_docente_id', 'dia_semana', 'bloque_horario_id']));
 
             return back()->with('success', 'Clase asignada al horario correctamente.');
 
         } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si la base de datos rechaza la inserción
-            return back()->withInput()->with('error', 'Ocurrió un error técnico al intentar guardar el horario. Verifica los datos e intenta nuevamente.');
+            return back()->withInput()->with('error', 'Ocurrió un error técnico al intentar guardar el horario.');
         }
     }
 
@@ -194,11 +182,7 @@ class HorarioController extends Controller
             return back()->with('success', 'Bloque de horario eliminado.');
             
         } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si la base de datos protege el registro
-            return back()->with('error', 'No se pudo eliminar el bloque del horario. Es posible que haya conflictos en la base de datos.');
+            return back()->with('error', 'No se pudo eliminar el bloque del horario.');
         }
     }
 }

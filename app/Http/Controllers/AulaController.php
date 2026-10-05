@@ -236,7 +236,27 @@ class AulaController extends Controller
             $this->authorize('viewAny', Aula::class);
             $aulas = $this->getAulasPaginadas();
 
-            return view('academico.asignaciones.index', compact('aulas'));
+            // Datos para el Asignador Masivo por Materia y Nivel
+            $todasAulasActivas = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
+                ->whereHas('anioEscolar', fn($q) => $q->where('activo', true))
+                ->orderBy('modalidad_id')
+                ->orderBy('grado_id')
+                ->orderBy('nombre')
+                ->get();
+
+            $asignaturas = \App\Models\Asignatura::orderBy('nombre')->get();
+            $docentes = \App\Models\Docente::with('usuario')->get()->sortBy(fn($d) => $d->usuario->nombre_completo ?? '');
+            $modalidades = \App\Models\Modalidad::orderBy('id')->get();
+
+            // Mapa de qué grados llevan cada asignatura en la Malla Curricular para auto-sugerir aulas
+            $mallaPorAsignatura = \App\Models\MallaCurricular::select('asignatura_id', 'grado_id')
+                ->get()
+                ->groupBy('asignatura_id')
+                ->map(fn($items) => $items->pluck('grado_id')->values());
+
+            return view('academico.asignaciones.index', compact(
+                'aulas', 'todasAulasActivas', 'asignaturas', 'docentes', 'modalidades', 'mallaPorAsignatura'
+            ));
         } catch (\Exception $e) {
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
                 throw $e;

@@ -62,6 +62,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('aulas', AulaController::class);
         Route::get('asignaciones', [AulaController::class, 'indexAsignaciones'])->name('asignaciones.index');
         Route::get('asignaciones/{aula}', [AulaController::class, 'showAsignaciones'])->name('asignaciones.show');
+        Route::post('asignaciones/masivo', [\App\Http\Controllers\AulaAsignaturaController::class, 'asignarMasivo'])->name('asignaciones.masivo');
         Route::get('gestor-horarios', [AulaController::class, 'indexHorarios'])->name('gestor-horarios.index');
         
         Route::put('usuarios/{usuario}/reset-password', [\App\Http\Controllers\UsuarioController::class, 'resetPassword'])
