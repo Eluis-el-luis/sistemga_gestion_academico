@@ -186,11 +186,11 @@ class NotaController extends Controller
             return back()->with('success', 'Calificaciones actualizadas. La auto-suma se ha calculado exitosamente.');
 
         } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si la transacción de base de datos falla o el NotaService truena
-            return back()->withInput()->with('error', 'Hubo un error técnico al guardar las calificaciones. El proceso fue revertido por seguridad.');
+            DB::rollBack();
+            return back()->withInput()->with(
+                'error',
+                $this->formatearError($e, 'Hubo un error técnico al guardar las calificaciones. El proceso fue revertido por seguridad.')
+            );
         }
     }
 
