@@ -171,7 +171,7 @@ document.addEventListener('alpine:init', () => {
 
             // Datos Seguros
             const dataSeleccionada = this.dbMetricas[this.indicador] || { titulo: 'Dato no disponible', datos: [0, 0, 0] };
-            const etiquetas = ['Preescolar', 'Primaria', 'Secundaria'];
+            const etiquetas = {!! json_encode(\App\Models\Modalidad::orderBy('id')->pluck('nombre')->toArray()) !!};
             
             const coloresRelleno = ['#fbbf24', '#60a5fa', '#34d399'];
             const coloresBorde = ['#f59e0b', '#3b82f6', '#10b981'];
@@ -208,8 +208,12 @@ document.addEventListener('alpine:init', () => {
                             titleFont: { size: 13, family: "'Figtree', sans-serif" },
                             bodyFont: { size: 14, weight: 'bold', family: "'Figtree', sans-serif" },
                             callbacks: { 
-                                // Si es conteo de matriculados, no mostrar el signo "%"
-                                label: context => ' Valor: ' + context.parsed.y + (this.indicador !== 'promedio_notas' && this.indicador !== 'matriculados' ? '%' : '') 
+                                label: context => {
+                                    // Usamos context.raw que funciona en TODAS las gráficas (barras, líneas, polar, pie, etc.)
+                                    let valor = context.raw; 
+                                    let sufijo = (this.indicador !== 'promedio_notas' && this.indicador !== 'matriculados') ? '%' : '';
+                                    return ' Valor: ' + valor + sufijo;
+                                }
                             }
                         }
                     },
