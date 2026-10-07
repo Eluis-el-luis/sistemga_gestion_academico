@@ -90,21 +90,17 @@ class BoletinPdfController extends Controller
     }
 
     /**
-     * Generar PDF de certificado de notas (formato oficial MINED).
+     * Generar PDF de certificado de notas (formato oficial MINED comparativo:
+     * grado de la matrícula + grado inmediatamente anterior).
      */
     public function certificado(Request $request, Matricula $matricula)
     {
         try {
             $this->authorize('view', $matricula);
 
-            $data = $this->reporteService->historialPorEstudiante($matricula->alumno_id);
+            $data = $this->datosCertificado($matricula);
 
-            $pdf = Pdf::loadView('pdf.certificado_notas', [
-                'matricula' => $data['matricula'],
-                'alumno' => $data['alumno'],
-                'resumenAsignaturas' => $data['resumenAsignaturas'],
-                'promedioGeneral' => $data['promedioGeneral'],
-            ])
+            $pdf = Pdf::loadView('pdf.certificado_notas', $data)
                 ->setPaper('letter', 'portrait')
                 ->setOptions([
                     'defaultFont' => 'DejaVu Sans',
@@ -112,7 +108,7 @@ class BoletinPdfController extends Controller
                     'isHtml5ParserEnabled' => true,
                 ]);
 
-            $filename = "certificado_notas_{$matricula->alumno->codigo_unico_persona}_{$data['matricula']->anioEscolar->nombre}.pdf";
+            $filename = "certificado_notas_{$matricula->alumno->codigo_unico_persona}_{$matricula->anioEscolar->nombre}.pdf";
 
             return $pdf->download($filename);
         } catch (\Exception $e) {
@@ -401,13 +397,7 @@ class BoletinPdfController extends Controller
                 return $pdf->output();
 
             case 'certificado':
-                $data = $this->reporteService->historialPorEstudiante($matricula->alumno_id);
-                $pdf = Pdf::loadView('pdf.certificado_notas', [
-                    'matricula' => $data['matricula'],
-                    'alumno' => $data['alumno'],
-                    'resumenAsignaturas' => $data['resumenAsignaturas'],
-                    'promedioGeneral' => $data['promedioGeneral'],
-                ])
+                $pdf = Pdf::loadView('pdf.certificado_notas', $this->datosCertificado($matricula))
                     ->setPaper('letter', 'portrait')
                     ->setOptions(['defaultFont' => 'DejaVu Sans']);
                 return $pdf->output();
@@ -415,6 +405,24 @@ class BoletinPdfController extends Controller
             default:
                 throw new \InvalidArgumentException("Tipo de PDF no soportado: {$tipo}");
         }
+    }
+
+    /**
+     * Datos del certificado MINED para una matrícula: el servicio agrupa el
+     * histórico del estudiante y devuelve el grado de la matrícula más el
+     * grado inmediatamente anterior (servicio con límite configurable).
+     */
+    protected function datosCertificado(Matricula $matricula): array
+    {
+        $datos = $this->reporteService->certificadoNotas(
+            $matricula->alumno_id,
+            $matricula->anio_escolar_id,
+            $matricula->aula->grado_id
+        );
+
+        $datos['logo'] = $this->logoDataUri();
+
+        return $datos;
     }
 
     /**

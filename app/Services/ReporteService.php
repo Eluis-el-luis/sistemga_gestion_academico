@@ -11,6 +11,7 @@ use App\Models\AulaAsignaturaDocente;
 use App\Models\CorteEvaluativo;
 use App\Models\Docente;
 use App\Models\Grado;
+use App\Models\IndicadorLogro;
 use App\Models\Matricula;
 use App\Models\Modalidad;
 use App\Models\Nota;
@@ -578,28 +579,162 @@ class ReporteService
     }
 
     /**
-     * Historial de notas por estudiante (todas las asignaturas y cortes).
+     * Certificado de Notas (formato MINED) de un estudiante.
+     *
+     * Agrupa el historial de matrículas del estudiante y devuelve las notas
+     * finales (NF cuantitativa + equivalencia cualitativa AA/AS/AF/AI) del
+     * grado seleccionado en el año indicado más los grados inmediatamente
+     * anteriores MISMO si aprobó o reprobó.
+     *
+     * El parámetro $limiteGrados (y la constante CERTIFICADO_LIMITE_GRADOS)
+     * es la "flexibilidad oculta": por defecto son 2 grados (seleccionado +
+     * anterior), pero basta aumentar el valor para ampliar el histórico.
      */
-    public function historialPorEstudiante(?int $alumnoId): array
+    public const CERTIFICADO_LIMITE_GRADOS = 2;
+
+    public function certificadoNotas(int $alumnoId, ?int $anioId = null, ?int $gradoId = null, int $limiteGrados = self::CERTIFICADO_LIMITE_GRADOS): array
     {
-        if (!$alumnoId) {
-            return ['alumno' => null, 'historial' => collect()];
-        }
+        $vacio = [
+            'alumno' => null,
+            'anio' => null,
+            'matricula' => null,
+            'gradoSeleccionado' => null,
+            'grados' => [],
+            'asignaturas' => [],
+            'limiteGrados' => $limiteGrados,
+        ];
 
         $alumno = Alumno::find($alumnoId);
         if (!$alumno) {
-            return ['alumno' => null, 'historial' => collect()];
+            return $vacio;
         }
 
-        $historial = Nota::with(['aulaAsignaturaDocente.asignatura', 'corteEvaluativo'])
-            ->whereHas('matricula', fn ($q) => $q->where('alumno_id', $alumnoId))
-            ->orderBy('corte_evaluativo_id')
-            ->get()
-            ->groupBy(function ($n) {
-                return $n->aulaAsignaturaDocente->asignatura->nombre;
-            });
+        $anio = $this->resolverAnio($anioId);
 
-        return ['alumno' => $alumno, 'historial' => $historial];
+        // Grado de partida: el filtro seleccionado o el de la matrícula del año
+        $gradoBase = $gradoId ? Grado::with('modalidad')->find($gradoId) : null;
+
+        $matriculaBase = Matricula::with(['aula.grado.modalidad', 'anioEscolar'])
+            ->where('alumno_id', $alumno->id)
+            ->when($anio, fn ($q) => $q->where('anio_escolar_id', $anio->id))
+            ->when($gradoBase, fn ($q) => $q->whereHas('aula', fn ($q2) => $q2->where('grado_id', $gradoBase->id)))
+            ->latest('id')
+            ->first();
+
+        if (!$gradoBase) {
+            $gradoBase = $matriculaBase?->aula?->grado;
+        }
+
+        if (!$gradoBase) {
+            // El estudiante no tiene matrícula en ese año/grado
+            return array_merge($vacio, ['alumno' => $alumno, 'anio' => $anio]);
+        }
+
+        // Cadena de grados (misma modalidad): seleccionado + anteriores,
+        // ordenada del menor al mayor para la tabla comparativa.
+        $limiteGrados = max(1, $limiteGrados);
+        $cadena = [$gradoBase];
+        $actual = $gradoBase;
+        for ($i = 1; $i < $limiteGrados; $i++) {
+            $anterior = Grado::where('modalidad_id', $actual->modalidad_id)
+                ->where('id', '<', $actual->id)
+                ->orderBy('id', 'desc')
+                ->first();
+            if (!$anterior) {
+                break;
+            }
+            array_unshift($cadena, $anterior);
+            $actual = $anterior;
+        }
+
+        // Escala cualitativa por modalidad (código => nombre del indicador)
+        $escala = IndicadorLogro::where('modalidad_id', $gradoBase->modalidad_id)
+            ->pluck('nombre', 'codigo');
+
+        $grados = [];
+        $nombresAsignaturas = [];
+
+        foreach ($cadena as $grado) {
+            // El grado seleccionado respeta el año filtrado; los anteriores toman
+            // la matrícula histórica del alumno en ese grado (cualquier año).
+            if ($grado->id === $gradoBase->id) {
+                $matricula = $matriculaBase ?? Matricula::with(['aula.grado.modalidad', 'anioEscolar'])
+                    ->where('alumno_id', $alumno->id)
+                    ->when($anio, fn ($q) => $q->where('anio_escolar_id', $anio->id))
+                    ->whereHas('aula', fn ($q2) => $q2->where('grado_id', $grado->id))
+                    ->latest('id')
+                    ->first();
+            } else {
+                $matricula = Matricula::with(['aula.grado.modalidad', 'anioEscolar'])
+                    ->where('alumno_id', $alumno->id)
+                    ->whereHas('aula', fn ($q) => $q->where('grado_id', $grado->id))
+                    ->latest('id')
+                    ->first();
+            }
+
+            $notas = [];
+            $finales = [];
+
+            if ($matricula) {
+                $asignaciones = AulaAsignaturaDocente::with('asignatura')
+                    ->where('aula_id', $matricula->aula_id)
+                    ->where('anio_escolar_id', $matricula->anio_escolar_id)
+                    ->get()
+                    ->sortBy('asignatura.nombre');
+
+                foreach ($asignaciones as $asignacion) {
+                    // NF del año REAL de la matrícula: se promedian los cortes
+                    // registrados de esa matrícula (sin depender del año activo),
+                    // para que los grados de años pasados también muestren su NF.
+                    $cortes = Nota::where('matricula_id', $matricula->id)
+                        ->where('aula_asignatura_docente_id', $asignacion->id)
+                        ->pluck('nota_cuantitativa')
+                        ->filter(fn ($n) => !is_null($n));
+
+                    $cuan = $cortes->isNotEmpty() ? (int) round($cortes->avg()) : null;
+                    $cua = $cuan !== null ? $this->notaService->calcularIndicadorLogro($cuan) : null;
+
+                    $nombre = $asignacion->asignatura->nombre;
+                    $notas[$nombre] = [
+                        'cuan' => $cuan,
+                        'cua' => $cua,
+                        'cua_nombre' => $cua ? ($escala[$cua] ?? $cua) : null,
+                    ];
+                    $nombresAsignaturas[] = $nombre;
+                    if ($cuan !== null) {
+                        $finales[] = $cuan;
+                    }
+                }
+            }
+
+            $promedio = count($finales) > 0 ? round(array_sum($finales) / count($finales), 2) : null;
+            $promedioCua = $promedio !== null ? $this->notaService->calcularIndicadorLogro((int) round($promedio)) : null;
+
+            $grados[] = [
+                'grado' => $grado,
+                'anioEscolar' => $matricula?->anioEscolar,
+                'matricula' => $matricula,
+                'promedio' => $promedio,
+                'promedio_cua' => $promedioCua,
+                'promedio_cua_nombre' => $promedioCua ? ($escala[$promedioCua] ?? $promedioCua) : null,
+                'notas' => $notas,
+            ];
+        }
+
+        // Unión ordenada alfabéticamente de las asignaturas de todos los grados
+        $nombresAsignaturas = array_values(array_unique($nombresAsignaturas));
+        sort($nombresAsignaturas);
+        $asignaturas = array_map(fn ($nombre) => ['nombre' => $nombre], $nombresAsignaturas);
+
+        return [
+            'alumno' => $alumno,
+            'anio' => $anio,
+            'matricula' => $matriculaBase ?? ($grados ? ($grados[array_key_last($grados)]['matricula']) : null),
+            'gradoSeleccionado' => $gradoBase,
+            'grados' => $grados,
+            'asignaturas' => $asignaturas,
+            'limiteGrados' => $limiteGrados,
+        ];
     }
 
     // =========================================================================
