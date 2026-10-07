@@ -43,12 +43,17 @@ class ReporteService
      */
     public function catalogos(?int $anioId): array
     {
+        $anio = $this->resolverAnio($anioId);
+
         return [
             'anios' => AnioEscolar::orderBy('id', 'desc')->get(),
             'modalidades' => Modalidad::all(),
             'grados' => Grado::orderBy('id')->get(),
             'asignaturas' => Asignatura::orderBy('nombre')->get(),
-            'cortes' => CorteEvaluativo::orderBy('numero')->get(),
+            // Los cortes se limitan al año escolar resuelto para evitar periodos de otros años.
+            'cortes' => CorteEvaluativo::when($anio, fn ($q) => $q->where('anio_escolar_id', $anio->id))
+                ->orderBy('numero')
+                ->get(),
         ];
     }
 
@@ -67,6 +72,9 @@ class ReporteService
         }
         if (!empty($filtros['docente_id'])) {
             $query->where('docente_id', $filtros['docente_id']);
+        }
+        if (!empty($filtros['aula_id'])) {
+            $query->where('aula_id', $filtros['aula_id']);
         }
         if (!empty($filtros['grado_id'])) {
             $query->whereHas('aula', fn ($q) => $q->where('grado_id', $filtros['grado_id']));
@@ -140,12 +148,14 @@ class ReporteService
     {
         $anio = $this->resolverAnio($filtros['anio_escolar_id'] ?? null);
 
-        // Asignaciones del año (y filtros opcionales de grado/aula/asignatura)
+        // Asignaciones del año (y filtros opcionales de grado/aula/asignatura/modalidad/docente)
         $asignaciones = \App\Models\AulaAsignaturaDocente::with('asignatura')
             ->where('anio_escolar_id', $anio?->id)
             ->when(!empty($filtros['aula_id']), fn ($q) => $q->where('aula_id', $filtros['aula_id']))
             ->when(!empty($filtros['grado_id']), fn ($q) => $q->whereHas('aula', fn ($q2) => $q2->where('grado_id', $filtros['grado_id'])))
+            ->when(!empty($filtros['modalidad_id']), fn ($q) => $q->whereHas('aula', fn ($q2) => $q2->where('modalidad_id', $filtros['modalidad_id'])))
             ->when(!empty($filtros['asignatura_id']), fn ($q) => $q->where('asignatura_id', $filtros['asignatura_id']))
+            ->when(!empty($filtros['docente_id']), fn ($q) => $q->where('docente_id', $filtros['docente_id']))
             ->get();
 
         // Asignaturas únicas (columnas), ordenadas alfabéticamente
@@ -215,6 +225,9 @@ class ReporteService
         $matriculas = Matricula::with(['alumno', 'aula.grado'])
             ->where('anio_escolar_id', $anio?->id)
             ->where('estado', 'activo')
+            ->when(!empty($filtros['aula_id']), fn ($q) => $q->where('aula_id', $filtros['aula_id']))
+            ->when(!empty($filtros['grado_id']), fn ($q) => $q->whereHas('aula', fn ($q2) => $q2->where('grado_id', $filtros['grado_id'])))
+            ->when(!empty($filtros['modalidad_id']), fn ($q) => $q->whereHas('aula', fn ($q2) => $q2->where('modalidad_id', $filtros['modalidad_id'])))
             ->get();
 
         $pendientes = [];
@@ -294,6 +307,8 @@ class ReporteService
 
         $aulas = Aula::with(['grado', 'modalidad'])
             ->when(!empty($filtros['grado_id']), fn ($q) => $q->where('grado_id', $filtros['grado_id']))
+            ->when(!empty($filtros['modalidad_id']), fn ($q) => $q->where('modalidad_id', $filtros['modalidad_id']))
+            ->when(!empty($filtros['aula_id']), fn ($q) => $q->where('id', $filtros['aula_id']))
             ->where('anio_escolar_id', $anio?->id)->get();
 
         $reporte = [];

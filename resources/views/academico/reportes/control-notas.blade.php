@@ -7,20 +7,10 @@
     </x-slot>
 
     <div class="pb-12 pt-6 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6 print:max-w-none print:space-y-4">
-        
+
         <!-- PANEL DE FILTROS (Se oculta por completo al imprimir) -->
         <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-4 print:hidden">
-            <div class="flex items-end gap-4">
-                <div>
-                    <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Estado</label>
-                    <select name="tipo" onchange="location.href='{{ route('academico.reportes.control-notas') }}?tipo='+this.value" class="border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
-                        <option value="">Todos</option>
-                        <option value="pendientes" @selected(request('tipo') === 'pendientes')>Notas Pendientes</option>
-                        <option value="ingresadas" @selected(request('tipo') === 'ingresadas')>Notas Ingresadas</option>
-                    </select>
-                </div>
-            </div>
-            @include('academico.reportes.partials.filtros-notas', ['ruta' => 'academico.reportes.control-notas'])
+            @include('academico.reportes.partials.filtros-notas', ['ruta' => 'academico.reportes.control-notas', 'conEstado' => true])
             <button type="button" onclick="window.print()" class="inline-flex items-center gap-2 bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black px-5 py-2.5 rounded-xl shadow-md text-xs uppercase tracking-widest transition-all">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H8v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                 Imprimir / PDF
