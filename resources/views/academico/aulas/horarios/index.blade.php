@@ -1,7 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div class="flex items-center gap-3">
+        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">            <div class="flex items-center gap-3">
                 <a href="{{ route('academico.gestor-horarios.index') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors" title="Volver al Gestor de Horarios">
                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z"></path></svg>
                 </a>
@@ -25,6 +24,13 @@
             </div>
         </div>
     </x-slot>
+
+    <!-- Impresión horizontal: el mapa semanal es una tabla ancha -->
+    <style>
+        @media print {
+            @page { size: letter landscape; margin: 10mm; }
+        }
+    </style>
 
     <div class="pb-12 pt-6 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
         

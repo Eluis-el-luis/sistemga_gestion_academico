@@ -6,8 +6,8 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'DejaVu Sans', sans-serif; font-size: 10px; line-height: 1.2; color: #000; }
-        @page { size: letter portrait; margin: 5mm; }
-        .boletin-container { width: 100%; max-width: 8.5in; margin: 0 auto; padding: 10px; }
+        @page { size: letter landscape; margin: 5mm; }
+        .boletin-container { width: 100%; max-width: 10.6in; margin: 0 auto; padding: 10px; }
         
         .header-section { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
         .logo { width: 60px; height: 60px; flex-shrink: 0; }
@@ -43,7 +43,9 @@
         <!-- HEADER: Logo + Title -->
         <div class="header-section">
             <div class="logo">
-                <img src="{{ asset('img/logo.png') }}" alt="Logo Colegio" onerror="this.style.display='none'">
+                @if(!empty($logo))
+                    <img src="{{ $logo }}" alt="Logo Colegio">
+                @endif
             </div>
             <h1 class="title">CERTIFICADO DE CALIFICACIONES</h1>
         </div>

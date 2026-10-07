@@ -137,8 +137,8 @@
                                         @endforeach
                                         
                                         <th class="px-6 py-4 text-center bg-[#FFFDF5] border-l border-amber-100">
-                                            <span class="block text-xs font-black text-[#3d2c1d]">Nota Final del Corte</span>
-                                            <span class="block text-[10px] font-black text-amber-500 uppercase tracking-widest mt-1">(N · escala 0-100 · sobre {{ $totalCorte }} pts)</span>
+                                            <span class="block text-xs font-black text-[#3d2c1d]">Nota Final del Corte {{ $corteActivo?->numero }}</span>
+                                            <span class="block text-[10px] font-black text-amber-500 uppercase tracking-widest mt-1">(escala 0-100 · sobre {{ $totalCorte }} pts)</span>
                                         </th>
                                     </tr>
                                 </thead>

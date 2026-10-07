@@ -144,7 +144,11 @@ class ActividadEvaluativaController extends Controller
                 'fecha' => $request->fecha,
             ]);
 
-            return back()->with('success', 'Actividad actualizada correctamente.');
+            // El puntaje máximo pudo cambiar con notas ya registradas:
+            // recalculamos la nota final del corte para mantenerla consistente.
+            $this->recalcularNotasParcial($asignacion->id, $actividad->corte_evaluativo_id);
+
+            return back()->with('success', 'Actividad actualizada y notas del corte recalculadas.');
 
         } catch (\Exception $e) {
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {

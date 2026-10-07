@@ -37,12 +37,13 @@ class BoletinPdfController extends Controller
             $this->authorize('view', $matricula);
 
             $data = $this->prepareBoletinData($matricula, $request->query('corte_evaluativo_id'));
+            $data['logo'] = $this->logoDataUri();
 
             $pdf = Pdf::loadView('pdf.boletin', $data)
-                ->setPaper('letter', 'portrait')
+                ->setPaper('letter', 'landscape')
                 ->setOptions([
                     'defaultFont' => 'DejaVu Sans',
-                    'isRemoteEnabled' => true,
+                    'isRemoteEnabled' => false,
                     'isHtml5ParserEnabled' => true,
                 ]);
 
@@ -69,10 +70,10 @@ class BoletinPdfController extends Controller
             $data = $this->prepareConstanciaData($matricula);
 
             $pdf = Pdf::loadView('pdf.constancia', $data)
-                ->setPaper('letter', 'portrait')
+                ->setPaper('letter', 'landscape')
                 ->setOptions([
                     'defaultFont' => 'DejaVu Sans',
-                    'isRemoteEnabled' => true,
+                    'isRemoteEnabled' => false,
                     'isHtml5ParserEnabled' => true,
                 ]);
 
@@ -107,7 +108,7 @@ class BoletinPdfController extends Controller
                 ->setPaper('letter', 'portrait')
                 ->setOptions([
                     'defaultFont' => 'DejaVu Sans',
-                    'isRemoteEnabled' => true,
+                    'isRemoteEnabled' => false,
                     'isHtml5ParserEnabled' => true,
                 ]);
 
@@ -136,6 +137,13 @@ class BoletinPdfController extends Controller
         ]);
 
         try {
+            // La generación masiva puede tardar: liberamos el bloqueo de sesión
+            // para que el resto de la aplicación siga respondiendo a este usuario,
+            // y ampliamos los límites de ejecución del proceso.
+            session()->save();
+            @set_time_limit(0);
+            @ini_set('memory_limit', '512M');
+
             $aula = \App\Models\Aula::with(['grado', 'anioEscolar'])->findOrFail($request->aula_id);
             $corteId = $request->corte_evaluativo_id;
 
@@ -379,15 +387,16 @@ class BoletinPdfController extends Controller
         switch ($tipo) {
             case 'boletin':
                 $data = $this->prepareBoletinData($matricula, $corteId);
+                $data['logo'] = $this->logoDataUri();
                 $pdf = Pdf::loadView('pdf.boletin', $data)
-                    ->setPaper('letter', 'portrait')
+                    ->setPaper('letter', 'landscape')
                     ->setOptions(['defaultFont' => 'DejaVu Sans']);
                 return $pdf->output();
 
             case 'constancia':
                 $data = $this->prepareConstanciaData($matricula);
                 $pdf = Pdf::loadView('pdf.constancia', $data)
-                    ->setPaper('letter', 'portrait')
+                    ->setPaper('letter', 'landscape')
                     ->setOptions(['defaultFont' => 'DejaVu Sans']);
                 return $pdf->output();
 
@@ -406,6 +415,27 @@ class BoletinPdfController extends Controller
             default:
                 throw new \InvalidArgumentException("Tipo de PDF no soportado: {$tipo}");
         }
+    }
+
+    /**
+     * Logo del colegio embebido como data URI (base64).
+     *
+     * DomPDF cargaba asset('img/logo.png') mediante HTTP contra el MISMO
+     * servidor de desarrollo (php artisan serve atiende una petición a la
+     * vez), provocando un bloqueo mutuo: la petición del PDF quedaba colgada
+     * esperando la imagen, y al mantener bloqueada la sesión, toda la
+     * aplicación dejaba de responder para ese usuario. Embeber la imagen en
+     * el HTML evita por completo la petición HTTP interna.
+     */
+    protected function logoDataUri(): string
+    {
+        $path = public_path('img/logo.png');
+
+        if (is_file($path)) {
+            return 'data:image/png;base64,' . base64_encode(file_get_contents($path));
+        }
+
+        return '';
     }
 
     protected function getPdfFilename(Matricula $matricula, string $tipo, ?int $corteId = null): string

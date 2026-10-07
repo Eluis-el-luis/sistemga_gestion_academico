@@ -21,6 +21,13 @@
         </div>
     </x-slot>
 
+    <!-- Impresión horizontal: el mapa semanal es una tabla ancha -->
+    <style>
+        @media print {
+            @page { size: letter landscape; margin: 10mm; }
+        }
+    </style>
+
     <div class="pb-12 pt-6 max-w-full mx-auto sm:px-6 lg:px-8">
         <div class="bg-white shadow-sm rounded-3xl border border-slate-200 overflow-hidden">
             <div class="overflow-x-auto">
