@@ -152,8 +152,16 @@ class NotaController extends Controller
                                     ->where('corte_evaluativo_id', $corteId)
                                     ->get()->keyBy('id');
 
-            // Total posible: suma de los puntajes máximos de las actividades del parcial.
-            $totalPosible = (float) $actividades->sum('puntaje_maximo');
+            // Total oficial del corte: peso_acumulado + peso_examen (normalmente 100).
+            // Las actividades reparten ese total, así que las que aún no se configuran
+            // valen 0 (no deben inflar la nota). Si el corte no tiene pesos, se usa
+            // como respaldo la suma de los puntajes configurados.
+            $corte = \App\Models\CorteEvaluativo::find($corteId);
+            $totalConfigurado = (float) $actividades->sum('puntaje_maximo');
+            $totalPosible = (float) (($corte->peso_acumulado ?? 0) + ($corte->peso_examen ?? 0));
+            if ($totalPosible <= 0) {
+                $totalPosible = $totalConfigurado;
+            }
 
             DB::transaction(function () use ($request, $asignacion, $corteId, $actividades, $totalPosible) {
                 // El front-end enviará un arreglo: name="notas[matricula_id][actividad_id]"
@@ -178,12 +186,12 @@ class NotaController extends Controller
                         $sumaTotalAlumno += $notaFinal;
                     }
 
-                    // 2. Auto-Suma Global en la tabla 'nota' (escalado a 0-100)
+                    // 2. Nota Final del Corte (N) en la tabla 'nota' (escala 0-100)
                     $this->notaService->registrarNotaFinal($matriculaId, $asignacion->id, $corteId, $sumaTotalAlumno, $totalPosible, auth()->id());
                 }
             });
 
-            return back()->with('success', 'Calificaciones actualizadas. La auto-suma se ha calculado exitosamente.');
+            return back()->with('success', 'Calificaciones actualizadas. La nota final del corte se ha calculado exitosamente.');
 
         } catch (\Exception $e) {
             DB::rollBack();

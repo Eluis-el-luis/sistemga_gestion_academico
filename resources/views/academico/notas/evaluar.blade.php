@@ -94,6 +94,12 @@
                     <form id="form-calificaciones" action="{{ route('academico.notas.store', $asignacion->id) }}" method="POST">
                         @csrf
                         <input type="hidden" name="corte_evaluativo_id" value="{{ $corteSeleccionado }}">
+                        @php
+                            // Mismo denominador que NotaController@store: pesos oficiales del corte
+                            $totalCorte = ($pesoAcumulado + $pesoExamen) > 0
+                                ? ($pesoAcumulado + $pesoExamen)
+                                : max(1, $sumaAcumulado + $sumaExamen);
+                        @endphp
 
                         <div class="overflow-x-auto custom-scrollbar">
                             <table class="w-full text-left border-collapse min-w-[800px]">
@@ -107,8 +113,8 @@
                                             </th>
                                         @endforeach
                                         <th class="px-6 py-3 text-center border-l border-slate-200 bg-slate-100/50">
-                                            <span class="block text-xs font-black text-[#3d2c1d] uppercase tracking-widest">Nota Final</span>
-                                            <span class="block text-[10px] text-slate-400 font-bold mt-1">Auto-suma</span>
+                                            <span class="block text-xs font-black text-[#3d2c1d] uppercase tracking-widest">Nota Final del Corte</span>
+                                            <span class="block text-[10px] text-slate-400 font-bold mt-1">(N · escala 0-100 · sobre {{ $totalCorte }} pts)</span>
                                         </th>
                                     </tr>
                                 </thead>
@@ -126,7 +132,10 @@
                                                     this.$el.querySelectorAll('.input-nota').forEach(input => {
                                                         suma += parseFloat(input.value) || 0;
                                                     });
-                                                    this.totalFila = suma.toFixed(2).replace(/\.00$/, '');
+                                                    // Mismo cálculo que el backend: puntos obtenidos escalados
+                                                    // al total oficial del corte (escala 0-100)
+                                                    let nota = (suma / {{ $totalCorte }}) * 100;
+                                                    this.totalFila = Math.min(100, Math.max(0, nota)).toFixed(2).replace(/\.00$/, '');
                                                 }
                                             }">
                                             <td class="px-6 py-4 sticky left-0 bg-white group-hover:bg-slate-50/50 transition-colors z-10 shadow-[1px_0_0_0_#f1f5f9]">
