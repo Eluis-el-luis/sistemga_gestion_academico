@@ -15,41 +15,51 @@
 
     <div class="pb-12 pt-6 max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-6">
 
-        <!-- BUSCADOR Y FILTROS -->
+        <!-- PASO 1: BUSCAR Y SELECCIONAR EL ESTUDIANTE -->
         <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 print:hidden">
-            <form method="GET" action="{{ route('academico.reportes.historial-estudiante') }}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Buscar estudiante</label>
-                    <input type="text" name="q" value="{{ $q }}" placeholder="Nombre o código (CUP)..."
-                           class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
+            <form method="GET" action="{{ route('academico.reportes.historial-estudiante') }}" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">1. Buscar estudiante</label>
+                        <input type="text" name="q" value="{{ $q }}" placeholder="Nombre o código (CUP)..."
+                               class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">2. Estudiante</label>
+                        <select name="alumno_id" onchange="this.form.submit()" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
+                            <option value="">Seleccione un estudiante...</option>
+                            @foreach($alumnos as $al)
+                                <option value="{{ $al->id }}" @selected(($alumnoId ?? null) == $al->id)>{{ $al->nombre_completo }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Año Escolar</label>
-                    <select name="anio_escolar_id" onchange="this.form.submit()" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
-                        @foreach($anios as $an)
-                            <option value="{{ $an->id }}" @selected(($anioId ?? ($anio->id ?? null)) == $an->id)>{{ $an->nombre }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Grado</label>
-                    <select name="grado_id" onchange="this.form.submit()" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
-                        <option value="">Todos</option>
-                        @foreach($gradosFiltro as $grado)
-                            <option value="{{ $grado->id }}" @selected(($gradoId ?? null) == $grado->id)>{{ $grado->nombre }} ({{ $grado->modalidad->nombre ?? '' }})</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Estudiante</label>
-                    <select name="alumno_id" onchange="this.form.submit()" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
-                        <option value="">Seleccione un estudiante...</option>
-                        @foreach($alumnos as $al)
-                            <option value="{{ $al->id }}" @selected(($alumnoId ?? null) == $al->id)>{{ $al->nombre_completo }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="md:col-span-2 xl:col-span-4 flex items-center gap-3">
+
+                <!-- PASO 2: ELEGIR AÑO Y GRADO (solo matrículas reales del estudiante) -->
+                @if($alumno)
+                    <div>
+                        <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                            3. Año y Grado del certificado
+                            <span class="text-slate-400 normal-case font-bold">(se incluye automáticamente el grado anterior)</span>
+                        </label>
+                        @if($matriculasAlumno->isEmpty())
+                            <p class="text-sm font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                                Este estudiante no tiene matrículas registradas, no es posible emitir el certificado.
+                            </p>
+                        @else
+                            <select name="matricula_id" onchange="this.form.submit()" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
+                                @foreach($matriculasAlumno as $m)
+                                    <option value="{{ $m->id }}" @selected(($matriculaSel?->id ?? null) == $m->id)>
+                                        Ciclo {{ $m->anioEscolar->nombre ?? '—' }} · {{ $m->aula->grado->nombre ?? '—' }} — Sección "{{ $m->aula->nombre ?? '—' }}"@if($m->estado !== 'activo') ({{ ucfirst($m->estado) }})@endif
+                                    </option>
+                                @endforeach
+                            </select>
+                        @endif
+                    </div>
+                @endif
+
+                <div class="flex items-center gap-3">
+                    <input type="hidden" name="alumno_keep" value="">
                     <button type="submit" class="bg-[#3d2c1d] text-white font-black px-5 py-2 rounded-xl shadow-sm text-sm">Buscar</button>
                     <a href="{{ route('academico.reportes.historial-estudiante') }}" class="text-sm font-bold text-slate-400 hover:text-rose-600 py-2">Limpiar</a>
                 </div>
@@ -58,7 +68,7 @@
 
         @if(!$alumno)
             <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-12 text-center text-stone-500 font-bold print:hidden">
-                Busca y selecciona un estudiante (puedes filtrar por grado y año escolar) para generar su certificado de notas.
+                Busca y selecciona un estudiante; luego elige el año y el grado del que quieres el certificado.
             </div>
         @else
             @php

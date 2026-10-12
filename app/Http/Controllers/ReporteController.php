@@ -304,11 +304,10 @@ class ReporteController extends Controller
             $this->autorizarReportes();
 
             $q = trim((string) $request->query('q', ''));
-            $gradoId = $request->query('grado_id') ? (int) $request->query('grado_id') : null;
-            $anioId = $request->query('anio_escolar_id') ? (int) $request->query('anio_escolar_id') : null;
             $alumnoId = $request->query('alumno_id') ? (int) $request->query('alumno_id') : null;
+            $matriculaId = $request->query('matricula_id') ? (int) $request->query('matricula_id') : null;
 
-            // Buscador de estudiantes: texto (nombre o CUP) + filtros de grado y año escolar
+            // PASO 1: Buscar y seleccionar el estudiante (texto por nombre o CUP)
             $alumnos = Alumno::query()
                 ->when($q !== '', function ($query) use ($q) {
                     $query->where(function ($q2) use ($q) {
@@ -316,21 +315,46 @@ class ReporteController extends Controller
                             ->orWhere('codigo_unico_persona', 'like', "%{$q}%");
                     });
                 })
-                ->when($gradoId || $anioId, function ($query) use ($gradoId, $anioId) {
-                    $query->whereHas('matriculas', function ($q2) use ($gradoId, $anioId) {
-                        $q2->when($anioId, fn ($q3) => $q3->where('anio_escolar_id', $anioId))
-                            ->when($gradoId, fn ($q3) => $q3->whereHas('aula', fn ($q4) => $q4->where('grado_id', $gradoId)));
-                    });
-                })
                 ->orderBy('nombre_completo')
                 ->limit(50)
                 ->get();
 
-            $resultado = $alumnoId
-                ? $this->reporteService->certificadoNotas($alumnoId, $anioId, $gradoId)
+            $alumno = $alumnoId ? Alumno::find($alumnoId) : null;
+            $matriculasAlumno = collect();
+            $matriculaSel = null;
+
+            if ($alumno) {
+                // PASO 2: Elegir año y grado a partir de las matrículas reales del
+                // estudiante, de modo que solo se ofrezcan combinaciones válidas.
+                $matriculasAlumno = \App\Models\Matricula::with(['aula.grado.modalidad', 'anioEscolar'])
+                    ->where('alumno_id', $alumno->id)
+                    ->get()
+                    ->sortByDesc('anio_escolar_id')
+                    ->values();
+
+                $anioActivo = $this->reporteService->anioActivo();
+                $matriculaSel = $matriculaId
+                    ? $matriculasAlumno->firstWhere('id', $matriculaId)
+                    : ($matriculasAlumno->firstWhere('anio_escolar_id', $anioActivo?->id) ?? $matriculasAlumno->first());
+            }
+
+            // PASO 3: Certificado comparativo (grado elegido + grados anteriores,
+            // con límite configurable en ReporteService::CERTIFICADO_LIMITE_GRADOS)
+            $resultado = $alumno
+                ? ($matriculaSel
+                    ? $this->reporteService->certificadoNotas($alumno->id, $matriculaSel->anio_escolar_id, $matriculaSel->aula->grado_id)
+                    : [
+                        'alumno' => $alumno,
+                        'anio' => $this->reporteService->resolverAnio(null),
+                        'matricula' => null,
+                        'gradoSeleccionado' => null,
+                        'grados' => [],
+                        'asignaturas' => [],
+                        'limiteGrados' => ReporteService::CERTIFICADO_LIMITE_GRADOS,
+                    ])
                 : [
                     'alumno' => null,
-                    'anio' => $this->reporteService->resolverAnio($anioId),
+                    'anio' => $this->reporteService->resolverAnio(null),
                     'matricula' => null,
                     'gradoSeleccionado' => null,
                     'grados' => [],
@@ -347,9 +371,9 @@ class ReporteController extends Controller
                     // La cadena de grados del certificado pisa 'grados'; el filtro usa su propia colección
                     'gradosFiltro' => $catalogos['grados'],
                     'alumnos' => $alumnos,
+                    'matriculasAlumno' => $matriculasAlumno,
+                    'matriculaSel' => $matriculaSel,
                     'q' => $q,
-                    'gradoId' => $gradoId,
-                    'anioId' => $anioId,
                     'alumnoId' => $alumnoId,
                 ]
             ));
