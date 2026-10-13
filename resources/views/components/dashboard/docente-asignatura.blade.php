@@ -1,7 +1,8 @@
 <div class="space-y-8 animate-fade-in">
 
-    <!-- BARRA DE HERRAMIENTAS RÁPIDAS (2 Columnas) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+    <!-- BARRA DE HERRAMIENTAS RÁPIDAS (Ahora con 3 Columnas) -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        
         <!-- Configurar Notas -->
         <a href="{{ route('academico.notas.index') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] hover:shadow-md transition-all flex items-center gap-4 cursor-pointer transform hover:-translate-y-0.5">
             <div class="w-12 h-12 rounded-xl bg-amber-50 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
@@ -21,6 +22,17 @@
             <div>
                 <span class="block font-black text-base text-[#3d2c1d] group-hover:text-[#e6ac27] transition-colors">Mi Asistencia</span>
                 <span class="block text-xs font-medium text-slate-500 mt-0.5">Historial y reportes</span>
+            </div>
+        </a>
+
+        <!-- NUEVO: Centro de Reportes del Docente -->
+        <a href="{{ route('academico.reportes.mis-clases') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] hover:shadow-md transition-all flex items-center gap-4 cursor-pointer transform hover:-translate-y-0.5">
+            <div class="w-12 h-12 rounded-xl bg-amber-50 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            </div>
+            <div>
+                <span class="block font-black text-base text-[#3d2c1d] group-hover:text-[#e6ac27] transition-colors">Centro de Reportes</span>
+                <span class="block text-xs font-medium text-slate-500 mt-0.5">Estadísticas de mis clases</span>
             </div>
         </a>
     </div>

@@ -425,4 +425,121 @@ class ReporteController extends Controller
             return redirect()->route('academico.reportes.index')->with('error', 'No se pudo cargar el reporte de padres de familia.');
         }
     }
+
+    // =============================================================
+    // REPORTES EXCLUSIVOS DEL DOCENTE POR ASIGNATURA
+    // =============================================================
+    public function misClases(Request $request)
+    {
+        try {
+            $user = auth()->user();
+            if (!$user->hasAnyRole(['Docente Guia', 'Docente por Asignatura'])) {
+                throw new \Illuminate\Auth\Access\AuthorizationException('Acceso denegado. Esta vista es exclusiva para docentes.');
+            }
+
+            $docente = Docente::where('usuario_id', $user->id)->firstOrFail();
+            $anio = $this->reporteService->anioActivo();
+
+            if (!$anio) {
+                return redirect()->route('dashboard')->with('error', 'No hay un año escolar activo para generar reportes.');
+            }
+
+            // 1. Obtenemos las clases y las ORDENAMOS estrictamente por el ID numérico del grado (1ro, 2do, ... 11mo)
+            $asignaciones = \App\Models\AulaAsignaturaDocente::with(['aula.grado', 'asignatura'])
+                ->where('docente_id', $docente->id)
+                ->where('anio_escolar_id', $anio->id)
+                ->where('activo', true)
+                ->get()
+                ->sortBy(function($asignacion) {
+                    return $asignacion->aula->grado_id; 
+                });
+
+            $cortes = \App\Models\CorteEvaluativo::orderBy('numero')->get();
+
+            // 2. Filtros de búsqueda
+            $asignacionId = $request->query('asignacion_id');
+            $corteId = $request->query('corte_id');
+
+            $asignacionSeleccionada = null;
+            $corteSeleccionado = null;
+            $alumnosReporte = collect();
+            
+            // Inicializamos estadísticas con los porcentajes en 0
+            $estadisticas = [
+                'aprobados' => 0, 'reprobados' => 0, 'promedio_general' => 0, 
+                'porcentaje_aprobados' => 0, 'porcentaje_reprobados' => 0
+            ];
+
+            // 3. Procesar tabla si hay selección
+            if ($asignacionId) {
+                $asignacionSeleccionada = $asignaciones->where('id', $asignacionId)->first();
+                $corteSeleccionado = $cortes->where('id', $corteId)->first();
+
+                if ($asignacionSeleccionada) {
+                    $matriculas = \App\Models\Matricula::with('alumno')
+                        ->where('aula_id', $asignacionSeleccionada->aula_id)
+                        ->where('anio_escolar_id', $anio->id)
+                        ->where('estado', 'activo')
+                        ->get()
+                        ->sortBy(function($matricula) {
+                            return $matricula->alumno->nombre_completo; // 1. CORREGIDO: Usar nombre_completo para ordenar
+                        });
+
+                    $notasQuery = \App\Models\Nota::whereIn('matricula_id', $matriculas->pluck('id'))
+                        ->where('aula_asignatura_docente_id', $asignacionSeleccionada->id);
+                        
+                    if ($corteId) {
+                        $notasQuery->where('corte_evaluativo_id', $corteId);
+                    }
+                    
+                    $notas = $notasQuery->get()->groupBy('matricula_id');
+
+                    $sumaNotas = 0;
+                    $conNota = 0;
+
+                    foreach ($matriculas as $matricula) {
+                        $notasAlumno = $notas->get($matricula->id, collect());
+                        $notaFinal = null;
+                        
+                        if ($notasAlumno->isNotEmpty()) {
+                            $notaFinal = round($notasAlumno->avg('nota_cuantitativa'));
+                            $sumaNotas += $notaFinal;
+                            $conNota++;
+                            
+                            if ($notaFinal >= 60) {
+                                $estadisticas['aprobados']++;
+                            } else {
+                                $estadisticas['reprobados']++;
+                            }
+                        }
+
+                        $alumnosReporte->push([
+                            'matricula_id' => $matricula->id,
+                            'cup' => $matricula->alumno->codigo_unico_persona,
+                            'nombre_completo' => $matricula->alumno->nombre_completo, // 2. CORREGIDO: Usar la columna correcta
+                            'nota' => $notaFinal
+                        ]);
+                    }
+                    
+                    if ($conNota > 0) {
+                        $estadisticas['promedio_general'] = round($sumaNotas / $conNota, 1);
+                        $estadisticas['porcentaje_aprobados'] = round(($estadisticas['aprobados'] / $conNota) * 100, 1);
+                        $estadisticas['porcentaje_reprobados'] = round(($estadisticas['reprobados'] / $conNota) * 100, 1);
+                    }
+                }
+            }
+
+            return view('academico.reportes.mis-clases', compact(
+                'anio', 'asignaciones', 'cortes', 'asignacionId', 'corteId', 
+                'asignacionSeleccionada', 'corteSeleccionado', 'alumnosReporte', 'estadisticas'
+            ));
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            return redirect()->route('dashboard')->with('error', 'Ocurrió un error al procesar el reporte de tus clases.');
+        }
+    }
+
 }
