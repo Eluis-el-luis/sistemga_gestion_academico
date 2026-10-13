@@ -10,9 +10,9 @@ use App\Models\AulaAsignaturaDocente;
 class NotaService
 {
     /**
-     * Registra/actualiza la nota final de un parcial para una matrícula,
-     * escalando los puntos obtenidos a la escala 0-100 según el total posible
-     * del corte (suma de puntajes máximos de sus actividades).
+     * Registra/actualiza la nota final del corte de una matrícula,
+     * escalando los puntos obtenidos a la escala 0-100 según el total oficial
+     * del corte (peso_acumulado + peso_examen, normalmente 100).
      */
     public function registrarNotaFinal(int $matriculaId, int $asignacionId, int $corteId, float $suma, ?float $totalPosible = null, ?int $updatedBy = null): ?Nota
     {

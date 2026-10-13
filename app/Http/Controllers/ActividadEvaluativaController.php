@@ -144,7 +144,11 @@ class ActividadEvaluativaController extends Controller
                 'fecha' => $request->fecha,
             ]);
 
-            return back()->with('success', 'Actividad actualizada correctamente.');
+            // El puntaje máximo pudo cambiar con notas ya registradas:
+            // recalculamos la nota final del corte para mantenerla consistente.
+            $this->recalcularNotasParcial($asignacion->id, $actividad->corte_evaluativo_id);
+
+            return back()->with('success', 'Actividad actualizada y notas del corte recalculadas.');
 
         } catch (\Exception $e) {
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
@@ -183,7 +187,7 @@ class ActividadEvaluativaController extends Controller
     }
 
     /**
-     * Recalcula la nota final (auto-suma) de un parcial para todas las matrículas.
+     * Recalcula la nota final del corte de un parcial para todas las matrículas.
      */
     protected function recalcularNotasParcial(int $asignacionId, int $corteId): void
     {
@@ -194,7 +198,14 @@ class ActividadEvaluativaController extends Controller
             ->where('corte_evaluativo_id', $corteId)
             ->get();
 
-        $totalPosible = (float) $actividades->sum('puntaje_maximo');
+        // Mismo denominador que NotaController@store: pesos oficiales del corte
+        // (normalmente 100), con respaldo en la suma configurada si no hay pesos.
+        $corte = CorteEvaluativo::find($corteId);
+        $totalConfigurado = (float) $actividades->sum('puntaje_maximo');
+        $totalPosible = (float) (($corte->peso_acumulado ?? 0) + ($corte->peso_examen ?? 0));
+        if ($totalPosible <= 0) {
+            $totalPosible = $totalConfigurado;
+        }
         $actividadIds = $actividades->pluck('id');
 
         $matriculas = \App\Models\Matricula::where('aula_id', \App\Models\AulaAsignaturaDocente::find($asignacionId)->aula_id)

@@ -302,51 +302,80 @@ class ReporteController extends Controller
     {
         try {
             $this->autorizarReportes();
-            $resultado = $this->reporteService->historialPorEstudiante($request->query('alumno_id'));
-            $catalogos = $this->pasarCatalogos($request);
 
-            // Enriquecer con el resumen por asignatura del certificado de notas
-            $alumno = $resultado['alumno'] ?? null;
-            $resumenAsignaturas = [];
-            $promedioGeneral = null;
-            $matricula = null;
+            $q = trim((string) $request->query('q', ''));
+            $alumnoId = $request->query('alumno_id') ? (int) $request->query('alumno_id') : null;
+            $matriculaId = $request->query('matricula_id') ? (int) $request->query('matricula_id') : null;
+
+            // PASO 1: Buscar y seleccionar el estudiante (texto por nombre o CUP)
+            $alumnos = Alumno::query()
+                ->when($q !== '', function ($query) use ($q) {
+                    $query->where(function ($q2) use ($q) {
+                        $q2->where('nombre_completo', 'like', "%{$q}%")
+                            ->orWhere('codigo_unico_persona', 'like', "%{$q}%");
+                    });
+                })
+                ->orderBy('nombre_completo')
+                ->limit(50)
+                ->get();
+
+            $alumno = $alumnoId ? Alumno::find($alumnoId) : null;
+            $matriculasAlumno = collect();
+            $matriculaSel = null;
 
             if ($alumno) {
-                $matricula = \App\Models\Matricula::with(['aula.grado', 'aula.modalidad', 'anioEscolar'])
+                // PASO 2: Elegir año y grado a partir de las matrículas reales del
+                // estudiante, de modo que solo se ofrezcan combinaciones válidas.
+                $matriculasAlumno = \App\Models\Matricula::with(['aula.grado.modalidad', 'anioEscolar'])
                     ->where('alumno_id', $alumno->id)
-                    ->where('estado', 'activo')
-                    ->latest('id')
-                    ->first();
+                    ->get()
+                    ->sortByDesc('anio_escolar_id')
+                    ->values();
 
-                if ($matricula) {
-                    $notaService = app(\App\Services\NotaService::class);
-                    $asignaciones = \App\Models\AulaAsignaturaDocente::with('asignatura')
-                        ->where('aula_id', $matricula->aula_id)
-                        ->where('anio_escolar_id', $matricula->anio_escolar_id)
-                        ->get();
-
-                    $finales = [];
-                    foreach ($asignaciones as $asignacion) {
-                        $resumen = $notaService->calcularResumenAsignatura($matricula, $asignacion);
-                        $resumenAsignaturas[] = [
-                            'asignatura' => $asignacion->asignatura->nombre,
-                            'area' => $asignacion->asignatura->area ?? 'Otras Áreas',
-                            'resumen' => $resumen,
-                        ];
-                        if ($resumen['nota_final'] !== null) {
-                            $finales[] = $resumen['nota_final'];
-                        }
-                    }
-
-                    if (count($finales) > 0) {
-                        $promedioGeneral = round(array_sum($finales) / count($finales), 2);
-                    }
-                }
+                $anioActivo = $this->reporteService->anioActivo();
+                $matriculaSel = $matriculaId
+                    ? $matriculasAlumno->firstWhere('id', $matriculaId)
+                    : ($matriculasAlumno->firstWhere('anio_escolar_id', $anioActivo?->id) ?? $matriculasAlumno->first());
             }
 
+            // PASO 3: Certificado comparativo (grado elegido + grados anteriores,
+            // con límite configurable en ReporteService::CERTIFICADO_LIMITE_GRADOS)
+            $resultado = $alumno
+                ? ($matriculaSel
+                    ? $this->reporteService->certificadoNotas($alumno->id, $matriculaSel->anio_escolar_id, $matriculaSel->aula->grado_id)
+                    : [
+                        'alumno' => $alumno,
+                        'anio' => $this->reporteService->resolverAnio(null),
+                        'matricula' => null,
+                        'gradoSeleccionado' => null,
+                        'grados' => [],
+                        'asignaturas' => [],
+                        'limiteGrados' => ReporteService::CERTIFICADO_LIMITE_GRADOS,
+                    ])
+                : [
+                    'alumno' => null,
+                    'anio' => $this->reporteService->resolverAnio(null),
+                    'matricula' => null,
+                    'gradoSeleccionado' => null,
+                    'grados' => [],
+                    'asignaturas' => [],
+                    'limiteGrados' => ReporteService::CERTIFICADO_LIMITE_GRADOS,
+                ];
+
+            $catalogos = $this->pasarCatalogos($request);
+
             return view('academico.reportes.historial-estudiante', array_merge(
-                ['alumno' => $resultado['alumno'] ?? null, 'resumenAsignaturas' => $resumenAsignaturas, 'promedioGeneral' => $promedioGeneral, 'matricula' => $matricula],
-                $catalogos
+                $catalogos,
+                $resultado,
+                [
+                    // La cadena de grados del certificado pisa 'grados'; el filtro usa su propia colección
+                    'gradosFiltro' => $catalogos['grados'],
+                    'alumnos' => $alumnos,
+                    'matriculasAlumno' => $matriculasAlumno,
+                    'matriculaSel' => $matriculaSel,
+                    'q' => $q,
+                    'alumnoId' => $alumnoId,
+                ]
             ));
 
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
@@ -355,7 +384,7 @@ class ReporteController extends Controller
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
                 throw $e;
             }
-            return redirect()->route('academico.reportes.index')->with('error', 'Ocurrió un error al generar el historial académico del estudiante.');
+            return redirect()->route('academico.reportes.index')->with('error', 'Ocurrió un error al generar el certificado de notas del estudiante.');
         }
     }
 
@@ -425,4 +454,121 @@ class ReporteController extends Controller
             return redirect()->route('academico.reportes.index')->with('error', 'No se pudo cargar el reporte de padres de familia.');
         }
     }
+
+    // =============================================================
+    // REPORTES EXCLUSIVOS DEL DOCENTE POR ASIGNATURA
+    // =============================================================
+    public function misClases(Request $request)
+    {
+        try {
+            $user = auth()->user();
+            if (!$user->hasAnyRole(['Docente Guia', 'Docente por Asignatura'])) {
+                throw new \Illuminate\Auth\Access\AuthorizationException('Acceso denegado. Esta vista es exclusiva para docentes.');
+            }
+
+            $docente = Docente::where('usuario_id', $user->id)->firstOrFail();
+            $anio = $this->reporteService->anioActivo();
+
+            if (!$anio) {
+                return redirect()->route('dashboard')->with('error', 'No hay un año escolar activo para generar reportes.');
+            }
+
+            // 1. Obtenemos las clases y las ORDENAMOS estrictamente por el ID numérico del grado (1ro, 2do, ... 11mo)
+            $asignaciones = \App\Models\AulaAsignaturaDocente::with(['aula.grado', 'asignatura'])
+                ->where('docente_id', $docente->id)
+                ->where('anio_escolar_id', $anio->id)
+                ->where('activo', true)
+                ->get()
+                ->sortBy(function($asignacion) {
+                    return $asignacion->aula->grado_id; 
+                });
+
+            $cortes = \App\Models\CorteEvaluativo::orderBy('numero')->get();
+
+            // 2. Filtros de búsqueda
+            $asignacionId = $request->query('asignacion_id');
+            $corteId = $request->query('corte_id');
+
+            $asignacionSeleccionada = null;
+            $corteSeleccionado = null;
+            $alumnosReporte = collect();
+            
+            // Inicializamos estadísticas con los porcentajes en 0
+            $estadisticas = [
+                'aprobados' => 0, 'reprobados' => 0, 'promedio_general' => 0, 
+                'porcentaje_aprobados' => 0, 'porcentaje_reprobados' => 0
+            ];
+
+            // 3. Procesar tabla si hay selección
+            if ($asignacionId) {
+                $asignacionSeleccionada = $asignaciones->where('id', $asignacionId)->first();
+                $corteSeleccionado = $cortes->where('id', $corteId)->first();
+
+                if ($asignacionSeleccionada) {
+                    $matriculas = \App\Models\Matricula::with('alumno')
+                        ->where('aula_id', $asignacionSeleccionada->aula_id)
+                        ->where('anio_escolar_id', $anio->id)
+                        ->where('estado', 'activo')
+                        ->get()
+                        ->sortBy(function($matricula) {
+                            return $matricula->alumno->nombre_completo; // 1. CORREGIDO: Usar nombre_completo para ordenar
+                        });
+
+                    $notasQuery = \App\Models\Nota::whereIn('matricula_id', $matriculas->pluck('id'))
+                        ->where('aula_asignatura_docente_id', $asignacionSeleccionada->id);
+                        
+                    if ($corteId) {
+                        $notasQuery->where('corte_evaluativo_id', $corteId);
+                    }
+                    
+                    $notas = $notasQuery->get()->groupBy('matricula_id');
+
+                    $sumaNotas = 0;
+                    $conNota = 0;
+
+                    foreach ($matriculas as $matricula) {
+                        $notasAlumno = $notas->get($matricula->id, collect());
+                        $notaFinal = null;
+                        
+                        if ($notasAlumno->isNotEmpty()) {
+                            $notaFinal = round($notasAlumno->avg('nota_cuantitativa'));
+                            $sumaNotas += $notaFinal;
+                            $conNota++;
+                            
+                            if ($notaFinal >= 60) {
+                                $estadisticas['aprobados']++;
+                            } else {
+                                $estadisticas['reprobados']++;
+                            }
+                        }
+
+                        $alumnosReporte->push([
+                            'matricula_id' => $matricula->id,
+                            'cup' => $matricula->alumno->codigo_unico_persona,
+                            'nombre_completo' => $matricula->alumno->nombre_completo, // 2. CORREGIDO: Usar la columna correcta
+                            'nota' => $notaFinal
+                        ]);
+                    }
+                    
+                    if ($conNota > 0) {
+                        $estadisticas['promedio_general'] = round($sumaNotas / $conNota, 1);
+                        $estadisticas['porcentaje_aprobados'] = round(($estadisticas['aprobados'] / $conNota) * 100, 1);
+                        $estadisticas['porcentaje_reprobados'] = round(($estadisticas['reprobados'] / $conNota) * 100, 1);
+                    }
+                }
+            }
+
+            return view('academico.reportes.mis-clases', compact(
+                'anio', 'asignaciones', 'cortes', 'asignacionId', 'corteId', 
+                'asignacionSeleccionada', 'corteSeleccionado', 'alumnosReporte', 'estadisticas'
+            ));
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            return redirect()->route('dashboard')->with('error', 'Ocurrió un error al procesar el reporte de tus clases.');
+        }
+    }
+
 }

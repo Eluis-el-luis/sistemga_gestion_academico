@@ -6,8 +6,8 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'DejaVu Sans', sans-serif; font-size: 11px; line-height: 1.4; color: #000; }
-        @page { size: letter portrait; margin: 15mm; }
-        .container { width: 100%; max-width: 8.5in; margin: 0 auto; padding: 20px; }
+        @page { size: letter landscape; margin: 15mm; }
+        .container { width: 100%; max-width: 9.8in; margin: 0 auto; padding: 20px; }
         
         .header { text-align: center; margin-bottom: 25px; }
         .header .institution { font-size: 16px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }

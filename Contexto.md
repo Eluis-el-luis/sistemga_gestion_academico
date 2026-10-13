@@ -1,596 +1,546 @@
-# Contexto tecnico del Sistema de Gestion Academica
+# Contexto técnico del sistema de gestión académica
 
-> Documento de incorporacion para desarrollo full stack. Describe el estado observado en el repositorio `sitema_gestion_academico` el 11 de septiembre de 2026. Las afirmaciones de implementacion son hechos observados en el codigo; las comprobaciones ejecutadas y sus limitaciones se separan explicitamente de los riesgos y recomendaciones.
+## 1. Propósito del proyecto
 
-## 1. Proposito y alcance
+Este repositorio corresponde a una aplicación monolítica de gestión académica escolar construida con Laravel 13 y Blade. El sistema modela la operación completa de un centro educativo: administración de usuarios, matrícula, aulas, asignaturas, malla curricular, notas, asistencia, boletines, reportes, apoyo pedagógico y control disciplinario.
 
-El proyecto es un sistema web monolitico para administrar la operacion academica de una institucion educativa. Centraliza identidad, usuarios, expediente de alumnos, matriculas, estructura escolar, horarios, evaluacion, asistencia, boletines, reportes y seguimiento institucional.
+La arquitectura no es una API REST independiente; la aplicación utiliza sesiones web, vistas Blade y controladores tradicionales, con un enfoque de dominio académico muy específico y una capa de autorización basada en roles y permisos de Spatie.
 
-La implementacion actual es principalmente server-rendered:
+La solución está orientada a un perfil institucional con usuarios del tipo Director, Subdirector, Docente Guía, Docente por Asignatura, Coordinador, Secretario y Alumno. La lógica de negocio está muy acoplada al contexto escolar, por lo que el dominio se define en términos de aulas, cortes evaluativos, asignaciones por docente, matrículas y registro de indicadores de logro.
 
-- Backend: PHP, Laravel, Eloquent ORM, Blade y sesiones HTTP.
-- Frontend: Blade, Tailwind CSS, Alpine.js y Vite.
-- Persistencia: base de datos relacional mediante migraciones Laravel.
-- Autorizacion: Laravel Policies, roles/permisos de Spatie y verificaciones puntuales en controladores.
-- Integracion: no existe un API propio registrado en `routes/api.php`; Sanctum esta instalado, pero no constituye por si mismo un contrato API.
+## 2. Stack tecnológico
 
-El repositorio contiene funcionalidades de las fases 5 a 8. La documentacion historica que lo limita a fase 6 no representa el estado actual.
+### Backend
 
-## 2. Estado de auditoria
+- PHP 8.3
+- Laravel Framework 13.8
+- Eloquent ORM
+- Illuminate Auth + Session guard
+- Spatie Laravel Permission 8.3
+- Laravel Sanctum 4.3
+- Laravel Tinker
+- Barryvdh/Laravel-Dompdf
+- Maatwebsite/Excel
 
-### 2.1 Inventario estructural
+### Frontend
 
-El inventario del repositorio contiene aproximadamente:
+- Vite 8
+- Tailwind CSS 3.1
+- Alpine.js 3.4.2 / 3.16.1
+- PostCSS y Autoprefixer
+- Blade templates + CSS modularizado con utilities de Tailwind
 
-- 40 controladores, incluyendo autenticacion.
-- 9 Form Requests de aplicacion y autenticacion.
-- 32 modelos Eloquent.
-- 13 Policies.
-- 5 servicios de dominio.
-- 56 migraciones.
-- 14 seeders.
-- 16 archivos de prueba.
-- Vistas Blade de autenticacion, dashboard y modulos academicos.
+### Infraestructura y calidad
 
-Estos conteos describen archivos, no cobertura ni completitud funcional.
+- PHPUnit para pruebas
+- Laravel Pint para formateo
+- Laravel Pail para logs en desarrollo
+- Composer scripts para entorno local
 
-### 2.2 Verificaciones ejecutadas el 2026-09-11
+## 3. Estructura general del repositorio
 
-| Comprobacion | Resultado | Alcance |
-|---|---|---|
-| Inspeccion de rutas, configuracion, controladores, requests, modelos, policies, servicios, migraciones, seeders, vistas y tests | Completada | Base de esta documentacion |
-| `php artisan route:list --json` | Ejecutado | Confirma que las rutas se pueden cargar y muestra middlewares efectivos |
-| `php artisan test` | No inicia | El PHP CLI no tiene `mbstring`, requerida por PHPUnit junto con otras extensiones |
-| `npm run build` | No concluido | PowerShell bloqueo la ejecucion del script por politica de ejecucion; no prueba un fallo de Vite |
-| `git status --short` | Cambio previo detectado | `app/Http/Controllers/DashboardController.php` ya estaba modificado; esta auditoria no lo cambio |
-| Diagnostico estatico de VS Code | Sin errores reportados por el explorador | No sustituye tests runtime, migraciones ni build |
-| `git diff --check -- Contexto.md` | Sin errores de espacios | El archivo queda sintacticamente valido como Markdown |
+La organización sigue la convención de Laravel, pero con un dominio académico muy específico:
 
-No debe afirmarse que toda la suite pasa ni que el build frontend es exitoso hasta repetir esas comprobaciones con el entorno correctamente configurado.
+- app/Http/Controllers: flujo HTTP, validación de entrada, orquestación de consultas y vistas
+- app/Http/Requests: reglas de validación para módulos sensibles
+- app/Models: modelos de dominio con nombres de tabla explícitos
+- app/Policies: autorización por recurso y por capacidad
+- app/Services: lógica de negocio reutilizable, especialmente en calificaciones
+- database/migrations: esquema relacional con convenciones propias del colegio
+- database/seeders: datos base, permisos y roles
+- resources/views: interfaz en Blade por módulos académicos
+- resources/js: inicialización del frontend cliente
+- resources/css: estilos globales y Tailwind
+- routes/web.php: router principal de la aplicación
+- routes/auth.php: autenticación y recuperación de contraseña
+- config/auth.php: configuración de guard y provider de autenticación
+- config/permission.php: configuración de Spatie Permission
 
-## 3. Stack y dependencias
+## 4. Convenciones de dominio y persistencia
 
-### 3.1 Backend
+### 4.1 Nombres de tablas y modelos
 
-`composer.json` declara:
+Una característica central del proyecto es que los modelos usan nombres de tablas en español y en singular, y algunas propiedades se definen explícitamente con `$table`.
 
-- PHP `^8.3`.
-- Laravel Framework `^13.8`.
-- Laravel Sanctum `^4.3`.
-- Laravel Tinker `^3.0`.
-- Spatie Laravel Permission `^8.3`.
+Ejemplos observados:
 
-Dependencias de desarrollo relevantes:
+- `Usuario` => `usuario`
+- `Alumno` => `alumno`
+- `Docente` => `docente`
+- `Aula` => `aula`
+- `Matricula` => `matricula`
+- `Asignatura` => `asignatura`
+- `CorteEvaluativo` => `corte_evaluativo`
+- `AulaAsignaturaDocente` => `aula_asignatura_docente`
+- `BloqueHorario` => `bloque_horario`
+- `IndicadorLogro` => `indicador_logro`
 
-- PHPUnit `^12.5.12`.
-- Laravel Breeze `^2.4`.
-- Laravel Pint `^1.27`.
-- Laravel Pail, Collision, Faker y Mockery.
+Esto implica que la aplicación no se apoya en convenciones plurales automáticas de Laravel; se ha diseñado para un esquema académico específico y no genérico. Es relevante para:
 
-El autoload PSR-4 mapea `App\\` a `app/`, `Database\\Factories\\` a `database/factories/` y `Database\\Seeders\\` a `database/seeders/`.
+- route model binding
+- Eloquent relationships
+- foreign keys
+- consultas manuales y joins
+- migraciones futuras
 
-### 3.2 Frontend
+### 4.2 Soft deletes
 
-`package.json` declara:
+El sistema usa SoftDeletes en modelos clave como `Usuario`, `Alumno`, `Docente`, `Matricula` y otros. Esto no debe confundirse con la lógica de negocio de "estado activo/inactivo". El flujo institucional mantiene una separación clara entre:
 
-- Vite `^8.0.0`.
-- Tailwind CSS `^3.1.0`.
-- `@tailwindcss/forms`, `@tailwindcss/postcss` y `@tailwindcss/vite`.
-- Alpine.js `^3.16.1` en `dependencies` y otra declaracion `^3.4.2` en `devDependencies`.
-- PostCSS, Autoprefixer, Concurrently y Laravel Vite Plugin.
+- registro físico eliminado en base de datos (`deleted_at`)
+- estado funcional del registro (`estado`, `activo`, `retirado`, etc.)
 
-SweetAlert2, Chart.js y algunas fuentes/iconos se cargan desde CDN en layouts o vistas; no son dependencias npm del proyecto.
+Esto es fundamental porque ciertos módulos consultan registros activos, pero la capa de persistencia no necesariamente los elimina físicamente de la base.
 
-### 3.3 Compatibilidad
+### 4.3 Claves foráneas y relaciones
 
-Laravel requiere PHP 8.3 o superior. PHPUnit requiere, como minimo, `dom`, `filter`, `json`, `libxml`, `mbstring`, `tokenizer` y `xmlwriter`, ademas de las extensiones PDO del motor seleccionado.
+La base está diseñada con identificadores relacionales explícitos y con relaciones de negocio que no siempre coinciden con la convención por defecto de Laravel. Por ejemplo:
 
-Desarrollo, CI y produccion deben fijar una matriz con version exacta de PHP, extensiones, Node/npm y motor de base de datos. La ausencia de `mbstring` en el CLI actual impide ejecutar pruebas aunque el codigo pueda cargar correctamente.
+- `Matricula` refiere a `alumno_id`, `aula_id`, `anio_escolar_id`
+- `AulaAsignaturaDocente` refiere a `aula_id`, `asignatura_id`, `docente_id`, `anio_escolar_id`
+- `Nota` refiere a `matricula_id`, `aula_asignatura_docente_id`, `corte_evaluativo_id`
+- `ActividadEvaluativa` refiere a `aula_asignatura_docente_id`
+- `AsistenciaAsignatura` refiere a `matricula_id`, `asignatura_id`, `bloque_horario_id`
 
-## 4. Arranque y arquitectura
+Estas relaciones están centradas en la lógica escolar de la institución, no en un esquema CRUD genérico.
 
-### 4.1 Bootstrap
+## 5. Autenticación y autorización
 
-`bootstrap/app.php` configura una aplicacion Laravel moderna con:
+### 5.1 Guard principal
 
-- rutas web desde `routes/web.php`;
-- comandos desde `routes/console.php`;
-- health check `/up`;
-- respuestas JSON forzadas solamente para solicitudes con path `api/*`.
+La configuración de `config/auth.php` define el guard `web`, con provider Eloquent apuntando a `App\Models\Usuario`.
 
-No se registran middlewares adicionales en el bootstrap. La proteccion de negocio se aplica en las rutas y en controladores/policies.
+`Usuario` extiende `Authenticatable` de Laravel, incorpora `HasRoles` de Spatie, `HasApiTokens`, `Notifiable` y `SoftDeletes`, y además implementa `MustVerifyEmail`.
 
-### 4.2 Capas
+Esto convierte al modelo `Usuario` en el principal actor de autenticación del sistema.
 
-La separacion vigente es:
+### 5.2 Roles y permisos
 
-1. Rutas: URL, verbo, nombre, controlador y middleware.
-2. Controladores: coordinacion de request, autorizacion, consultas, transacciones y respuestas.
-3. Form Requests: validacion de flujos que ya los utilizan.
-4. Policies: autorizacion de modelos y relaciones de dominio.
-5. Servicios: reglas reutilizables de notas, asistencia, reportes, reparacion y aulas.
-6. Modelos Eloquent: tablas, relaciones, casts, fillable y soft deletes.
-7. Migraciones: esquema, claves foraneas, indices y restricciones.
-8. Vistas Blade, JavaScript y CSS: interfaz y comportamiento local.
+El sistema usa Spatie Permission para la autorización. Los roles y permisos están dados en `database/seeders/PermisoSeeder.php`.
 
-No existe una capa de repositorios, bus de comandos ni SPA. Los cambios deben respetar estas fronteras y no crear abstracciones nuevas sin necesidad.
+Roles principales:
 
-### 4.3 Scripts operativos
+- Director
+- Subdirector
+- Docente Guia
+- Docente por Asignatura
+- Coordinador
+- Gestor de Usuarios
+- Secretaria
+- Alumno
 
-`composer run setup` ejecuta instalacion, copia `.env`, genera clave, migra, instala npm y compila assets.
+Permisos principales:
 
-`composer run dev` intenta levantar en paralelo:
+- alumnos.gestionar / alumnos.ver / alumnos.supervisar
+- asignaturas_aula.gestionar / asignaturas_aula.ver
+- notas.gestionar / notas.ver
+- asistencia.gestionar / asistencia.ver
+- indicadores.gestionar / indicadores.ver
+- boletines.gestionar / boletines.ver
+- malla.gestionar / malla.ver
+- avance.gestionar / avance.ver
+- apoyo_padres.gestionar / apoyo_padres.ver
+- reparacion.gestionar / reparacion.ver
+- reportes.gestionar / reportes.ver / reportes.supervisar
+- configuracion.gestionar / configuracion.ver
 
-- servidor PHP con `php artisan serve`;
-- listener de cola con `php artisan queue:listen`;
-- visor de logs con `php artisan pail`;
-- Vite con `npm run dev`.
+### 5.3 Policies
 
-Depende de `npx concurrently` y de que PowerShell permita ejecutar scripts npm/npx.
+La capa de soporte de autorización se implementa a través de policies en `app/Policies`, por ejemplo:
 
-## 5. Configuracion de entorno
+- `AulaAsignaturaDocentePolicy`
+- `AsistenciaAulaPolicy`
+- `NotaPolicy`
+- `MatriculaPolicy`
+- `UsuarioPolicy`
+- `AulaPolicy`
+- `HorarioPolicy`
 
-`.env.example` configura por defecto:
+Ejemplo clave: `AulaAsignaturaDocentePolicy` usa `before()` para conceder permiso absoluto a Director y Subdirector, y luego valida el acceso por permiso y por pertenencia del docente a la asignatura.
 
-| Area | Valor |
-|---|---|
-| Entorno | `local` |
-| Debug | `true` |
-| URL | `http://localhost` |
-| Locale | `en` |
-| Base de datos | SQLite |
-| Sesiones | `database` |
-| Cache | `database` |
-| Cola | `database` |
-| Filesystem | `local` |
-| Mail | `log` |
-| Broadcasting | `log` |
-| Redis | Configurado, no seleccionado por defecto |
+La regla general del proyecto es: el rol operativo define la capacidad, y la policy valida el alcance del recurso. Esto es especialmente importante en operaciones como:
 
-`config/database.php` contiene conexiones SQLite, MySQL, MariaDB, PostgreSQL y SQL Server. Esto no significa que las migraciones esten certificadas para todos ellos; el motor objetivo debe elegirse y probarse desde cero.
+- calificar notas
+- gestionar asistencia de aula
+- editar horarios
+- supervisar matrículas
+- revisar boletines
 
-Antes de produccion se deben fijar `APP_ENV`, `APP_DEBUG=false`, `APP_KEY`, `APP_URL`, credenciales de base de datos, drivers de sesion/cache/cola, almacenamiento persistente, mailer real, retencion de logs y backups.
+## 6. Rutas y estructura de navegación HTTP
 
-## 6. Identidad, autenticacion y perfil
+El router principal se encuentra en `routes/web.php` y define dos grandes bloques:
 
-### 6.1 Modelo autenticable
+### 6.1 Rutas públicas y de sesión
 
-El guard `web` utiliza sesiones y el provider `users` usa `App\\Models\\Usuario`. `Usuario` representa la tabla singular `usuario` y combina:
+- `/` redirige a login
+- `/dashboard`
+- `/profile`
+- rutas de Breeze para autenticación, verificación, recuperación y restablecimiento de contraseña
 
-- autenticacion Laravel;
-- `HasApiTokens` de Sanctum;
-- `HasRoles` de Spatie;
-- notificaciones;
-- soft deletes;
-- relacion con `Rol` mediante `rol_id`;
-- relaciones opcionales con `Docente` y `Alumno`.
+### 6.2 Grupo académico con prefijo `/academico`
 
-`HasApiTokens` no implica que exista un flujo de tokens para clientes: no hay rutas API propias.
+La mayor parte del sistema vive bajo:
 
-### 6.2 Autenticacion
+- `Route::middleware('auth')`
+- `Route::prefix('academico')`
+- `Route::name('academico.')`
 
-`routes/auth.php` implementa:
+Este paquete incluye módulos de:
 
-- login y logout;
-- recuperacion y restablecimiento de contrasena;
-- verificacion y reenvio de correo;
-- confirmacion de contrasena;
-- cambio de contrasena.
+- alumnos
+- matrículas
+- aulas y asignaciones
+- horarios y visor
+- malla curricular
+- bloques de horario
+- notas y actividades evaluativas
+- cortes evaluativos
+- asistencia por aula y asignatura
+- boletines y constancias
+- exámenes de reparación
+- avance de contenido
+- apoyo de padres
+- disciplina
+- reportes
+- gestión de usuarios
+- grupo-materias
 
-El registro publico no esta declarado en las rutas actuales, aunque permanecen `RegisteredUserController` y una vista heredada de Breeze. Ese residuo debe eliminarse o documentarse como flujo administrativo no expuesto.
+El diseño del router es un reflejo del dominio escolar y define claramente los puntos de entrada de cada operación.
 
-### 6.3 Perfil
+## 7. Modelo de negocio principal
 
-`ProfileController` y `ProfileUpdateRequest` gestionan el perfil autenticado. El proyecto usa `nombre_completo`, no el atributo generico `name` del skeleton inicial. Cualquier cambio debe revisar config, modelo, factory, request, vistas y tests.
+### 7.1 Usuario
 
-## 7. Autorizacion y roles
+El modelo `Usuario` es la entidad central del sistema. Representa al usuario autenticado del portal institucional.
 
-### 7.1 Mecanismos activos
+Relaciones clave:
 
-La autorizacion se reparte entre:
+- `docente()` => un usuario puede ser un docente
+- `alumno()` => un usuario puede ser un alumno
+- `asistencias()` => registros de asistencia personal
 
-1. `$this->authorize(...)` y Policies.
-2. `hasRole`, `hasAnyRole` y `hasPermissionTo` de Spatie.
-3. Condiciones directas e `abort(403)` en controladores.
-4. `authorize(): true` en varios Form Requests, por lo que esos requests no son la fuente principal de autorizacion.
+Además, el modelo está encargado de la identidad digital y de la validación de sesión, lo que hace que sea el eje de intersección entre autenticación y dominio académico.
 
-Todas las rutas academicas tienen `auth`, pero no existe un middleware global que traduzca automaticamente cada permiso a una ruta. La seguridad efectiva depende de cada controlador y policy.
+### 7.2 Alumno
 
-### 7.2 Dos representaciones de rol
+`Alumno` concentra el expediente académico y personal del estudiante. En la práctica, es la entidad que captura:
 
-El sistema mantiene dos conceptos:
+- datos personales básicos
+- familiares o autorizados
+- datos de salud
+- registro religioso o de convivencia
+- asociatividad con matrículas y asistencia
 
-- catalogo de negocio `rol`, referenciado por `usuario.rol_id`;
-- roles/permisos Spatie en `roles`, `permissions`, `model_has_roles`, `model_has_permissions` y `role_has_permissions`.
+La matrícula de un alumno no es simplemente una relación de tabla; es un vínculo de continuidad con el historial escolar.
 
-`PermisoSeeder` crea roles Spatie como `Director`, `Subdirector`, `Docente Guia`, `Docente por Asignatura`, `Alumno`, `Coordinador`, `Gestor de Usuarios` y `Secretaria`. Tambien crea permisos como `alumnos.gestionar`, `notas.gestionar`, `asistencia.gestionar`, `boletines.ver`, `malla.gestionar`, `reportes.ver` y `configuracion.gestionar`.
+### 7.3 Docente
 
-No existe un servicio unico que sincronice `rol_id` y el rol Spatie dentro de una transaccion. Es una deuda de arquitectura antes de ampliar la matriz de acceso.
+`Docente` representa la identidad funcional del profesor dentro del sistema. Se asocia a un usuario y tiene una relación muy fuerte con la operación de curso, ya que participa en:
 
-### 7.3 Policies
+- asignaciones de aula / materia / docente
+- gestión de notas
+- registro de asistencia
+- tutoría de aula
+- supervisión de horarios
 
-Existen policies para alumnos, aulas, asignaciones aula-asignatura-docente, asistencia de aula, apoyo de padres, avance de contenidos, boletines, examen de reparacion, horarios, matriculas, malla curricular, notas y usuarios.
+### 7.4 Aula y asignación académica
 
-Varias conceden acceso general a Director y Subdirector mediante `before()`. Una prueba basada solo en permisos individuales no representa necesariamente ese comportamiento.
+La entidad central del sistema académico es `AulaAsignaturaDocente`.
 
-### 7.4 Riesgos de autorizacion
+Representa la relación de una asignatura que se imparte dentro de un aula, por un docente concreto, durante un año escolar y con una carga horaria determinada. Esta entidad es la base sobre la que se construyen muchos procesos:
 
-- `NotaController::index()` decide visibilidad por rol sin una invocacion evidente a una policy.
-- `GestorBoletinController` conserva autorizacion comentada y debe auditarse antes de considerarlo exclusivo.
-- Una ruta nueva con solo `auth` puede quedar accesible a todo usuario autenticado si el controlador no autoriza.
-- Reportes contienen datos sensibles de alumnos, familias, notas y asistencia; deben mantenerse restringidos por rol y contexto.
-- El nombre Spatie es `Docente Guia` sin tilde; no introducir variantes sin migracion y pruebas.
+- calificaciones
+- asistencia por materia
+- horarios
+- indicadores de logro
+- carga docente
+- reportes de rendimiento
 
-## 8. Modelo de dominio
+El modelo `Aula` también es central porque almacena la relación con:
 
-### 8.1 Catalogos y estructura escolar
+- grado
+- modalidad
+- año escolar
+- docente guía
 
-- `Rol`: catalogo propio de roles.
-- `Modalidad`: modalidad o jornada academica.
-- `AnioEscolar`: ciclo escolar y bandera de activo.
-- `Grado`: grado asociado a modalidad y limite de horas maximas.
-- `Asignatura`: materia, incluyendo area.
-- `GrupoMateria`: agrupacion usada por el boletin oficial.
-- `CorteEvaluativo`: periodo de evaluacion asociado al año escolar y con pesos configurables.
-- `IndicadorLogro`: catalogo cualitativo asociado a modalidad y rangos de grado.
-- `MallaCurricular`: relacion grado-asignatura y configuracion curricular.
-- `BloqueHorario`: bloque de jornada, turno y bandera `es_recreo`.
+### 7.5 Matricula
 
-### 8.2 Personas y organizacion
+`Matricula` conecta a un alumno con una aula y con un año escolar. El estado de la matrícula define si el alumno se encuentra activo, retirado o reactivado. El sistema usa ese estado para filtrar alumnos en planillas y para controlar el acceso a evaluaciones y reportes.
 
-- `Usuario`: identidad, credenciales, roles y borrado logico.
-- `Docente`: perfil docente asociado a usuario y opcionalmente a modalidad coordinada.
-- `Alumno`: expediente personal, familiar, medico y autorizados.
-- `Aula`: grupo/seccion asociado a grado, modalidad, año escolar y docente guia.
-- `Matricula`: vinculacion alumno-aula-año, con estado operativo y soft delete.
+### 7.6 Nota y evaluación
 
-### 8.3 Asignaciones y horarios
+La capa de evaluación se compone de varias entidades:
 
-`AulaAsignaturaDocente` es la entidad central que indica que una asignatura se imparte en un aula durante un año, con docente opcional, horas semanales y estado activo.
+- `CorteEvaluativo`: define los parciales/periodos del año
+- `ActividadEvaluativa`: define actividades dentro de un parcial
+- `NotaActividad`: guarda la calificación individual de esa actividad por alumno
+- `Nota`: representa el consolidado final del alumno en una asignatura + corte
+- `IndicadorLogro`: convierte la nota cuantitativa en la escala cualitativa del sistema escolar
 
-`Horario` relaciona una asignacion con un `BloqueHorario`. Los controladores validan, segun el flujo, modalidad, jornada, recreos y colisiones. `AulaService` interviene en creacion/configuracion de aulas y puede sincronizar asignaturas desde la malla.
+El servicio `NotaService` encapsula la lógica de conversión y promedios:
 
-### 8.4 Evaluacion
+- 90 a 100 => AA
+- 76 a 89 => AS
+- 60 a 75 => AF
+- 0 a 59 => AI
 
-- `ActividadEvaluativa`: actividad de una asignacion y corte; puede tener tipo.
-- `NotaActividad`: calificacion de una matricula para una actividad y usuario que actualiza.
-- `Nota`: calificacion consolidada por matricula, asignacion, corte e indicador.
-- `CorteCerrado`: bloqueo/auditoria de cortes.
-- `SolicitudEdicionNota`: solicitud y resolucion de desbloqueos.
-- `Boletin`: consolidado oficial por matricula.
-- `ExamenReparacion`: examen extraordinario por matricula y asignatura.
+Además, calcula promedios semestrales y anuales, y establece aprobado cuando la nota final es mayor o igual a 60.
 
-### 8.5 Asistencia y seguimiento
+## 8. Flujos de negocio principales
 
-- `AsistenciaAula`: asistencia diaria por matricula gestionada por docente guia.
-- `AsistenciaAsignatura`: incidencia por matricula, asignatura, bloque y fecha.
-- `AsistenciaPersonal`: marcacion de llegada del personal autenticado.
-- `SustitucionDocente`: tabla de sustituciones; existe migracion, pero no se identifico superficie completa de modelo/controlador/ruta.
-- `AvanceContenido`: porcentaje por asignacion y periodo.
-- `ApoyoPadres`: participacion familiar por aula y mes.
-- `EvaluacionFamiliar`: evaluacion/seguimiento familiar.
-- `IncidenciaDisciplinaria`: control disciplinario asociado al flujo de alumno/matricula.
+### 8.1 Gestión de usuarios y acceso
 
-## 9. Persistencia y esquema
+El sistema prepara el contexto de identidad y permisos antes de acceder a cualquier módulo. En la práctica:
 
-### 9.1 Convenciones
+- el usuario inicia sesión con el guard web
+- se valida su rol y permisos Spatie
+- la UI se adapta según la identidad del usuario
+- los controladores llaman a `authorize()` o verifican permisos explícitos
 
-Las tablas del dominio usan nombres singulares en español: `usuario`, `alumno`, `docente`, `aula`, `matricula`, `asignatura`, `nota` y `horario`, entre otras. Los modelos declaran `$table` y claves explicitas cuando Laravel no puede inferirlas.
+La lógica de roles no está limitada solamente a UI; también puede tener impacto real en la consulta de registros y en la edición de datos académicos.
 
-No cambiar una tabla a plural ni renombrar una FK suponiendo que Eloquent la resolvera. Cada cambio debe revisar modelo, relaciones, bindings, policies, factories, seeders, vistas y tests.
+### 8.2 Matrícula y expediente
 
-### 9.2 Integridad y eliminacion
+La matrícula es un proceso de negocio de alto impacto porque establece la relación entre estudiante, curso y ciclo escolar. El módulo de matriculación permite:
 
-Las migraciones combinan `cascade`, `restrict`, `set null` y soft deletes. Estas decisiones son reglas de negocio. El estado de matricula (`activo`, `retirado`, `repitente`, `promovido`) no equivale a `deleted_at`; las consultas deben expresar ambas dimensiones.
+- crear matrícula
+- actualizar matrícula
+- retirar matrícula
+- reactivar matrícula
+- consultar expediente y resultados del estudiante
 
-### 9.3 Restricciones e idempotencia
+Además, el sistema combina datos del alumno, aula, modalidad y plan académico para generar un panorama operativo completo.
 
-Hay restricciones unicas para notas, asistencia y otras entidades. Los servicios usan `updateOrCreate` en flujos idempotentes.
+### 8.3 Aulas y asignaturas
 
-La unicidad debe protegerse en aplicacion para mensajes claros y en base de datos para soportar concurrencia. Las operaciones por lote de notas/asistencia deben permanecer en transacciones.
+Este módulo es la base del plan de estudios:
 
-### 9.4 Migraciones que requieren atencion
+- asignación de docentes a aulas
+- gestión de asignaturas por aula
+- carga horaria semanal
+- configuración de horarios
+- consulta de aulas por docente y por grado
 
-- La migracion de `apoyo_padres` crea `apoyo_padres`, pero su `down()` referencia `apoyo_padre`; debe corregirse para rollback limpio.
-- Existen migraciones de `sustitucion_docente` y `envio_boletines` sin superficie funcional completa identificada.
-- La migracion que agrega `modalidad_id` a `docente` debe alinearse con `$fillable` y los formularios de Docente.
-- Las migraciones se agregaron por fases; se debe probar `migrate:fresh` en el motor objetivo, no solo una base ya migrada.
+`AulaAsignaturaDocente` es el punto nodal del modelo académico y muchos otros procesos dependen de ella.
 
-## 10. Contrato HTTP
+### 8.4 Horarios
 
-### 10.1 Acceso y autenticacion
+La aplicación incluye un gestor y un visor de horarios. La estructura permite:
 
-`GET /` redirige a `login`. Las rutas de autenticacion cubren `/login`, `/forgot-password`, `/reset-password`, `/verify-email`, `/confirm-password`, `/password` y `/logout`.
+- gestionar bloques por modalidad
+- asignar horario a una asignación docente
+- ver disponibilidad por docente o aula
+- consultar el mapa horario escolar
 
-El dashboard y avisos estan en `/dashboard` y requieren autenticacion. El perfil esta en `/profile` y requiere autenticacion.
+La lógica se apoya en `BloqueHorario` y en la relación con `AulaAsignaturaDocente`.
 
-### 10.2 Area academica
+### 8.5 Calificaciones
 
-Todas las rutas de negocio estan bajo prefijo `/academico`, nombres `academico.*` y middleware `auth`.
+El flujo de notas es probablemente el módulo más estrictamente regulado del sistema. En `NotaController` se observan varios patrones importantes:
 
-| Modulo | Superficie principal |
-|---|---|
-| Alumnos | resource `academico.alumnos.*` |
-| Matriculas | resource, `retirar`, `reactivar` |
-| Prematricula | listado, promover y remitir |
-| Aulas | resource, asignaciones, asignaturas y horarios |
-| Malla | CRUD parcial, clonado y horas por grado |
-| Bloques | CRUD parcial, clonado, generacion masiva y eliminacion de jornada |
-| Usuarios | resource y reset de contraseña |
-| Horarios | alta/baja por aula y visor por docente/aula |
-| Notas | indice, planilla, guardado, cierre y desbloqueo |
-| Actividades | alta, actualizacion y baja por asignacion |
-| Cortes | consulta y actualizacion |
-| Asistencia | aula, asignatura y personal |
-| Boletines | listado, detalle, constancia, aprobacion y bandeja |
-| Reparacion | listado, alta y baja |
-| Avance | listado, alta y baja |
-| Apoyo familiar | apoyo de padres y evaluacion familiar |
-| Disciplina | listado, alta y actualizacion |
-| Reportes | notas, asistencia, rendimiento, MINED, estudiantes y padres |
-| Grupo materia | CRUD y asignacion de materias |
+- autorización previa a la operación
+- validación del corte evaluativo
+- bloqueo del parcial mediante `CorteCerrado`
+- transacción sobre los cambios
+- cálculo automático del total acumulado por alumno
+- persistencia de notas individuales y nota consolidada por corte
 
-### 10.3 Duplicaciones y bindings
+Esto indica una lógica de negocio sólida para evitar inconsistencias en los registros de notas, especialmente cuando se trabaja con planillas masivas.
 
-`routes/web.php` declara dos veces `PUT academico/usuarios/{usuario}/reset-password` con el mismo nombre y accion. `route:list` muestra una ruta efectiva, pero la declaracion duplicada debe eliminarse.
+### 8.6 Asistencia
 
-Los bindings `{alumno}`, `{matricula}`, `{aula}`, `{asignacion}`, `{horario}`, `{bloque}`, `{corte}`, `{usuario}` e `{incidencia}` resuelven IDs, pero no sustituyen la comprobacion de pertenencia al aula, año, docente o asignacion.
+La asistencia se implementa en dos niveles:
 
-## 11. Flujos de negocio
+- asistencia por aula
+- asistencia por asignatura
 
-### 11.1 Alumno, expediente y matricula
+La asistencia por aula está diseñada para el docente guía, con foco en el grupo completo del aula y sus matrículas activas. La asistencia por asignatura está centrada en el docente que imparte la materia y puede considerar incidencias puntuales por clase, fecha y bloque horario.
 
-`StoreAlumnoRequest` y `UpdateAlumnoRequest` validan datos del expediente. `AlumnoPolicy` controla consulta y gestion.
+El diseño usa `updateOrCreate` para evitar duplicados y está atado a claves de negocio como:
 
-`MatriculaController` crea y actualiza matriculas y expone retiro/reactivacion. `PrematriculaController` gestiona promocion y remision. Las transiciones deben ser coherentes con `deleted_at`, aula destino, año escolar y duplicidad.
+- `matricula_id`
+- `asignatura_id`
+- `bloque_horario_id`
+- `fecha`
 
-### 11.2 Aula y malla
+Esto hace que un mismo estudiante no tenga dos incidencias duplicadas para la misma clase.
 
-La malla relaciona grados y asignaturas. Al crear/configurar aulas, `AulaService` puede sincronizar la estructura curricular y asignaciones base.
+### 8.7 Boletines y reportes
 
-Las asignaciones deben filtrarse por aula, modalidad, año y estado `activo`. No se debe aceptar un `asignacion_id` aislado sin validar el contexto.
+El sistema incluye procesos de cierre de ciclo y generación de boletines, constancias, certificaciones y reportes de rendimiento. Hay controllers especializados para:
 
-### 11.3 Bloques y horarios
+- `BoletinController`
+- `BoletinPdfController`
+- `GestorBoletinController`
+- `ReporteController`
 
-`BloqueHorarioController` administra bloques por modalidad, clonacion, generacion masiva y eliminacion de jornadas. Un bloque puede marcarse como recreo.
+Estos reportes se basan en el historial académico y en los estados de matrícula y notas generadas por las asignaturas y cortes evaluativos.
 
-`HorarioController` crea y elimina horarios de un aula. `VisorHorarioController` consulta horarios por aula y docente. Antes de persistir deben comprobarse colisiones de bloque, docente, aula, año y asignacion.
+### 8.8 Apoyo y disciplina
 
-### 11.4 Calificaciones
+La aplicación también incluye módulos orientados a soporte institucional y convivencia:
 
-El flujo incluye:
+- `ApoyoPadresController`
+- `ApoyoFamiliarController`
+- `IncidenciaDisciplinariaController`
+- `AvanceContenidoController`
+- `ExamenReparacionController`
 
-1. Seleccion de asignacion y corte.
-2. Gestion de actividades evaluativas.
-3. Registro de `NotaActividad`.
-4. Calculo/consolidacion de `Nota`.
-5. Indicador cualitativo y promedios mediante `NotaService`.
-6. Cierre mediante `CorteCerrado`.
-7. Solicitud y resolucion de desbloqueo mediante `SolicitudEdicionNota`.
+Esto evidencia que el proyecto no es únicamente una gestión de calificaciones; actúa como un sistema de operación escolar completo.
 
-`NotaService` observa estos rangos:
+## 9. Patrones de implementación observados
 
-| Rango | Indicador |
-|---:|---|
-| 90-100 | `AA` |
-| 76-89 | `AS` |
-| 60-75 | `AF` |
-| 0-59 | `AI` |
+### 9.1 Controller-centric business logic
 
-La aprobacion comienza en 60 y el servicio calcula promedios semestrales/anuales con redondeo segun la implementacion vigente.
+La lógica principal de la aplicación se concentra en controladores. Esto es típico de Laravel, pero en este proyecto se ha ido estructurando en servicios según complejidad. El caso más evidente es `NotaService`, usado por `NotaController` para encapsular lógica de notas y conversiones.
 
-**Riesgo importante:** la ruta de guardado usa `NotaController::store(Request $request, ...)`, no `StoreNotaRequest`; las reglas de ese request no se aplican automaticamente. Deben validarse rango, matricula, pertenencia al aula, asignacion, corte y año escolar, idealmente aplicando efectivamente un Form Request.
+### 9.2 Uso de Policies como capa de restricciones
 
-El cierre tampoco debe aceptar `corte_evaluativo_id` sin comprobar existencia y pertenencia al año escolar de la asignacion.
+El proyecto no depende solo del guard, sino que combina varios niveles de control:
 
-### 11.5 Asistencia
+- `middleware('auth')` en rutas
+- `authorize()` en controladores
+- checks de rol (`hasRole`) en vistas y lógicas de negocio
+- checks de permiso (`hasPermissionTo`) en policies
 
-**Asistencia de aula:** el docente guia consulta estudiantes activos y registra asistencia diaria. `GuardarAsistenciaAulaRequest` valida existencia de matricula, pero el controlador/servicio debe comprobar pertenencia al aula.
+Esto es una práctica sólida, pero requiere disciplina porque si se agrega una ruta nueva sin policy, se abre un riesgo de fuga de acceso.
 
-**Asistencia por asignatura:** la clave funcional es matricula + asignatura + bloque + fecha. Las incidencias observadas son `Fuga`, `Llegada Tardía` y `Permiso de Salida`. Una fila ausente puede representar presencia; no asumir que `Presente` es siempre persistido sin revisar migracion y controlador.
+### 9.3 Recursos y formularios por módulo
 
-El acceso debe comprobar que el docente pertenece a la asignacion o que su rol permite supervision. El borrado de incidencia debe volver a comprobar esa pertenencia y no confiar solo en binding.
+La UI se construye desde vistas Blade con fragmentación por módulos. La estructura es muy clara:
 
-**Asistencia personal:** `AsistenciaPersonalController` permite consultar y marcar llegada mediante `/asistencia-personal/marcar`.
+- layouts para el shell base
+- vistas de índice por entidad
+- formularios para creación/edición
+- paneles de reportes y gestión
 
-### 11.6 Boletines y reparacion
+### 9.4 Dependencia de datos de contexto escolar
 
-`BoletinController` consulta matriculas/notas, genera detalle y constancia, y permite aprobar boletines. Debe comprobar notas completas y ciclo correcto.
+El sistema no usa solo IDs; muchos procesos dependen de contexto operativo explícito, como:
 
-`GestorBoletinController` ofrece la bandeja de impresion. Su autorizacion requiere auditoria porque hay codigo comentado relacionado con acceso.
+- año escolar activo
+- modalidad
+- aula
+- docente guía
+- corte evaluativo vigente
+- estado de matrícula
 
-`ExamenReparacionController` usa `ReparacionService`. El resultado es `aprobado` desde 60 y `reprobado` por debajo. El servicio es idempotente por matricula/asignatura y actualiza el registro existente.
+Eso hace que la validación de entrada sea crítica para evitar que un usuario consulte o edite información fuera de su contexto curricular.
 
-### 11.7 Avance, familia y disciplina
+## 10. Configuración del frontend
 
-`AvanceContenidoController` registra porcentajes por asignacion y mes. Debe validar rango y pertenencia del usuario al contexto.
+La capa frontend está basada en Blade + Tailwind + Alpine.js. El layout principal incluye:
 
-`ApoyoPadresController` registra por aula y mes la cantidad de padres que apoyan frente al total. Rechaza `cantidad_apoyan > total_padres` y es idempotente por aula/mes.
+- navegación institucional
+- sidebar responsive
+- persistencia del estado del menú en localStorage
+- carga de librerías externas para gráficos y alertas
 
-`ApoyoFamiliarController` gestiona evaluaciones familiares. `IncidenciaDisciplinariaController` lista, crea y actualiza incidencias.
+El archivo de configuración relevante es `package.json`, que define:
 
-### 11.8 Reportes
+- Vite como bundler
+- Tailwind como utility framework
+- Alpine como JS para interactividad local
+- `concurrently` para levantar varios procesos simultáneamente
 
-`ReporteController` y `ReporteService` concentran consultas de:
+Este enfoque facilita el desarrollo rápido de módulos dentro del monolito, aunque hay dependencia de recursos CDN como SweetAlert2 o Chart.js en el layout, lo que requiere una decisión explícita de arquitectura y mantenimiento.
 
-- control, pendientes y notas globales;
-- notas por asignatura;
-- rendimiento por corte e historial del estudiante;
-- asistencia global, por seccion/dia, por rango y por estudiante;
-- estadisticas de asistencia;
-- reportes MINED, de estudiantes y de padres.
+## 11. Pruebas y calidad del código
 
-Son consultas de alto impacto en privacidad. Cada filtro debe limitar por año escolar, modalidad, aula y estado de matricula cuando corresponda. La prueba existente verifica acceso de Director y rechazo del docente por asignatura al centro de reportes.
+El proyecto tiene un conjunto inicial de pruebas basado en Laravel, pero no se trata de una suite exhaustiva del dominio académico. La lógica crítica está en módulos como notas, asistencia y permisos, por lo que la cobertura debería priorizar:
 
-## 12. Seeders y datos iniciales
+1. autorización por rol y permiso
+2. validación de ownership en recursos académicos
+3. cálculo de indicadores de logro
+4. operación por lotes de notas
+5. idempotencia de asistencia
+6. filtros por aula, gestión de matrículas activas y año escolar
+7. tests de regresión para rutas críticas
 
-`DatabaseSeeder` ejecuta, en orden general:
+Lo importante es no tratar la validación y autorización como un detalle opcional; en este proyecto, son una parte esencial del modelo de seguridad.
 
-1. `RolSeeder`.
-2. `PermisoSeeder`.
-3. Modalidades y años escolares.
-4. Grados, asignaturas y grupos de materias.
-5. Malla e indicadores.
-6. Cortes y bloques.
-7. `UsuarioSeeder`.
+## 12. Operación local y despliegue
 
-No se observan seeders de docentes, alumnos, aulas, matriculas, asignaciones u horarios operativos. Una instalacion limpia puede tener catalogos y cuentas, pero no una estructura escolar completa.
+El flujo de arranque recomendado, según el proyecto, es:
 
-`UsuarioSeeder` contiene contraseñas iniciales conocidas para desarrollo. No ejecutar esos datos en produccion; usar bootstrap seguro y rotacion de credenciales.
-
-Los tests crean con frecuencia roles Spatie y catalogo `Rol` por separado. Eso puede ocultar problemas de sincronizacion que aparecerian en una base real.
-
-## 13. Frontend
-
-### 13.1 Renderizado y estado local
-
-El layout autenticado esta en `resources/views/layouts/app.blade.php`; las vistas de negocio estan bajo `resources/views/academico`. Blade genera HTML en servidor y Vite procesa `resources/js/app.js` y `resources/css/app.css`.
-
-`resources/js/app.js` registra Alpine globalmente y ejecuta `Alpine.start()`. El layout usa Alpine para sidebar, persistencia en `localStorage` y comportamiento responsive.
-
-### 13.2 Estilos y dependencias
-
-`resources/css/app.css` importa base, componentes y utilidades Tailwind. `tailwind.config.js` escanea vistas y configura modo oscuro por clase.
-
-La interfaz usa direccion institucional clara, acentos ambar/amarillo, tonos slate y Figtree desde fuente externa. Existen SVG inline repetidos.
-
-Alpine se carga desde Vite y tambien aparece en CDN en algunas vistas. SweetAlert2, Chart.js, fuentes e iconos externos introducen dependencia de disponibilidad, CSP, cache, privacidad y reproducibilidad. Para produccion debe definirse una estrategia de versionado, integridad y fallback.
-
-## 14. Pruebas y calidad
-
-### 14.1 Pruebas existentes
-
-La suite visible incluye:
-
-- autenticacion, logout, recuperacion, cambio de contraseña y verificacion;
-- perfil;
-- matriz de permisos y autorizacion por rol;
-- idempotencia;
-- `NotaService`;
-- fase 7: avance, reparacion y apoyo de padres;
-- reportes.
-
-### 14.2 Cobertura faltante o a reforzar
-
-- aislamiento por docente, aula, modalidad y año;
-- propiedad contextual de notas, asistencia, horarios y boletines;
-- cierre y desbloqueo de cortes;
-- transiciones de matricula y prematricula;
-- permisos de Secretaria, Coordinador y Gestor;
-- disciplina, asistencia personal, grupos y evaluacion familiar;
-- rollback de migraciones;
-- concurrencia contra indices unicos;
-- privacidad de reportes;
-- exportacion de constancias y boletines.
-
-Los limites de `NotaService` deben cubrir 0, 59, 60, 75, 76, 89, 90 y 100, mas negativos, superiores a 100, nulos y decimales conforme al negocio.
-
-## 15. Riesgos priorizados
-
-### Criticos antes de produccion
-
-1. Habilitar y fijar extensiones PHP, especialmente `mbstring`, y repetir PHPUnit en CI.
-2. Aplicar realmente `StoreNotaRequest` o validacion equivalente al guardado.
-3. Garantizar pertenencia contextual de matriculas, asignaciones, cortes, aulas e incidencias antes de leer o mutar.
-4. Auditar autorizacion de `GestorBoletinController` y endpoints que dependen de comprobaciones internas.
-5. Elegir fuente canonica de rol o implementar sincronizacion transaccional entre `rol_id` y Spatie.
-6. Probar migraciones desde cero en el motor de produccion.
-
-### Altos
-
-1. Corregir el `down()` de `apoyo_padres`.
-2. Eliminar la declaracion duplicada de `usuarios/{usuario}/reset-password`.
-3. Proteger las contraseñas de `UsuarioSeeder`.
-4. Revisar `Docente::$fillable` frente a `modalidad_id`.
-5. Añadir indices compuestos cuando consultas y reglas lo requieran.
-6. Evitar mezclar registros activos y soft-deleted en reportes, matriculas y boletines.
-
-### Medios
-
-1. Eliminar o consolidar Alpine CDN/Vite.
-2. Decidir estrategia para Chart.js, SweetAlert2 y fuentes CDN.
-3. Completar o retirar superficies de sustitucion y envio de boletines.
-4. Sustituir comentarios heredados y README generico de Laravel.
-5. Incorporar pruebas de fases 7/8 y de los cambios pendientes del dashboard.
-
-## 16. Guia para implementar cambios
-
-1. Identificar modelo, migracion y policy dueños del dato.
-2. Revisar contexto: año, modalidad, aula, asignacion, matricula y estado.
-3. Validar entrada mediante Form Request realmente aplicado a la ruta.
-4. Autorizar antes de consultar o mutar datos sensibles.
-5. Preferir policy o servicio reutilizable a condicion inline.
-6. Mantener transacciones en operaciones por lote e indices unicos para idempotencia.
-7. Preservar nombres de tablas y claves explicitas en español.
-8. Añadir prueba feature del endpoint y prueba unitaria de la regla.
-9. Ejecutar migraciones limpias, tests, rutas y build frontend en el entorno objetivo.
-10. Limpiar cache de configuracion y permisos tras cambiar seeders.
-11. Revisar privacidad cuando una consulta devuelve alumnos, notas, asistencia, familias o disciplina.
-12. No introducir API por asumir que Sanctum ya define un contrato.
-
-## 17. Comandos operativos
-
-### Instalacion
-
-```powershell
+```bash
 composer install
-Copy-Item .env.example .env
 php artisan key:generate
-php artisan migrate
-npm install
+php artisan migrate --force
+npm install --ignore-scripts
 npm run build
 ```
 
-### Desarrollo
+Además, el script `composer run dev` levanta simultáneamente:
 
-```powershell
-composer run dev
-```
+- PHP server
+- queue listener
+- pail logs
+- Vite dev server
 
-Como alternativa, ejecutar servidor Laravel, Vite, cola y logs por separado para aislar fallos.
+La aplicación está preparada para correr de forma local en un entorno Laravel típico, pero la producción requiere revisión de:
 
-### Diagnostico
+- `APP_ENV`
+- `APP_DEBUG`
+- `APP_KEY`
+- `APP_URL`
+- base de datos real
+- sesión, cache y cola
+- almacenamiento persistente
+- correo transaccional
+- logs centralizados
+- pipeline CI/CD
+- backups
+- supervisión de errores y rendimiento
 
-```powershell
-php artisan about
-php artisan route:list
-php artisan migrate:status
-php artisan optimize:clear
-php artisan view:cache
-php artisan permission:cache-reset
-```
+## 13. Riesgos técnicos y deuda identificada
 
-### Pruebas y calidad
+### 13.1 Riesgos de seguridad y autorización
 
-```powershell
-php artisan test
-php artisan test --testsuite=Feature
-php artisan test --testsuite=Unit
-vendor/bin/pint --test
-npm run build
-```
+Los puntos críticos a vigilar son:
 
-En Windows, si `npm run build` es bloqueado por PowerShell, revisar la politica de ejecucion del usuario o ejecutar desde un shell autorizado. La solucion debe quedar documentada en CI, no depender de una configuracion manual local.
+- nuevas rutas sin policy asociada
+- validación de propiedad implementada inline
+- uso inconsistente de roles y permisos
+- acceso a recursos por ID sin filtros de contexto
+- falta de homogeneidad entre roles declarados en DB y roles esperados por negocio
 
-## 18. Referencia de archivos
+### 13.2 Riesgos de consistencia del dominio
 
-| Responsabilidad | Archivos |
-|---|---|
-| Bootstrap | `bootstrap/app.php` |
-| Rutas | `routes/web.php`, `routes/auth.php` |
-| Dependencias | `composer.json`, `composer.lock`, `package.json`, `package-lock.json` |
-| Entorno | `.env.example`, `config/database.php`, `config/auth.php`, `config/permission.php` |
-| Identidad | `app/Models/Usuario.php`, `app/Http/Controllers/Auth/`, `ProfileController.php` |
-| Permisos | `database/seeders/PermisoSeeder.php`, `app/Policies/`, `config/permission.php` |
-| Academico | `app/Models/`, `app/Http/Controllers/`, `app/Http/Requests/` |
-| Reglas | `app/Services/NotaService.php`, `AsistenciaService.php`, `AulaService.php`, `ReporteService.php`, `ReparacionService.php` |
-| Esquema | `database/migrations/` |
-| Datos iniciales | `database/seeders/` |
-| UI | `resources/views/`, `resources/js/app.js`, `resources/css/app.css`, `tailwind.config.js`, `vite.config.js` |
-| Tests | `tests/Feature/`, `tests/Unit/`, `phpunit.xml` |
+El esquema académico usa model names y tablas particulares. Si se alteran columnas, nombres de modelos o relaciones, cada operación del proyecto puede romperse. Por eso cada cambio de dominio debe evaluarse como un cambio de contrato de negocio y no como un ajuste puntual.
 
-## 19. Conclusiones
+### 13.3 Riesgos de acoplamiento de UI y negocio
 
-La base actual ya es un sistema academico amplio, no un skeleton de Laravel: cubre estructura escolar, matricula, evaluacion, asistencia, boletines, reportes y seguimiento institucional. La separacion entre controladores, requests, policies, servicios, modelos y vistas permite continuar, pero la seguridad depende de mantener esas fronteras.
+La aplicación usa vistas Blade y controladores con lógica de estado y validación. Esto hace que el código crezca rápido, y sin disciplina de servicio, las responsabilidades se mezclan. Para futuras mejoras, es recomendable separar mejor:
 
-Las prioridades tecnicas son cerrar la validacion contextual de notas y asistencia, unificar el modelo de roles, completar autorizacion de boletines/reportes, probar migraciones limpias y hacer reproducible el entorno PHP/Node. Las futuras actualizaciones de este documento deben conservar la separacion entre capacidades observadas, verificaciones ejecutadas y trabajo pendiente.
+- validación de entrada
+- autorización
+- consultas de dominio
+- presentación
+
+## 14. Recomendaciones para mantenimiento profesional
+
+1. Consolidar una sola fuente de verdad para roles y permisos.
+2. Mantener una práctica estricta de `authorize()` en todos los puntos de escritura.
+3. Evitar validaciones de propiedad inline y trasladarlas a policies.
+4. Mantener un único criterio para el estado activo/inactivo de matrículas y registros eliminados.
+5. Asegurar que cada módulo tenga tests de regresión.
+6. Revisar la estructura de migraciones antes de cambiar claves foráneas o nombres de tablas.
+7. Separar lógica de dominio de lógica HTTP cuando el módulo lo requiera.
+8. Documentar claramente la diferencia entre `deleted_at`, `estado` y `activo` en el dominio escolar.
+9. No asumir que la presencia de Sanctum implica una API REST disponible.
+10. Priorizar comprobación de permisos sobre comprobaciones de UI.
+
+## 15. Conclusión arquitectónica
+
+Este proyecto es un sistema escolar monolítico con una lógica de negocio altamente especializada y una capa de acceso bien organizada en torno a modelos académicos, roles y permisos. Tiene un diseño serio y un dominio muy definido, pero requiere disciplina para evitar que la lógica de autorización, validación y filtrado por contexto se disperse en controladores.
+
+Desde la perspectiva de un desarrollador full stack, el punto más importante es entender que esta aplicación no es una CRUD genérica: es un sistema de operación escolar con reglas de negocio y permisos profundamente conectados con el modelo institucional. La clave del mantenimiento futuro es preservar esa coherencia en cada módulo: usuarios, matrículas, aulas, horarios, notas, asistencia y reportes.
+
+Para un profesional de backend y frontend, el proyecto combina tres capas bien diferenciadas:
+
+- dominio académico y persistencia
+- seguridad y autorización institucional
+- UI con Blade/Tailwind/Alpine para gestión operativa
+
+Eso convierte a este repositorio en una base sólida, pero con una dependencia directa de la calidad del diseño de reglas y de la disciplina de mantenimiento del código.

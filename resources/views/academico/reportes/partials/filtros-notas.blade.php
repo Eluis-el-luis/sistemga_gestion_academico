@@ -58,6 +58,16 @@
             @endforeach
         </select>
     </div>
+    @if(isset($conEstado))
+    <div>
+        <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Estado</label>
+        <select name="tipo" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
+            <option value="">Todos</option>
+            <option value="pendientes" @selected(request('tipo') === 'pendientes')>Notas Pendientes</option>
+            <option value="ingresadas" @selected(request('tipo') === 'ingresadas')>Notas Ingresadas</option>
+        </select>
+    </div>
+    @endif
     <div>
         <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Periodo Evaluativo</label>
         <select name="corte_evaluativo_id" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">

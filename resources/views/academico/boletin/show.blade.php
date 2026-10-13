@@ -2,7 +2,7 @@
 
     <style type="text/css">
         @media print {
-            @page { size: letter portrait; margin: 5mm; }
+            @page { size: letter landscape; margin: 5mm; }
             nav, aside, header, .print-hidden { display: none !important; }
             html, body, #app, main { background-color: white !important; margin: 0 !important; padding: 0 !important; }
             

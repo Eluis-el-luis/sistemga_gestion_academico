@@ -37,12 +37,13 @@ class BoletinPdfController extends Controller
             $this->authorize('view', $matricula);
 
             $data = $this->prepareBoletinData($matricula, $request->query('corte_evaluativo_id'));
+            $data['logo'] = $this->logoDataUri();
 
             $pdf = Pdf::loadView('pdf.boletin', $data)
-                ->setPaper('letter', 'portrait')
+                ->setPaper('letter', 'landscape')
                 ->setOptions([
                     'defaultFont' => 'DejaVu Sans',
-                    'isRemoteEnabled' => true,
+                    'isRemoteEnabled' => false,
                     'isHtml5ParserEnabled' => true,
                 ]);
 
@@ -69,10 +70,10 @@ class BoletinPdfController extends Controller
             $data = $this->prepareConstanciaData($matricula);
 
             $pdf = Pdf::loadView('pdf.constancia', $data)
-                ->setPaper('letter', 'portrait')
+                ->setPaper('letter', 'landscape')
                 ->setOptions([
                     'defaultFont' => 'DejaVu Sans',
-                    'isRemoteEnabled' => true,
+                    'isRemoteEnabled' => false,
                     'isHtml5ParserEnabled' => true,
                 ]);
 
@@ -89,29 +90,25 @@ class BoletinPdfController extends Controller
     }
 
     /**
-     * Generar PDF de certificado de notas (formato oficial MINED).
+     * Generar PDF de certificado de notas (formato oficial MINED comparativo:
+     * grado de la matrícula + grado inmediatamente anterior).
      */
     public function certificado(Request $request, Matricula $matricula)
     {
         try {
             $this->authorize('view', $matricula);
 
-            $data = $this->reporteService->historialPorEstudiante($matricula->alumno_id);
+            $data = $this->datosCertificado($matricula);
 
-            $pdf = Pdf::loadView('pdf.certificado_notas', [
-                'matricula' => $data['matricula'],
-                'alumno' => $data['alumno'],
-                'resumenAsignaturas' => $data['resumenAsignaturas'],
-                'promedioGeneral' => $data['promedioGeneral'],
-            ])
+            $pdf = Pdf::loadView('pdf.certificado_notas', $data)
                 ->setPaper('letter', 'portrait')
                 ->setOptions([
                     'defaultFont' => 'DejaVu Sans',
-                    'isRemoteEnabled' => true,
+                    'isRemoteEnabled' => false,
                     'isHtml5ParserEnabled' => true,
                 ]);
 
-            $filename = "certificado_notas_{$matricula->alumno->codigo_unico_persona}_{$data['matricula']->anioEscolar->nombre}.pdf";
+            $filename = "certificado_notas_{$matricula->alumno->codigo_unico_persona}_{$matricula->anioEscolar->nombre}.pdf";
 
             return $pdf->download($filename);
         } catch (\Exception $e) {
@@ -136,6 +133,13 @@ class BoletinPdfController extends Controller
         ]);
 
         try {
+            // La generación masiva puede tardar: liberamos el bloqueo de sesión
+            // para que el resto de la aplicación siga respondiendo a este usuario,
+            // y ampliamos los límites de ejecución del proceso.
+            session()->save();
+            @set_time_limit(0);
+            @ini_set('memory_limit', '512M');
+
             $aula = \App\Models\Aula::with(['grado', 'anioEscolar'])->findOrFail($request->aula_id);
             $corteId = $request->corte_evaluativo_id;
 
@@ -379,26 +383,21 @@ class BoletinPdfController extends Controller
         switch ($tipo) {
             case 'boletin':
                 $data = $this->prepareBoletinData($matricula, $corteId);
+                $data['logo'] = $this->logoDataUri();
                 $pdf = Pdf::loadView('pdf.boletin', $data)
-                    ->setPaper('letter', 'portrait')
+                    ->setPaper('letter', 'landscape')
                     ->setOptions(['defaultFont' => 'DejaVu Sans']);
                 return $pdf->output();
 
             case 'constancia':
                 $data = $this->prepareConstanciaData($matricula);
                 $pdf = Pdf::loadView('pdf.constancia', $data)
-                    ->setPaper('letter', 'portrait')
+                    ->setPaper('letter', 'landscape')
                     ->setOptions(['defaultFont' => 'DejaVu Sans']);
                 return $pdf->output();
 
             case 'certificado':
-                $data = $this->reporteService->historialPorEstudiante($matricula->alumno_id);
-                $pdf = Pdf::loadView('pdf.certificado_notas', [
-                    'matricula' => $data['matricula'],
-                    'alumno' => $data['alumno'],
-                    'resumenAsignaturas' => $data['resumenAsignaturas'],
-                    'promedioGeneral' => $data['promedioGeneral'],
-                ])
+                $pdf = Pdf::loadView('pdf.certificado_notas', $this->datosCertificado($matricula))
                     ->setPaper('letter', 'portrait')
                     ->setOptions(['defaultFont' => 'DejaVu Sans']);
                 return $pdf->output();
@@ -406,6 +405,45 @@ class BoletinPdfController extends Controller
             default:
                 throw new \InvalidArgumentException("Tipo de PDF no soportado: {$tipo}");
         }
+    }
+
+    /**
+     * Datos del certificado MINED para una matrícula: el servicio agrupa el
+     * histórico del estudiante y devuelve el grado de la matrícula más el
+     * grado inmediatamente anterior (servicio con límite configurable).
+     */
+    protected function datosCertificado(Matricula $matricula): array
+    {
+        $datos = $this->reporteService->certificadoNotas(
+            $matricula->alumno_id,
+            $matricula->anio_escolar_id,
+            $matricula->aula->grado_id
+        );
+
+        $datos['logo'] = $this->logoDataUri();
+
+        return $datos;
+    }
+
+    /**
+     * Logo del colegio embebido como data URI (base64).
+     *
+     * DomPDF cargaba asset('img/logo.png') mediante HTTP contra el MISMO
+     * servidor de desarrollo (php artisan serve atiende una petición a la
+     * vez), provocando un bloqueo mutuo: la petición del PDF quedaba colgada
+     * esperando la imagen, y al mantener bloqueada la sesión, toda la
+     * aplicación dejaba de responder para ese usuario. Embeber la imagen en
+     * el HTML evita por completo la petición HTTP interna.
+     */
+    protected function logoDataUri(): string
+    {
+        $path = public_path('img/logo.png');
+
+        if (is_file($path)) {
+            return 'data:image/png;base64,' . base64_encode(file_get_contents($path));
+        }
+
+        return '';
     }
 
     protected function getPdfFilename(Matricula $matricula, string $tipo, ?int $corteId = null): string

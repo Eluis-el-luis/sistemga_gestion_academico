@@ -16,33 +16,76 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+        <!-- ESTILOS GLOBALES DE IMPRESIÓN PARA TODO EL SISTEMA -->
+        <style>
+            @media print {
+                @page {
+                    margin: 14mm 16mm;
+                }
+                /* Ocultar navegación, sidebar, encabezados web, filtros, paginación y botones en TODAS las vistas */
+                nav, aside, header, .no-print, .print\:hidden, form[method="GET"], button {
+                    display: none !important;
+                }
+                /* Forzar impresión de colores exactos institucionales */
+                html, body, * {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                    color-adjust: exact !important;
+                }
+                body, main, .min-h-screen {
+                    background-color: #ffffff !important;
+                    color: #3d2c1d !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+                /* Quitar cualquier padding lateral del sidebar en impresión */
+                .contenedor-principal-layout {
+                    padding-left: 0 !important;
+                    width: 100% !important;
+                }
+                /* Dar respiro automático al contenedor principal impreso */
+                main > div {
+                    padding: 4mm 2mm !important;
+                    max-width: 100% !important;
+                    background-color: #ffffff !important;
+                }
+                /* Evitar que las tablas o tarjetas se corten feo entre páginas */
+                tr, td, th {
+                    page-break-inside: avoid !important;
+                }
+                .overflow-x-auto {
+                    overflow: visible !important;
+                }
+            }
+        </style>
     </head>
     
     @php
-        // CORRECCIÓN: Sincronizado exactamente con los roles de navigation.blade.php
         // Si el usuario no es Director o Subdirector, el menú lateral y su espacio desaparecen por completo.
         $mostrarSidebar = auth()->check() && auth()->user()->hasAnyRole(['Director', 'Subdirector']);
     @endphp
 
     <body class="font-sans antialiased text-[#3d2c1d] bg-slate-50 dark:bg-slate-900 dark:text-slate-200 transition-colors duration-300" 
-      x-data="{ 
-          sidebarOpen: false,
-          showTopBtnGlobal: false 
-      }" 
-      @resize.window="if(window.innerWidth < 1024) sidebarOpen = false" 
-      @scroll.window="showTopBtnGlobal = (window.pageYOffset > 150)">
+          x-data="{ 
+              sidebarOpen: false,
+              showTopBtnGlobal: false 
+          }" 
+          @resize.window="if(window.innerWidth < 1024) sidebarOpen = false" 
+          @scroll.window="showTopBtnGlobal = (window.pageYOffset > 150)">
         
         <!-- SIDEBAR -->
         @if($mostrarSidebar)
             @include('layouts.navigation')
         @endif
 
-        <!-- CONTENEDOR DINÁMICO -->
-        <div class="flex flex-col min-h-screen transition-all duration-300 {{ !$mostrarSidebar ? 'w-full' : '' }}" 
+        <!-- CONTENEDOR DINÁMICO (Con print:!pl-0 para que el sidebar no empuje el PDF) -->
+        <div class="contenedor-principal-layout flex flex-col min-h-screen transition-all duration-300 print:!pl-0 {{ !$mostrarSidebar ? 'w-full' : '' }}" 
              @if($mostrarSidebar) :class="sidebarOpen ? 'lg:pl-64' : 'lg:pl-20'" @endif>
             
             <!-- TOPBAR GLOBAL -->
-                <nav class="sticky top-0 z-50 bg-white dark:bg-slate-800 border-b border-slate-200/60 dark:border-slate-700 shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 transition-colors duration-300">                <div class="flex items-center gap-4 lg:gap-6">
+            <nav class="sticky top-0 z-50 bg-white dark:bg-slate-800 border-b border-slate-200/60 dark:border-slate-700 shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 transition-colors duration-300 print:hidden">
+                <div class="flex items-center gap-4 lg:gap-6">
                     <!-- Botón Hamburguesa -->
                     @if($mostrarSidebar)
                         <button @click="sidebarOpen = !sidebarOpen" class="text-slate-500 hover:text-[#e6ac27] bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-700 hover:bg-amber-50 p-2 rounded-lg transition-colors focus:outline-none">
@@ -91,7 +134,7 @@
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
                                 <x-dropdown-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();" class="text-red-600 font-bold hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 mt-1 border-t border-slate-100 dark:border-slate-700 pt-2">
-                                    <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                                    <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
                                     {{ __('Cerrar Sesión') }}
                                 </x-dropdown-link>
                             </form>
@@ -102,7 +145,7 @@
 
             <!-- ENCABEZADO DE PÁGINA -->
             @isset($header)
-                <header class="bg-transparent pt-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+                <header class="bg-transparent pt-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full print:hidden">
                     {{ $header }}
                 </header>
             @endisset
@@ -110,10 +153,15 @@
             <!-- CONTENIDO PRINCIPAL -->
             <main class="flex-1 w-full">
                 {{ $slot }}
+                <!-- Pie de página automático para cualquier impresión del sistema -->
+                <div class="hidden print:flex justify-between items-center mt-4 px-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                    <span>Documento generado el {{ now()->timezone('America/Managua')->format('d/m/Y h:i A') }}</span>
+                    <span class="text-[#3d2c1d]">Colegio Cristiano En Nicaragua • Sistema de Gestión Académica</span>
+                </div>
             </main>
 
             <!-- Botón flotante -->
-            <button x-show="showTopBtnGlobal" x-transition @click="window.scrollTo({top: 0, behavior: 'smooth'})" class="fixed bottom-8 right-8 z-50 p-3.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-full shadow-lg transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[#e6ac27]" title="Volver arriba">
+            <button x-show="showTopBtnGlobal" x-transition @click="window.scrollTo({top: 0, behavior: 'smooth'})" class="fixed bottom-8 right-8 z-50 p-3.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-full shadow-lg transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[#e6ac27] print:hidden" title="Volver arriba">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
             </button>
         </div>

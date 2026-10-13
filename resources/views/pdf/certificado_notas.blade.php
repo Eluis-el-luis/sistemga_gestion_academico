@@ -5,54 +5,64 @@
     <title>Certificado de Notas</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'DejaVu Sans', sans-serif; font-size: 10px; line-height: 1.3; color: #333; }
-        .page { width: 100%; max-width: 8.5in; margin: 0 auto; padding: 20px; }
-        .header { text-align: center; border-bottom: 3px solid #1a3c5e; padding-bottom: 15px; margin-bottom: 20px; }
-        .header h1 { font-size: 18px; color: #1a3c5e; font-weight: bold; margin-bottom: 3px; }
-        .header h2 { font-size: 14px; color: #2c5f8a; font-weight: normal; margin-bottom: 3px; }
-        .header .subtitle { font-size: 11px; color: #555; }
-        .certificado-title { text-align: center; font-size: 16px; font-weight: bold; color: #1a3c5e; margin: 20px 0; text-decoration: underline; }
-        .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; font-size: 10px; }
-        .info-item { background: #f8f9fa; padding: 8px; border-radius: 4px; border: 1px solid #e0e0e0; }
-        .info-label { font-weight: bold; color: #1a3c5e; font-size: 8px; text-transform: uppercase; }
+        body { font-family: 'DejaVu Sans', sans-serif; font-size: 10px; line-height: 1.3; color: #000; }
+        @page { size: letter portrait; margin: 15mm; }
+        .page { width: 100%; max-width: 7.2in; margin: 0 auto; }
+
+        .header { display: flex; align-items: center; gap: 10px; border-bottom: 3px solid #1a3c5e; padding-bottom: 12px; margin-bottom: 16px; }
+        .header .logo { width: 55px; height: 55px; flex-shrink: 0; }
+        .header .logo img { width: 100%; height: 100%; object-fit: contain; }
+        .header .titles { flex: 1; text-align: center; }
+        .header h1 { font-size: 16px; color: #1a3c5e; font-weight: bold; text-transform: uppercase; }
+        .header h2 { font-size: 12px; color: #2c5f8a; font-weight: bold; margin-top: 2px; }
+        .header .subtitle { font-size: 9px; color: #555; margin-top: 2px; }
+
+        .certificado-title { text-align: center; font-size: 14px; font-weight: bold; color: #1a3c5e; margin: 14px 0; text-decoration: underline; text-transform: uppercase; }
+
+        .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; font-size: 9px; }
+        .info-item { background: #f8f9fa; padding: 6px 8px; border: 1px solid #e0e0e0; }
+        .info-label { font-weight: bold; color: #1a3c5e; font-size: 7px; text-transform: uppercase; letter-spacing: 0.5px; }
         .info-value { font-size: 10px; }
 
-        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 8px; }
-        th, td { border: 1px solid #ddd; padding: 4px 2px; text-align: center; }
-        th { background: #1a3c5e; color: white; font-weight: bold; font-size: 7px; }
-        .area-header { background: #2c5f8a !important; color: white; font-size: 8px; }
-        .area-name { text-align: left; padding-left: 6px; }
-        .subject-name { text-align: left; padding-left: 10px; font-size: 7px; }
-        .grade-cell { font-weight: bold; font-size: 8px; }
-        .promedio-row { background: #fff3e0; font-weight: bold; }
-        .promedio-row td { font-size: 9px; }
-        .final-row { background: #e8f5e9; font-weight: bold; }
-        .final-row td { font-size: 9px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 9px; }
+        th, td { border: 1px solid #333; padding: 4px 3px; text-align: center; }
+        .thead-main th { background: #1a3c5e; color: #ffffff; font-weight: bold; font-size: 8px; text-transform: uppercase; }
+        .thead-sub th { background: #2c5f8a; color: #ffffff; font-weight: bold; font-size: 7px; text-transform: uppercase; }
+        .subject-name { text-align: left; padding-left: 6px; font-weight: bold; text-transform: uppercase; }
+        .promedio-row { background: #eef2f7; font-weight: bold; }
+        .sin-matricula td { color: #777; font-size: 8px; }
 
-        .footer { margin-top: 25px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; font-size: 9px; }
-        .signature-block { text-align: center; }
-        .signature-line { border-top: 1px solid #333; margin-top: 35px; padding-top: 4px; font-weight: bold; font-size: 9px; }
-        .signature-role { font-size: 8px; color: #666; }
-        .promedio-general { text-align: right; font-size: 11px; font-weight: bold; color: #1a3c5e; margin-top: 15px; padding: 8px; background: #f0f4f8; border-radius: 4px; border: 1px solid #1a3c5e; }
-        .official-seal { text-align: center; margin: 20px 0; padding: 15px; border: 2px solid #1a3c5e; border-radius: 8px; background: #fafafa; }
-        .official-seal .seal-text { font-size: 12px; font-weight: bold; color: #1a3c5e; }
-        .official-seal .seal-sub { font-size: 9px; color: #666; margin-top: 5px; }
-        .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 80px; color: rgba(0,0,0,0.03); font-weight: bold; pointer-events: none; z-index: -1; }
+        .legend { font-size: 7px; color: #444; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
 
-        @page { margin: 15mm; }
+        .official-seal { text-align: center; margin: 16px 0; padding: 12px; border: 2px solid #1a3c5e; background: #fafafa; }
+        .official-seal .seal-text { font-size: 11px; font-weight: bold; color: #1a3c5e; }
+        .official-seal .seal-sub { font-size: 8px; color: #666; margin-top: 4px; }
+
+        .footer { display: flex; justify-content: space-between; gap: 12px; font-size: 9px; margin-top: 10px; }
+        .signature-block { text-align: center; flex: 1; }
+        .signature-line { border-top: 1px solid #333; margin-top: 35px; padding-top: 4px; font-weight: bold; font-size: 8px; text-transform: uppercase; }
+
+        .foot-note { margin-top: 18px; text-align: center; font-size: 7px; color: #666; border-top: 1px solid #ddd; padding-top: 8px; }
     </style>
 </head>
 <body>
-    <div class="watermark">CERTIFICADO</div>
     <div class="page">
-        <!-- ENCABEZADO OFICIAL -->
+        <!-- DATOS DEL CENTRO -->
         <div class="header">
-            <h1>MINISTERIO DE EDUCACIÓN</h1>
-            <h2>COLEGIO CRISTIANO NICARAGUENSE</h2>
-            <div class="subtitle">Código Centro: {{ $matricula->aula->anioEscolar->nombre }} - Matrícula Oficial</div>
+            @if(!empty($logo))
+                <div class="logo"><img src="{{ $logo }}" alt="Logo"></div>
+            @endif
+            <div class="titles">
+                <h1>Ministerio de Educación</h1>
+                <h2>Colegio Cristiano en Nicaragua</h2>
+                <div class="subtitle">
+                    {{ $matricula?->aula?->modalidad?->nombre ?? 'Educación Regular' }}
+                    @if($matricula?->anioEscolar) &middot; Ciclo Escolar {{ $matricula->anioEscolar->nombre }}@endif
+                </div>
+            </div>
         </div>
 
-        <div class="certificado-title">CERTIFICADO DE NOTAS OFICIAL</div>
+        <div class="certificado-title">Certificado de Notas</div>
 
         <!-- DATOS DEL ESTUDIANTE -->
         <div class="info-grid">
@@ -61,8 +71,8 @@
                 <div class="info-value">{{ $alumno->nombre_completo }}</div>
             </div>
             <div class="info-item">
-                <div class="info-label">CUP (Código Único de Persona)</div>
-                <div class="info-value">{{ $alumno->codigo_unico_persona }}</div>
+                <div class="info-label">Código Único de Persona (CUP)</div>
+                <div class="info-value">{{ $alumno->codigo_unico_persona ?? 'N/A' }}</div>
             </div>
             <div class="info-item">
                 <div class="info-label">Fecha de Nacimiento</div>
@@ -70,123 +80,87 @@
             </div>
             <div class="info-item">
                 <div class="info-label">Sexo</div>
-                <div class="info-value">{{ $alumno->sexo === 'M' ? 'Masculino' : 'Femenino' }}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Grado / Sección</div>
-                <div class="info-value">{{ $matricula->aula->grado->nombre }} - {{ $matricula->aula->nombre }}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Modalidad</div>
-                <div class="info-value">{{ $matricula->aula->modalidad->nombre }}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Año Escolar</div>
-                <div class="info-value">{{ $matricula->anioEscolar->nombre }}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Docente Guía</div>
-                <div class="info-value">{{ $matricula->aula->docenteGuia->usuario->nombre_completo ?? 'Por asignar' }}</div>
+                <div class="info-value">{{ $alumno->sexo === 'M' ? 'Masculino' : ($alumno->sexo === 'F' ? 'Femenino' : '—') }}</div>
             </div>
         </div>
 
-        <!-- TABLA DE NOTAS POR ÁREAS -->
-        @foreach ($resumenAsignaturas as $item)
+        <!-- TABLA COMPARATIVA POR ASIGNATURAS -->
+        @if(empty($grados))
             <table>
-                <thead>
-                    <tr>
-                        <th class="area-header area-name" colspan="8">{{ $item['area'] }}</th>
-                    </tr>
-                    <tr>
-                        <th class="area-name" style="width: 25%;">Asignatura</th>
-                        @for ($i = 1; $i <= 4; $i++)
-                            <th style="width: 8%;">I{{ $i }}</th>
-                        @endfor
-                        <th style="width: 10%;">Sem. I</th>
-                        <th style="width: 10%;">Sem. II</th>
-                        <th style="width: 10%;">Final</th>
-                        <th style="width: 8%;">Indicador</th>
-                    </tr>
-                </thead>
                 <tbody>
-                    <tr>
-                        <td class="subject-name">{{ $item['asignatura'] }}</td>
-                        @for ($i = 1; $i <= 4; $i++)
-                            <td class="grade-cell">
-                                @if (isset($item['resumen']['cortes'][$i]) && $item['resumen']['cortes'][$i] !== null)
-                                    {{ number_format($item['resumen']['cortes'][$i], 0) }}
-                                @else
-                                    —
-                                @endif
-                            </td>
-                        @endfor
-                        <td class="grade-cell">
-                            @if ($item['resumen']['semestre1'] !== null)
-                                {{ $item['resumen']['semestre1'] }}
-                            @else
-                                —
-                            @endif
-                        </td>
-                        <td class="grade-cell">
-                            @if ($item['resumen']['semestre2'] !== null)
-                                {{ $item['resumen']['semestre2'] }}
-                            @else
-                                —
-                            @endif
-                        </td>
-                        <td class="grade-cell">
-                            @if ($item['resumen']['nota_final'] !== null)
-                                {{ number_format($item['resumen']['nota_final'], 0) }}
-                            @else
-                                —
-                            @endif
-                        </td>
-                        <td class="grade-cell">
-                            @if ($item['resumen']['indicador_final'])
-                                {{ $item['resumen']['indicador_final'] }}
-                            @else
-                                —
-                            @endif
-                        </td>
+                    <tr class="sin-matricula">
+                        <td style="padding: 14px;">El estudiante no tiene matrícula registrada en el año y grado seleccionados.</td>
                     </tr>
                 </tbody>
             </table>
-        @endforeach
+        @else
+            <table>
+                <thead>
+                    <tr class="thead-main">
+                        <th rowspan="2" style="width: 34%; text-align: left; padding-left: 6px;">Asignatura</th>
+                        @foreach($grados as $g)
+                            <th colspan="2">
+                                {{ $g['grado']->nombre }}@if($g['anioEscolar'])<br><span style="font-weight: normal; text-transform: none;">Ciclo {{ $g['anioEscolar']->nombre }}&middot; Sec. "{{ $g['matricula']?->aula?->nombre ?? '—' }}"</span>@endif
+                            </th>
+                        @endforeach
+                    </tr>
+                    <tr class="thead-sub">
+                        @foreach($grados as $g)
+                            <th style="width: {{ count($grados) ? 33 / count($grados) : 33 }}%;">Cuantitativa</th>
+                            <th style="width: {{ count($grados) ? 33 / count($grados) : 33 }}%;">Cualitativa</th>
+                        @endforeach
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($asignaturas as $fila)
+                        <tr>
+                            <td class="subject-name">{{ $fila['nombre'] }}</td>
+                            @foreach($grados as $g)
+                                @php $n = $g['notas'][$fila['nombre']] ?? null; @endphp
+                                <td><strong>{{ $n && $n['cuan'] !== null ? $n['cuan'] : '—' }}</strong></td>
+                                <td>{{ $n['cua'] ?? '—' }}{{ $n && $n['cua_nombre'] ? ' — ' . $n['cua_nombre'] : '' }}</td>
+                            @endforeach
+                        </tr>
+                    @empty
+                        <tr class="sin-matricula">
+                            <td colspan="{{ 1 + count($grados) * 2 }}" style="padding: 14px;">No hay asignaturas con notas registradas para los grados del certificado.</td>
+                        </tr>
+                    @endforelse
+                    <tr class="promedio-row">
+                        <td class="subject-name">Promedio del grado</td>
+                        @foreach($grados as $g)
+                            <td>{{ $g['promedio'] !== null ? number_format($g['promedio'], 2) : '—' }}</td>
+                            <td>{{ $g['promedio_cua'] ?? '—' }}{{ $g['promedio_cua_nombre'] ? ' — ' . $g['promedio_cua_nombre'] : '' }}</td>
+                        @endforeach
+                    </tr>
+                </tbody>
+            </table>
+        @endif
 
-        <!-- PROMEDIO GENERAL -->
-        <div class="promedio-general">
-            PROMEDIO GENERAL ACUMULADO: {{ number_format($promedioGeneral, 2) }} / 100
-            @if ($promedioGeneral !== null)
-                <br><small>Indicador de Logro: {{ \App\Services\NotaService::calcularIndicadorLogro((int) round($promedioGeneral)) }} 
-                ({{ \App\Services\NotaService::estaAprobado((int) round($promedioGeneral)) ? 'APROBADO' : 'REPROBADO' }})</small>
-            @endif
-        </div>
+        <!-- ESCALA CUALITATIVA MINED -->
+        <p class="legend">
+            Escala de logro: AA = Aprendizaje Avanzado (90-100) &middot; AS = Aprendizaje Satisfactorio (76-89) &middot; AF = Aprendizaje Fundamental (60-75) &middot; AI = Aprendizaje Inicial (0-59)
+        </p>
 
         <!-- SELLO OFICIAL -->
         <div class="official-seal">
-            <div class="seal-text">SELLO Y FIRMA DEL DIRECTOR</div>
+            <div class="seal-text">SELLO Y FIRMA DE LA DIRECCIÓN</div>
             <div class="seal-sub">Válido solo con firma y sello oficial de la institución</div>
         </div>
 
         <!-- FIRMAS -->
         <div class="footer">
             <div class="signature-block">
-                <div class="signature-line">________________________________</div>
-                <div class="signature-role">Director(a) del Centro</div>
+                <div class="signature-line">Director(a) del Centro</div>
             </div>
             <div class="signature-block">
-                <div class="signature-line">________________________________</div>
-                <div class="signature-role">Secretario(a) Académico</div>
-            </div>
-            <div class="signature-block">
-                <div class="signature-line">________________________________</div>
-                <div class="signature-role">Ministerio de Educación (Visado)</div>
+                <div class="signature-line">Secretario(a) Académico</div>
             </div>
         </div>
 
-        <div style="margin-top: 25px; text-align: center; font-size: 8px; color: #666; border-top: 1px solid #ddd; padding-top: 10px;">
-            Este certificado es un documento oficial. Su autenticidad puede verificarse en la Dirección Departamental de Educación.
-            <br>Emitido en Managua, Nicaragua, el {{ now()->timezone('America/Managua')->format('d \d\e F \d\e Y') }}
+        <div class="foot-note">
+            Este certificado es un documento oficial. Su autenticidad puede verificarse en la Dirección del Centro.
+            <br>Emitido en León, Nicaragua, el {{ now()->timezone('America/Managua')->format('d/m/Y') }}
         </div>
     </div>
 </body>
