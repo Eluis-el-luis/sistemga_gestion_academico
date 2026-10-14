@@ -277,14 +277,16 @@ La capa de evaluación se compone de varias entidades:
 - `Nota`: representa el consolidado final del alumno en una asignatura + corte
 - `IndicadorLogro`: convierte la nota cuantitativa en la escala cualitativa del sistema escolar
 
-El servicio `NotaService` encapsula la lógica de conversión y promedios:
+El servicio `NotaService` encapsula la lógica de conversión y promedios (escala oficial MINED vigente 2026):
 
-- 90 a 100 => AA
-- 76 a 89 => AS
-- 60 a 75 => AF
-- 0 a 59 => AI
+- 90 a 100 => AA (Aprendizaje Avanzado)
+- 76 a 89 => AS (Aprendizaje Satisfactorio)
+- 60 a 75 => AE (Aprendizaje Esperado) — antes AF (Aprendizaje Fundamental), renombrado globalmente en Oct 2026 (código, catálogo `indicador_logro`, seeder, factory y migración `2026_10_14_update_indicador_logro_af_a_ae`)
+- 0 a 59 => AI (Aprendizaje Inicial)
 
 Además, calcula promedios semestrales y anuales, y establece aprobado cuando la nota final es mayor o igual a 60.
+
+**Nota Final del Corte (0-100):** se calcula escalando la suma de puntos obtenidos contra el **total oficial del corte** (`peso_acumulado + peso_examen`, normalmente 100), no contra la suma de puntajes configurados: las actividades no configuradas aún valen 0. Esta escala se usa tanto al guardar (`NotaController@store`, `ActividadEvaluativaController::recalcularNotasParcial` — también recalcula al editar el puntaje máximo de una actividad) como en el cálculo en vivo de las vistas `notas/evaluar` y `notas/planilla` (columna "Nota Final del Corte N", donde N = número del corte).
 
 ## 8. Flujos de negocio principales
 
@@ -375,6 +377,24 @@ El sistema incluye procesos de cierre de ciclo y generación de boletines, const
 - `ReporteController`
 
 Estos reportes se basan en el historial académico y en los estados de matrícula y notas generadas por las asignaturas y cortes evaluativos.
+
+**Formatos de salida (Oct 2026):**
+
+- **Boletín** y **Constancia de notas**: carta HORIZONTAL (landscape), una página por documento. **Certificado de notas**: carta VERTICAL.
+- Las vistas web con impresión (horarios por aula/docente, reportes) imprimen en horizontal vía `@page landscape`.
+- Todos los PDF se generan con `isRemoteEnabled = false` y el logo embebido en base64 (`BoletinPdfController::logoDataUri`); nunca se cargan recursos vía HTTP durante el render (eso causaba un deadlock con `php artisan serve`, y el request colgado bloqueaba la sesión dejando toda la app sin responder hasta reiniciar el equipo).
+- `BoletinPdfController::masivo` libera el bloqueo de sesión antes de generar el ZIP y amplía límites de tiempo/memoria.
+
+**Certificado de Notas (formato MINED)** — `academico/reportes/historial-estudiante`:
+- Flujo en 3 pasos: buscar estudiante (nombre/CUP) → seleccionarlo → elegir año + grado entre sus matrículas reales.
+- `ReporteService::certificadoNotas()` agrupa el historial: grado seleccionado (en el año elegido, se muestre aprobado o reprobado) + grados inmediatamente anteriores de la misma modalidad. El límite es la constante `ReporteService::CERTIFICADO_LIMITE_GRADOS` (2 por defecto), fácilmente modificable.
+- La NF de años pasados se promedia con los cortes del año real de cada matrícula (no el año activo).
+- Tabla comparativa por asignaturas con NF cuantitativa (0-100) y cualitativa (AA/AS/AE/AI) por grado, promedio por grado, datos del centro y firma.
+
+**Rendimiento por Corte — Formato MINED "III CORTE 2026"** — `ReporteService::rendimientoCorteMined()`:
+- Una tabla por modalidad (Preescolar/Primaria/Secundaria) con fila TOTAL, todas las métricas partidas en AS (ambos sexos) y F (femenino): MI, MA, % DE PERM (MA/MI), APROB (0 materias reprobadas), % DE APROB (APROB/evaluados), APLAZ 1-2, APLAZ 3-MAS, EVALUADO PERIODO OFICIAL (MA con notas en el corte), EVALUADO PERIODO EXTRA (con examen de reparación en el rango del corte/año), NO EVALUADO (= MA − evaluados), ASIST REFORZ y MAEST INT REF (0; no hay módulo de reforzamiento).
+- Sección ESCALA de rendimiento por modalidad: conteo de estudiantes por banda cualitativa del promedio del corte (AA/AS/AE/AI) + VALOR (= total evaluados).
+- Supuestos de cálculo documentados en el docblock del método.
 
 ### 8.8 Apoyo y disciplina
 

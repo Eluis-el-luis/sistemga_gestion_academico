@@ -401,9 +401,26 @@ class ReporteService
     }
 
     /**
-     * Rendimiento académico por corte (formato MINED / REA).
-     * Por cada grado de una modalidad calcula: MI/MA (AS/F), aprobados en todas,
-     * aplazados de 1/2/3+, docentes por grado, % aprobados y % retención.
+     * Rendimiento académico por corte — Formato oficial MINED
+     * "FORMATO DE REND. GENERAL Y ESCALA POR ESCUELA III CORTE 2026".
+     *
+     * Una tabla por modalidad; cada métrica partida en AS (ambos sexos,
+     * incluye femenino) y F (solo femenino). Los desgloses por sexo se filtran
+     * sobre las colecciones Eloquent ya cargadas en memoria (volumen por grado
+     * es de decenas; no amerita conteos SQL separados). La clasificación por
+     * nº de materias reprobadas (<60) y la escala cualitativa reutilizan
+     * NotaService (escala vigente 2026: AA/AS/AE/AI).
+     *
+     * Supuestos documentados:
+     * - % DE PERM  = MA / MI        (permanencia de la matrícula).
+     * - % DE APROB = APROB / EVALUADO PERIODO OFICIAL.
+     * - EVALUADO PERIODO OFICIAL = MA con al menos una nota en el corte.
+     * - EVALUADO PERIODO EXTRA   = MA con examen de reparación en el rango
+     *                              del corte (o cualquiera del año si no hay corte).
+     * - NO EVALUADO = MA − EVALUADO PERIODO OFICIAL.
+     * - ASIST REFORZ / MAEST INT REF = 0: el sistema no tiene módulo de
+     *   reforzamiento interdocente (celdas en blanco como el formato).
+     * - ESCALA/VALOR = total de evaluados con escala (AA + AS + AE + AI).
      */
     public function rendimientoCorteMined(array $filtros): array
     {
@@ -412,6 +429,8 @@ class ReporteService
         $gradoId = $filtros['grado_id'] ?? null;
         $corteId = $filtros['corte_evaluativo_id'] ?? null;
 
+        $corte = $corteId ? CorteEvaluativo::find($corteId) : null;
+
         $gradosQuery = Grado::with('modalidad')
             ->when($modalidadId, fn ($q) => $q->where('modalidad_id', $modalidadId))
             ->when($gradoId, fn ($q) => $q->where('id', $gradoId))
@@ -419,101 +438,124 @@ class ReporteService
             ->orderBy('id')
             ->get();
 
-        $filas = [];
+        $secciones = [];
 
         foreach ($gradosQuery as $grado) {
-            $aulas = Aula::where('grado_id', $grado->id)
+            $aulaIds = Aula::where('grado_id', $grado->id)
                 ->where('anio_escolar_id', $anio?->id)
-                ->get();
+                ->pluck('id');
 
-            $aulaIds = $aulas->pluck('id');
-
-            // MI (Matrícula Inicial): TODAS las matrículas del año/grado (incluye retirados)
+            // MI: TODAS las matrículas del año/grado (incluye retirados)
+            // MA: solo matrículas ACTIVAS
             $matriculasMI = Matricula::with('alumno')
                 ->whereIn('aula_id', $aulaIds)
                 ->where('anio_escolar_id', $anio?->id)
                 ->get();
+            $matriculasMA = $matriculasMI->where('estado', 'activo');
 
-            // MA (Matrícula Actual): Solo matrículas ACTIVAS
-            $matriculasMA = Matricula::with('alumno')
-                ->whereIn('aula_id', $aulaIds)
-                ->where('anio_escolar_id', $anio?->id)
-                ->where('estado', 'activo')
-                ->get();
+            $matriculaIds = $matriculasMA->pluck('id');
 
-            // Para el resto del reporte usamos matrículas activas (MA)
-            $matriculas = $matriculasMA;
-
-            // Asignaciones (para contar docentes por grado)
-            $asignaciones = AulaAsignaturaDocente::whereIn('aula_id', $aulaIds)
-                ->where('anio_escolar_id', $anio?->id)
-                ->get();
-            $totalDocentes = $asignaciones->whereNotNull('docente_id')->pluck('docente_id')->unique()->count();
-
-            // MI / MA por sexo
-            $miAs = $matriculasMI->where('alumno.sexo', 'M')->count();
-            $miF = $matriculasMI->where('alumno.sexo', 'F')->count();
-            $maAs = $matriculasMA->where('alumno.sexo', 'M')->count();
-            $maF = $matriculasMA->where('alumno.sexo', 'F')->count();
-
-            // Clasificar alumnos por nº de asignaturas reprobadas
-            $aprobadosTodasAs = 0; $aprobadosTodasF = 0;
-            $aplazados1As = 0; $aplazados1F = 0;
-            $aplazados2As = 0; $aplazados2F = 0;
-            $aplazados3As = 0; $aplazados3F = 0;
-
-            $matriculaIds = $matriculas->pluck('id');
             $notas = Nota::whereIn('matricula_id', $matriculaIds)
                 ->when($corteId, fn ($q) => $q->where('corte_evaluativo_id', $corteId))
                 ->get()
                 ->groupBy('matricula_id');
 
-            foreach ($matriculas as $matricula) {
-                $notasAlumno = $notas->get($matricula->id, collect());
+            // Periodo extra: matrículas con examen de reparación (rango del corte o del año)
+            $reparacionIds = \App\Models\ExamenReparacion::whereIn('matricula_id', $matriculaIds)
+                ->when($corte, fn ($q) => $q->whereBetween('fecha', [$corte->fecha_inicio, $corte->fecha_fin]))
+                ->pluck('matricula_id')
+                ->unique();
 
-                if ($notasAlumno->isEmpty()) {
-                    continue; // sin notas → no se clasifica
+            $fila = [
+                'grado' => $grado->nombre,
+                'mi_as' => $matriculasMI->count(),
+                'mi_f' => $matriculasMI->where('alumno.sexo', 'F')->count(),
+                'ma_as' => $matriculasMA->count(),
+                'ma_f' => $matriculasMA->where('alumno.sexo', 'F')->count(),
+                'aprob_as' => 0, 'aprob_f' => 0,
+                'aplaz12_as' => 0, 'aplaz12_f' => 0,
+                'aplaz3_as' => 0, 'aplaz3_f' => 0,
+                'eval_oficial_as' => 0, 'eval_oficial_f' => 0,
+                'eval_extra_as' => $reparacionIds->count(),
+                'eval_extra_f' => $matriculasMA->whereIn('id', $reparacionIds)->where('alumno.sexo', 'F')->count(),
+                'no_evaluado_as' => 0, 'no_evaluado_f' => 0,
+                'asist_ref_as' => 0, 'asist_ref_f' => 0,
+                'maest_ref_as' => 0, 'maest_ref_f' => 0,
+                'aa_as' => 0, 'aa_f' => 0,
+                'as_as' => 0, 'as_f' => 0,
+                'ae_as' => 0, 'ae_f' => 0,
+                'ai_as' => 0, 'ai_f' => 0,
+            ];
+
+            foreach ($matriculasMA as $matricula) {
+                $notasAlumno = $notas->get($matricula->id);
+                $esF = $matricula->alumno->sexo === 'F';
+
+                // Sin notas en el corte → NO EVALUADO / SIN EVALUAC
+                if (!$notasAlumno || $notasAlumno->isEmpty()) {
+                    $fila['no_evaluado_as']++;
+                    if ($esF) $fila['no_evaluado_f']++;
+                    continue;
                 }
 
-                $reprobadas = $notasAlumno->where('nota_cuantitativa', '<', 60)->count();
-                $esM = $matricula->alumno->sexo === 'M';
+                $fila['eval_oficial_as']++;
+                if ($esF) $fila['eval_oficial_f']++;
 
+                // APROB / APLAZ por nº de asignaturas reprobadas (< 60)
+                $reprobadas = $notasAlumno->where('nota_cuantitativa', '<', 60)->count();
                 if ($reprobadas === 0) {
-                    $esM ? $aprobadosTodasAs++ : $aprobadosTodasF++;
-                } elseif ($reprobadas === 1) {
-                    $esM ? $aplazados1As++ : $aplazados1F++;
-                } elseif ($reprobadas === 2) {
-                    $esM ? $aplazados2As++ : $aplazados2F++;
+                    $fila['aprob_as']++;
+                    if ($esF) $fila['aprob_f']++;
+                } elseif ($reprobadas <= 2) {
+                    $fila['aplaz12_as']++;
+                    if ($esF) $fila['aplaz12_f']++;
                 } else {
-                    $esM ? $aplazados3As++ : $aplazados3F++;
+                    $fila['aplaz3_as']++;
+                    if ($esF) $fila['aplaz3_f']++;
+                }
+
+                // Escala: banda cualitativa del promedio del corte
+                $banda = $this->notaService->calcularIndicadorLogro((int) round((float) $notasAlumno->avg('nota_cuantitativa')));
+                $clave = match ($banda) {
+                    'AA' => 'aa', 'AS' => 'as', 'AE' => 'ae', 'AI' => 'ai', default => null,
+                };
+                if ($clave) {
+                    $fila["{$clave}_as"]++;
+                    if ($esF) $fila["{$clave}_f"]++;
                 }
             }
 
-            $totalEvaluados = $aprobadosTodasAs + $aprobadosTodasF + $aplazados1As + $aplazados1F + $aplazados2As + $aplazados2F + $aplazados3As + $aplazados3F;
+            // Porcentajes por fila (guarda de división por cero)
+            $fila['perm_as'] = $fila['mi_as'] > 0 ? round(($fila['ma_as'] / $fila['mi_as']) * 100, 1) : 0;
+            $fila['perm_f'] = $fila['mi_f'] > 0 ? round(($fila['ma_f'] / $fila['mi_f']) * 100, 1) : 0;
+            $fila['aprob_pct_as'] = $fila['eval_oficial_as'] > 0 ? round(($fila['aprob_as'] / $fila['eval_oficial_as']) * 100, 1) : 0;
+            $fila['aprob_pct_f'] = $fila['eval_oficial_f'] > 0 ? round(($fila['aprob_f'] / $fila['eval_oficial_f']) * 100, 1) : 0;
+            $fila['valor_as'] = $fila['aa_as'] + $fila['as_as'] + $fila['ae_as'] + $fila['ai_as'];
+            $fila['valor_f'] = $fila['aa_f'] + $fila['as_f'] + $fila['ae_f'] + $fila['ai_f'];
 
-            $filas[] = [
-                'grado' => $grado->nombre,
-                'modalidad' => $grado->modalidad->nombre ?? '',
-                'mi_as' => $miAs,
-                'mi_f' => $miF,
-                'ma_as' => $maAs,
-                'ma_f' => $maF,
-                'aprobados_todas_as' => $aprobadosTodasAs,
-                'aprobados_todas_f' => $aprobadosTodasF,
-                'aplazados_1_as' => $aplazados1As,
-                'aplazados_1_f' => $aplazados1F,
-                'aplazados_2_as' => $aplazados2As,
-                'aplazados_2_f' => $aplazados2F,
-                'aplazados_3_as' => $aplazados3As,
-                'aplazados_3_f' => $aplazados3F,
-                'total_docentes' => $totalDocentes,
-                'porcentaje_aprobados' => $totalEvaluados > 0 ? round((($aprobadosTodasAs + $aprobadosTodasF) / $totalEvaluados) * 100, 1) : 0,
-'porcentaje_retencion' => ($miAs + $miF) > 0 ? round((($maAs + $maF) / ($miAs + $miF)) * 100, 1) : 0.0,
-            ];
+            $nombreModalidad = $grado->modalidad->nombre ?? 'Sin modalidad';
+            $secciones[$nombreModalidad]['modalidad'] = $nombreModalidad;
+            $secciones[$nombreModalidad]['filas'][] = $fila;
+        }
+
+        // Fila TOTAL por modalidad (sumas; porcentajes recalculados desde totales)
+        foreach ($secciones as $nombre => $seccion) {
+            $total = ['grado' => 'TOTAL'];
+            foreach (['mi', 'ma', 'aprob', 'aplaz12', 'aplaz3', 'eval_oficial', 'eval_extra', 'no_evaluado', 'asist_ref', 'maest_ref', 'aa', 'as', 'ae', 'ai', 'valor'] as $m) {
+                foreach (['as', 'f'] as $s) {
+                    $total["{$m}_{$s}"] = array_sum(array_column($seccion['filas'], "{$m}_{$s}"));
+                }
+            }
+            $total['perm_as'] = $total['mi_as'] > 0 ? round(($total['ma_as'] / $total['mi_as']) * 100, 1) : 0;
+            $total['perm_f'] = $total['mi_f'] > 0 ? round(($total['ma_f'] / $total['mi_f']) * 100, 1) : 0;
+            $total['aprob_pct_as'] = $total['eval_oficial_as'] > 0 ? round(($total['aprob_as'] / $total['eval_oficial_as']) * 100, 1) : 0;
+            $total['aprob_pct_f'] = $total['eval_oficial_f'] > 0 ? round(($total['aprob_f'] / $total['eval_oficial_f']) * 100, 1) : 0;
+            $secciones[$nombre]['total'] = $total;
         }
 
         return [
-            'filas' => $filas,
+            'secciones' => array_values($secciones),
+            'corte' => $corte,
             'modalidad' => $modalidadId ? Modalidad::find($modalidadId)?->nombre : null,
         ];
     }
@@ -582,7 +624,7 @@ class ReporteService
      * Certificado de Notas (formato MINED) de un estudiante.
      *
      * Agrupa el historial de matrículas del estudiante y devuelve las notas
-     * finales (NF cuantitativa + equivalencia cualitativa AA/AS/AF/AI) del
+     * finales (NF cuantitativa + equivalencia cualitativa AA/AS/AE/AI) del
      * grado seleccionado en el año indicado más los grados inmediatamente
      * anteriores MISMO si aprobó o reprobó.
      *

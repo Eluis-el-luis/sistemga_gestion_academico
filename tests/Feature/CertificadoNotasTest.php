@@ -162,7 +162,7 @@ class CertificadoNotasTest extends TestCase
         $this->assertSame(90, $data['grados'][1]['notas']['Matemática']['cuan']);
         $this->assertSame('AA', $data['grados'][1]['notas']['Matemática']['cua']);
         $this->assertSame(70, $data['grados'][1]['notas']['Lengua y Literatura']['cuan']);
-        $this->assertSame('AF', $data['grados'][1]['notas']['Lengua y Literatura']['cua']);
+        $this->assertSame('AE', $data['grados'][1]['notas']['Lengua y Literatura']['cua']);
 
         // Unión de asignaturas incluye las de ambos grados
         $nombres = array_column($data['asignaturas'], 'nombre');

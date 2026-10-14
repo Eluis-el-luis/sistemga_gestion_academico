@@ -9,7 +9,7 @@ use App\Models\Asignatura;
 class ReparacionService
 {
     /**
-     * Nota mínima para aprobar (Aprendizaje Fundamental).
+     * Nota mínima para aprobar (Aprendizaje Esperado).
      */
     public const NOTA_APROBACION = 60;
 
