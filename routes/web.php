@@ -196,6 +196,12 @@ Route::middleware('auth')->group(function () {
         Route::get('reportes/asistencia-estudiante', [\App\Http\Controllers\ReporteController::class, 'estadisticasPorEstudiante'])->name('reportes.asistencia-estudiante');
         Route::get('reportes/mis-clases', [\App\Http\Controllers\ReporteController::class, 'misClases'])->name('reportes.mis-clases');
         
+        // NUEVA ROTA PARA EL DOCENTE GUÍA:
+        Route::get('reportes/mi-aula', [\App\Http\Controllers\ReporteController::class, 'miAula'])->name('reportes.mi-aula');
+        
+        // Rendimiento académico
+        Route::get('reportes/notas-por-asignatura', [\App\Http\Controllers\ReporteController::class, 'notasPorAsignatura'])->name('reportes.notas-por-asignatura');
+  
         // Rendimiento académico
         Route::get('reportes/notas-por-asignatura', [\App\Http\Controllers\ReporteController::class, 'notasPorAsignatura'])->name('reportes.notas-por-asignatura');
         Route::get('reportes/rendimiento-corte', [\App\Http\Controllers\ReporteController::class, 'rendimientoCorte'])->name('reportes.rendimiento-corte');

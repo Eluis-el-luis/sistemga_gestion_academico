@@ -1,7 +1,7 @@
 @hasanyrole('Docente Guia')
 <div x-show="rolActivo === 'Docente Guia'" x-transition.opacity style="display: none;" class="space-y-6">
     
-    <!-- Encabezado de Contexto con Botón de Horario (Opción B) -->
+    <!-- Encabezado de Contexto con Botón de Horario -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2 px-2">
         <div>
             <h3 class="text-xl font-black text-[#3d2c1d]">
@@ -26,9 +26,10 @@
         @endif
     </div>
 
-    <!-- 4 Accesos Rápidos Operativos -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- 1. Mis Alumnos (Apunta a la tabla que ya hicimos) -->
+    <!-- 5 Accesos Rápidos Operativos (Actualizado a 5 columnas) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+        
+        <!-- 1. Mis Alumnos -->
         <a href="{{ route('academico.tutor.mis-alumnos') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] hover:shadow-md transition-all flex flex-col justify-between min-h-[130px]">
             <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
@@ -69,6 +70,17 @@
             <div class="mt-4">
                 <span class="block font-black text-[#3d2c1d]">Prematrícula y Pases</span>
                 <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Proyección y Movilidad</span>
+            </div>
+        </a>
+
+        <!-- 5. NUEVO: Centro de Reportes -->
+        <a href="{{ route('academico.reportes.mi-aula') }}" class="group bg-[#FFFDF5] p-5 rounded-2xl border border-[#e6ac27]/30 shadow-sm hover:border-[#e6ac27] hover:shadow-md transition-all flex flex-col justify-between min-h-[130px]">
+            <div class="w-10 h-10 rounded-xl bg-amber-100 border border-amber-200 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            </div>
+            <div class="mt-4">
+                <span class="block font-black text-[#3d2c1d]">Centro de Reportes</span>
+                <span class="block text-[10px] font-bold text-[#e6ac27] uppercase tracking-widest mt-1">Auditoría Global</span>
             </div>
         </a>
     </div>

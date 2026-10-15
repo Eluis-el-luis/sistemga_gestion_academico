@@ -542,4 +542,112 @@ class ReporteController extends Controller
         }
     }
 
+    public function miAula(Request $request)
+    {
+        try {
+            $user = auth()->user();
+            if (!$user->hasAnyRole(['Docente Guia'])) {
+                throw new \Illuminate\Auth\Access\AuthorizationException('Acceso denegado. Esta vista es exclusiva para Tutores.');
+            }
+
+            $docente = Docente::where('usuario_id', $user->id)->firstOrFail();
+            $anio = $this->reporteService->anioActivo();
+
+            if (!$anio) {
+                return redirect()->route('dashboard')->with('error', 'No hay un año escolar activo para generar reportes.');
+            }
+
+            // 1. Obtener el aula asignada a este Docente Guía
+            $aulaGuia = \App\Models\Aula::with('grado')
+                ->where('docente_guia_id', $docente->id)
+                ->where('anio_escolar_id', $anio->id)
+                ->first();
+
+            if (!$aulaGuia) {
+                return redirect()->route('dashboard')->with('error', 'No tienes un aula asignada como Docente Guía en el ciclo activo.');
+            }
+
+            $cortes = \App\Models\CorteEvaluativo::orderBy('numero')->get();
+            $corteId = $request->query('corte_id');
+            $corteSeleccionado = $corteId ? $cortes->where('id', $corteId)->first() : null;
+
+            // 2. Obtener todas las asignaturas de esta aula (para las columnas de la tabla)
+            $asignaciones = \App\Models\AulaAsignaturaDocente::with('asignatura')
+                ->where('aula_id', $aulaGuia->id)
+                ->where('anio_escolar_id', $anio->id)
+                ->where('activo', true)
+                ->get()
+                ->sortBy(function($asig) {
+                    return $asig->asignatura->nombre; // Ordenar materias alfabéticamente
+                });
+
+            // 3. Obtener listado de alumnos y sus notas
+            $matriculas = \App\Models\Matricula::with('alumno')
+                ->where('aula_id', $aulaGuia->id)
+                ->where('anio_escolar_id', $anio->id)
+                ->where('estado', 'activo')
+                ->get()
+                ->sortBy(function($matricula) {
+                    return $matricula->alumno->nombre_completo; // Ordenar alumnos A-Z
+                });
+
+            $notasQuery = \App\Models\Nota::whereIn('matricula_id', $matriculas->pluck('id'));
+            if ($corteId) {
+                $notasQuery->where('corte_evaluativo_id', $corteId);
+            }
+            $notas = $notasQuery->get()->groupBy('matricula_id');
+
+            $alumnosReporte = collect();
+
+            foreach ($matriculas as $matricula) {
+                $notasAlumno = $notas->get($matricula->id, collect());
+                
+                $notasPorMateria = [];
+                $sumaNotas = 0;
+                $materiasEvaluadas = 0;
+                $materiasReprobadas = 0;
+
+                foreach ($asignaciones as $asignacion) {
+                    $notasMateria = $notasAlumno->where('aula_asignatura_docente_id', $asignacion->id);
+                    $notaFinal = null;
+
+                    if ($notasMateria->isNotEmpty()) {
+                        // Promedio o nota de la materia
+                        $notaFinal = round($notasMateria->avg('nota_cuantitativa'));
+                        $sumaNotas += $notaFinal;
+                        $materiasEvaluadas++;
+                        
+                        if ($notaFinal < 60) {
+                            $materiasReprobadas++;
+                        }
+                    }
+                    
+                    $notasPorMateria[$asignacion->id] = $notaFinal;
+                }
+
+                $promedioGeneral = $materiasEvaluadas > 0 ? round($sumaNotas / $materiasEvaluadas, 1) : null;
+
+                $alumnosReporte->push([
+                    'matricula_id' => $matricula->id,
+                    'cup' => $matricula->alumno->codigo_unico_persona,
+                    'nombre_completo' => $matricula->alumno->nombre_completo,
+                    'notas' => $notasPorMateria,
+                    'promedio_general' => $promedioGeneral,
+                    'reprobadas' => $materiasReprobadas
+                ]);
+            }
+
+            return view('academico.reportes.mi-aula', compact(
+                'anio', 'aulaGuia', 'cortes', 'corteId', 'corteSeleccionado', 
+                'asignaciones', 'alumnosReporte'
+            ));
+
+        } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
+            return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar el reporte de tu aula.');
+        }
+    }
+
 }
