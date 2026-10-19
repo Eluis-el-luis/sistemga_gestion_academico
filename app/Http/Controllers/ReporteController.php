@@ -542,6 +542,9 @@ class ReporteController extends Controller
         }
     }
 
+    // =============================================================
+    // REPORTES EXCLUSIVOS DEL DOCENTE GUÍA (TUTOR)
+    // =============================================================
     public function miAula(Request $request)
     {
         try {
@@ -557,7 +560,7 @@ class ReporteController extends Controller
                 return redirect()->route('dashboard')->with('error', 'No hay un año escolar activo para generar reportes.');
             }
 
-            // 1. Obtener el aula asignada a este Docente Guía
+            // 1. Obtener el aula asignada
             $aulaGuia = \App\Models\Aula::with('grado')
                 ->where('docente_guia_id', $docente->id)
                 ->where('anio_escolar_id', $anio->id)
@@ -567,28 +570,38 @@ class ReporteController extends Controller
                 return redirect()->route('dashboard')->with('error', 'No tienes un aula asignada como Docente Guía en el ciclo activo.');
             }
 
+            // 2. Filtros
             $cortes = \App\Models\CorteEvaluativo::orderBy('numero')->get();
             $corteId = $request->query('corte_id');
             $corteSeleccionado = $corteId ? $cortes->where('id', $corteId)->first() : null;
 
-            // 2. Obtener todas las asignaturas de esta aula (para las columnas de la tabla)
+            $tipoReporte = $request->query('tipo_reporte', 'general'); // general, riesgo, materia
+            $filtroRiesgo = $request->query('filtro_riesgo', 'todos'); // 1_2, 3_mas, todos
+            $materiaId = $request->query('materia_id');
+
+            // 3. Asignaturas del Aula
             $asignaciones = \App\Models\AulaAsignaturaDocente::with('asignatura')
                 ->where('aula_id', $aulaGuia->id)
                 ->where('anio_escolar_id', $anio->id)
                 ->where('activo', true)
                 ->get()
                 ->sortBy(function($asig) {
-                    return $asig->asignatura->nombre; // Ordenar materias alfabéticamente
+                    return $asig->asignatura->nombre;
                 });
 
-            // 3. Obtener listado de alumnos y sus notas
+            // Si es reporte por materia, filtramos las asignaciones
+            if ($tipoReporte === 'materia' && $materiaId) {
+                $asignaciones = $asignaciones->where('id', $materiaId);
+            }
+
+            // 4. Obtener Alumnos y Notas
             $matriculas = \App\Models\Matricula::with('alumno')
                 ->where('aula_id', $aulaGuia->id)
                 ->where('anio_escolar_id', $anio->id)
                 ->where('estado', 'activo')
                 ->get()
                 ->sortBy(function($matricula) {
-                    return $matricula->alumno->nombre_completo; // Ordenar alumnos A-Z
+                    return $matricula->alumno->nombre_completo;
                 });
 
             $notasQuery = \App\Models\Nota::whereIn('matricula_id', $matriculas->pluck('id'));
@@ -603,6 +616,7 @@ class ReporteController extends Controller
                 $notasAlumno = $notas->get($matricula->id, collect());
                 
                 $notasPorMateria = [];
+                $detalleReprobadas = [];
                 $sumaNotas = 0;
                 $materiasEvaluadas = 0;
                 $materiasReprobadas = 0;
@@ -612,34 +626,61 @@ class ReporteController extends Controller
                     $notaFinal = null;
 
                     if ($notasMateria->isNotEmpty()) {
-                        // Promedio o nota de la materia
                         $notaFinal = round($notasMateria->avg('nota_cuantitativa'));
                         $sumaNotas += $notaFinal;
                         $materiasEvaluadas++;
                         
                         if ($notaFinal < 60) {
                             $materiasReprobadas++;
+                            $detalleReprobadas[] = [
+                                'asignatura' => $asignacion->asignatura->nombre,
+                                'nota' => $notaFinal
+                            ];
                         }
                     }
-                    
                     $notasPorMateria[$asignacion->id] = $notaFinal;
                 }
 
                 $promedioGeneral = $materiasEvaluadas > 0 ? round($sumaNotas / $materiasEvaluadas, 1) : null;
 
-                $alumnosReporte->push([
-                    'matricula_id' => $matricula->id,
-                    'cup' => $matricula->alumno->codigo_unico_persona,
-                    'nombre_completo' => $matricula->alumno->nombre_completo,
-                    'notas' => $notasPorMateria,
-                    'promedio_general' => $promedioGeneral,
-                    'reprobadas' => $materiasReprobadas
-                ]);
+                // Filtrado Lógico según el tipo de reporte
+                $incluirAlumno = true;
+
+                if ($tipoReporte === 'riesgo') {
+                    if ($filtroRiesgo === '1_2' && ($materiasReprobadas < 1 || $materiasReprobadas > 2)) {
+                        $incluirAlumno = false;
+                    } elseif ($filtroRiesgo === '3_mas' && $materiasReprobadas < 3) {
+                        $incluirAlumno = false;
+                    } elseif ($filtroRiesgo === 'todos' && $materiasReprobadas === 0) {
+                        $incluirAlumno = false;
+                    }
+                }
+
+                if ($incluirAlumno) {
+                    $alumnosReporte->push([
+                        'matricula_id' => $matricula->id,
+                        'cup' => $matricula->alumno->codigo_unico_persona,
+                        'nombre_completo' => $matricula->alumno->nombre_completo,
+                        'notas' => $notasPorMateria,
+                        'promedio_general' => $promedioGeneral,
+                        'reprobadas_count' => $materiasReprobadas,
+                        'detalle_reprobadas' => $detalleReprobadas
+                    ]);
+                }
             }
+
+            // Datos para los filtros
+            $todasLasAsignaciones = \App\Models\AulaAsignaturaDocente::with('asignatura')
+                ->where('aula_id', $aulaGuia->id)
+                ->where('anio_escolar_id', $anio->id)
+                ->where('activo', true)
+                ->get()
+                ->sortBy(function($asig) { return $asig->asignatura->nombre; });
+
 
             return view('academico.reportes.mi-aula', compact(
                 'anio', 'aulaGuia', 'cortes', 'corteId', 'corteSeleccionado', 
-                'asignaciones', 'alumnosReporte'
+                'asignaciones', 'alumnosReporte', 'tipoReporte', 'filtroRiesgo', 'materiaId', 'todasLasAsignaciones'
             ));
 
         } catch (\Exception $e) {
