@@ -95,14 +95,42 @@ class ReporteController extends Controller
     // =============================================================
     // CONTROL DE INGRESO DE NOTAS
     // =============================================================
+    // =============================================================
+    // CONTROL DE NOTAS Y AVANCE PROGRAMÁTICO (MINED)
+    // =============================================================
     public function controlNotas(Request $request)
     {
         try {
             $this->autorizarReportes();
-            $filas = $this->reporteService->controlNotas($this->filtros($request));
+            
+            // Tipo de auditoría en esta misma vista: 'notas' (por defecto) o 'avance'
+            $tipoAuditoria = $request->query('tipo_auditoria', 'notas');
+            $perspectivaAvance = $request->query('perspectiva', 'docente'); // 'docente' o 'aula'
+
+            $filas = [];
+            $estadisticasAvance = ['completados' => 0, 'proceso' => 0, 'atrasados' => 0, 'promedio' => 0];
+
+            if ($tipoAuditoria === 'avance') {
+                $filas = $this->reporteService->auditoriaAvanceContenido($this->filtros($request), $perspectivaAvance);
+                
+                // Calcular estadísticas rápidas para los KPIs de avance
+                if (count($filas) > 0) {
+                    $suma = array_sum(array_column($filas, 'porcentaje'));
+                    $estadisticasAvance['promedio'] = round($suma / count($filas), 1);
+                    $estadisticasAvance['completados'] = collect($filas)->where('porcentaje', '>=', 90)->count();
+                    $estadisticasAvance['proceso'] = collect($filas)->whereBetween('porcentaje', [50, 89.9])->count();
+                    $estadisticasAvance['atrasados'] = collect($filas)->where('porcentaje', '<', 50)->count();
+                }
+            } else {
+                $filas = $this->reporteService->controlNotas($this->filtros($request));
+            }
+
             $catalogos = $this->pasarCatalogos($request);
 
-            return view('academico.reportes.control-notas', array_merge(compact('filas'), $catalogos));
+            return view('academico.reportes.control-notas', array_merge(
+                compact('filas', 'tipoAuditoria', 'perspectivaAvance', 'estadisticasAvance'), 
+                $catalogos
+            ));
 
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
             return redirect()->route('dashboard')->with('error', $e->getMessage());
@@ -110,7 +138,7 @@ class ReporteController extends Controller
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
                 throw $e;
             }
-            return redirect()->route('academico.reportes.index')->with('error', 'No se pudo generar el reporte de control de notas.');
+            return redirect()->route('academico.reportes.index')->with('error', 'No se pudo generar el reporte de control.');
         }
     }
 

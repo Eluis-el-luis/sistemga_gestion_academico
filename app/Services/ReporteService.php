@@ -55,13 +55,16 @@ class ReporteService
     /**
      * Query base de asignaciones filtradas por año y criterios opcionales.
      */
-    protected function queryAsignaciones(array $filtros)
+   protected function queryAsignaciones(array $filtros)
     {
         $anio = $this->resolverAnio($filtros['anio_escolar_id'] ?? null);
 
         $query = AulaAsignaturaDocente::with(['aula.grado', 'asignatura', 'docente.usuario'])
             ->where('anio_escolar_id', $anio?->id);
 
+        if (!empty($filtros['aula_id'])) {
+            $query->where('aula_id', $filtros['aula_id']);
+        }
         if (!empty($filtros['asignatura_id'])) {
             $query->where('asignatura_id', $filtros['asignatura_id']);
         }
@@ -88,10 +91,16 @@ class ReporteService
     public function controlNotas(array $filtros): array
     {
         [$query, $anio] = $this->queryAsignaciones($filtros);
-        $asignaciones = $query->orderBy('aula_id')->get();
+        
+        // Ordenar por grado numérico, luego por sección y luego por asignatura
+        $asignaciones = $query->get()->sortBy([
+            fn ($a, $b) => ($a->aula->grado_id ?? 0) <=> ($b->aula->grado_id ?? 0),
+            fn ($a, $b) => strcmp($a->aula->nombre ?? '', $b->aula->nombre ?? ''),
+            fn ($a, $b) => strcmp($a->asignatura->nombre ?? '', $b->asignatura->nombre ?? ''),
+        ]);
 
         $corteId = $filtros['corte_evaluativo_id'] ?? null;
-        $tipo = $filtros['tipo'] ?? 'pendientes'; // 'pendientes' | 'ingresadas'
+        $tipo = $filtros['tipo'] ?? 'todos'; // 'todos' | 'pendientes' | 'ingresadas'
 
         $filas = [];
         foreach ($asignaciones as $asignacion) {
@@ -111,7 +120,7 @@ class ReporteService
                 ->where('bloqueado', true)
                 ->exists();
 
-            // filtro de tipo: si se pide solo ingresadas o solo pendientes
+            // Filtro de estado si se pide explícitamente ingresadas o pendientes
             if ($tipo === 'ingresadas' && $conNota === 0) continue;
             if ($tipo === 'pendientes' && $pendientes === 0) continue;
 
@@ -281,6 +290,52 @@ class ReporteService
             ];
         }
         return $reporte;
+    }
+
+    /**
+     * Auditoría de Avance Programático (MINED / Interno) por Docente o por Aula.
+     */
+    public function auditoriaAvanceContenido(array $filtros, string $perspectiva = 'docente'): array
+    {
+        [$query, $anio] = $this->queryAsignaciones($filtros);
+        $asignaciones = $query->get();
+
+        $reporte = [];
+
+        foreach ($asignaciones as $asignacion) {
+            // Buscamos el avance registrado para esta asignación en el año activo
+            $avanceModel = \App\Models\AvanceContenido::where('aula_asignatura_docente_id', $asignacion->id)->latest()->first();
+            
+            $porcentaje = $avanceModel ? (float) $avanceModel->porcentaje_avance : 0.0;
+            $unidadesImpartidas = $avanceModel->unidades_impartidas ?? 'No registrado';
+
+            if ($perspectiva === 'docente') {
+                $reporte[] = [
+                    'docente' => $asignacion->docente->usuario->nombre_completo ?? 'Sin asignar',
+                    'asignatura' => $asignacion->asignatura->nombre,
+                    'grado' => $asignacion->aula->grado->nombre . ' - Sección "' . $asignacion->aula->nombre . '"',
+                    'detalle' => $unidadesImpartidas,
+                    'porcentaje' => $porcentaje,
+                ];
+            } else {
+                // Perspectiva por Aula / Grado
+                $reporte[] = [
+                    'grado' => $asignacion->aula->grado->nombre . ' - Sección "' . $asignacion->aula->nombre . '"',
+                    'asignatura' => $asignacion->asignatura->nombre,
+                    'docente' => $asignacion->docente->usuario->nombre_completo ?? 'Sin asignar',
+                    'detalle' => $unidadesImpartidas,
+                    'porcentaje' => $porcentaje,
+                ];
+            }
+        }
+
+        // Ordenar según la perspectiva elegida
+        $coleccion = collect($reporte);
+        if ($perspectiva === 'docente') {
+            return $coleccion->sortBy('docente')->values()->all();
+        } else {
+            return $coleccion->sortBy('grado')->values()->all();
+        }
     }
 
     /**
