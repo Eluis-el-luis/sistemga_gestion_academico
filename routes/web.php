@@ -212,6 +212,15 @@ Route::middleware('auth')->group(function () {
         Route::put('grupo-materia/{grupo}', [\App\Http\Controllers\GrupoMateriaController::class, 'update'])->name('grupo-materia.update');
         Route::delete('grupo-materia/{grupo}', [\App\Http\Controllers\GrupoMateriaController::class, 'destroy'])->name('grupo-materia.destroy');
         Route::post('grupo-materia/asignar', [\App\Http\Controllers\GrupoMateriaController::class, 'asignarMaterias'])->name('grupo-materia.asignar');
+
+        // --- RESPALDOS DE LA BASE DE DATOS (Dirección) ---
+        // Creado tras el incidente de Oct 2026 (Contexto.md, sección 16).
+        // Ver/crear/descargar: Director y Subdirector. Eliminar/restaurar: Director.
+        Route::get('respaldos', [\App\Http\Controllers\RespaldoController::class, 'index'])->name('respaldos.index');
+        Route::post('respaldos', [\App\Http\Controllers\RespaldoController::class, 'store'])->name('respaldos.store');
+        Route::get('respaldos/{nombre}/descargar', [\App\Http\Controllers\RespaldoController::class, 'descargar'])->name('respaldos.descargar');
+        Route::post('respaldos/{nombre}/restaurar', [\App\Http\Controllers\RespaldoController::class, 'restaurar'])->name('respaldos.restaurar');
+        Route::delete('respaldos/{nombre}', [\App\Http\Controllers\RespaldoController::class, 'destroy'])->name('respaldos.destroy');
     });
 });
 

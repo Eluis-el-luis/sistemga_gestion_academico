@@ -168,45 +168,43 @@ class UsuarioController extends Controller
             return back()->withInput()->withErrors(['roles' => 'Ya existe una cuenta de Subdirección asignada en el sistema.']);
         }
 
-        DB::beginTransaction();
+        // Autorizar ANTES de abrir transacción: una AuthorizationException no
+        // debe dejar la transacción abierta.
+        $this->authorize('create', Usuario::class);
+
         try {
-            $this->authorize('create', Usuario::class);
+            DB::transaction(function () use ($request) {
+                // Creamos el usuario
+                $usuario = Usuario::create([
+                    'nombre_completo' => $request->nombre_completo,
+                    'email'           => $request->email,
+                    'password'        => bcrypt($request->password),
+                    'activo'          => true,
+                ]);
 
-            // Creamos el usuario
-            $usuario = Usuario::create([
-                'nombre_completo' => $request->nombre_completo,
-                'email'           => $request->email,
-                'password'        => bcrypt($request->password), 
-                'activo'          => true,
-            ]);
+                // Spatie asigna los permisos correctamente en su tabla intermedia
+                $usuario->assignRole($request->roles);
 
-            // Spatie asigna los permisos correctamente en su tabla intermedia
-            $usuario->assignRole($request->roles);
+                $esDocente = collect($request->roles)->contains(function ($rol) {
+                    return str_contains($rol, 'Docente') || $rol === 'Coordinador';
+                });
 
-            $esDocente = collect($request->roles)->contains(function ($rol) {
-                return str_contains($rol, 'Docente') || $rol === 'Coordinador';
+                if ($esDocente) {
+                    \App\Models\Docente::create([
+                        'usuario_id'            => $usuario->id,
+                        'codigo_unico_persona'  => $request->codigo_unico_persona ?? 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
+                        'sexo'                  => $request->sexo ?? 'M',
+                        'modalidad_id'          => $request->modalidad_id,
+                        'es_coordinador'        => collect($request->roles)->contains('Coordinador'),
+                        'modalidad_coordina_id' => collect($request->roles)->contains('Coordinador') ? $request->modalidad_coordina_id : null,
+                    ]);
+                }
             });
 
-            if ($esDocente) {
-                \App\Models\Docente::create([
-                    'usuario_id'            => $usuario->id,
-                    'codigo_unico_persona'  => $request->codigo_unico_persona ?? 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
-                    'sexo'                  => $request->sexo ?? 'M',
-                    'modalidad_id'          => $request->modalidad_id,
-                    'es_coordinador'        => collect($request->roles)->contains('Coordinador'),
-                    'modalidad_coordina_id' => collect($request->roles)->contains('Coordinador') ? $request->modalidad_coordina_id : null,
-                ]);
-            }
-
-            DB::commit();
             return redirect()->route('academico.usuarios.index')
                              ->with('success', 'Personal registrado y accesos configurados correctamente.');
 
         } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            DB::rollBack();
             // CONTINGENCIA: Si falla la inserción en la base de datos
             return back()->withInput()->with('error', 'Ocurrió un error técnico al registrar al usuario. El proceso fue cancelado por seguridad.');
         }
@@ -238,46 +236,44 @@ class UsuarioController extends Controller
             return back()->withInput()->withErrors(['roles' => 'Ya existe otra cuenta de Subdirección asignada en el sistema.']);
         }
 
-        DB::beginTransaction();
+        // Autorizar ANTES de abrir transacción: una AuthorizationException no
+        // debe dejar la transacción abierta (esto además rompía las pruebas).
+        $this->authorize('update', $usuario);
+
         try {
-            $this->authorize('update', $usuario);
+            DB::transaction(function () use ($request, $usuario) {
+                // Actualizamos únicamente los datos propios del usuario
+                $usuario->update([
+                    'nombre_completo' => $request->nombre_completo,
+                    'email'           => $request->email,
+                    'activo'          => $request->activo,
+                ]);
 
-            // Actualizamos únicamente los datos propios del usuario
-            $usuario->update([
-                'nombre_completo' => $request->nombre_completo,
-                'email'           => $request->email,
-                'activo'          => $request->activo,
-            ]);
+                // Spatie se encarga de guardar la relación del rol
+                $usuario->syncRoles($request->roles);
 
-            // Spatie se encarga de guardar la relación del rol
-            $usuario->syncRoles($request->roles);
+                $esDocente = collect($request->roles)->contains(function ($rol) {
+                    return str_contains($rol, 'Docente') || $rol === 'Coordinador';
+                });
 
-            $esDocente = collect($request->roles)->contains(function ($rol) {
-                return str_contains($rol, 'Docente') || $rol === 'Coordinador';
+                if ($esDocente) {
+                    \App\Models\Docente::updateOrCreate(
+                        ['usuario_id' => $usuario->id],
+                        [
+                            'codigo_unico_persona'  => $request->codigo_unico_persona ?? $usuario->docente?->codigo_unico_persona ?? 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
+                            'sexo'                  => $request->sexo ?? $usuario->docente?->sexo ?? 'M',
+                            'modalidad_id'          => $request->modalidad_id,
+                            'es_coordinador'        => collect($request->roles)->contains('Coordinador'),
+                            'modalidad_coordina_id' => collect($request->roles)->contains('Coordinador') ? $request->modalidad_coordina_id : null,
+                        ]
+                    );
+                }
             });
 
-            if ($esDocente) {
-                \App\Models\Docente::updateOrCreate(
-                    ['usuario_id' => $usuario->id],
-                    [
-                        'codigo_unico_persona'  => $request->codigo_unico_persona ?? $usuario->docente?->codigo_unico_persona ?? 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
-                        'sexo'                  => $request->sexo ?? $usuario->docente?->sexo ?? 'M',
-                        'modalidad_id'          => $request->modalidad_id,
-                        'es_coordinador'        => collect($request->roles)->contains('Coordinador'),
-                        'modalidad_coordina_id' => collect($request->roles)->contains('Coordinador') ? $request->modalidad_coordina_id : null,
-                    ]
-                );
-            }
-
-            DB::commit();
             return redirect()->route('academico.usuarios.index')
                              ->with('success', 'Perfil y accesos actualizados correctamente.');
 
         } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            DB::rollBack();
             // CONTINGENCIA: Si falla el update
             return back()->withInput()->with('error', 'Ocurrió un problema técnico al actualizar la información del usuario.');
         }
