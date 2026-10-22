@@ -82,6 +82,80 @@ class ReporteService
         return [$query, $anio];
     }
 
+    /**
+     * Auditoría detallada: Asistencia exacta de un aula en un día en específico.
+     */
+    public function asistenciaPorSeccion(array $filtros): array
+    {
+        $anio = $this->resolverAnio($filtros['anio_escolar_id'] ?? null);
+        $fecha = $filtros['fecha'] ?? now()->toDateString();
+        $aulaId = $filtros['aula_id'] ?? null;
+
+        $aula = null;
+        $filas = [];
+        $totales = ['presentes' => 0, 'ausentes' => 0, 'justificadas' => 0, 'sin_registrar' => 0, 'total' => 0];
+
+        if ($aulaId) {
+            $aula = \App\Models\Aula::with('grado')->find($aulaId);
+            
+            // 1. Obtenemos solo a los alumnos activos de esa aula
+            $matriculas = \App\Models\Matricula::with('alumno')
+                ->where('anio_escolar_id', $anio?->id)
+                ->where('aula_id', $aulaId)
+                ->where('estado', 'activo')
+                ->get()
+                ->sortBy(fn($m) => $m->alumno->nombre_completo ?? '');
+
+            // 2. Extraemos los registros de asistencia de ese día
+            $asistencias = \App\Models\AsistenciaAula::whereIn('matricula_id', $matriculas->pluck('id'))
+                ->where('fecha', $fecha)
+                ->get()
+                ->keyBy('matricula_id');
+
+            $totales['total'] = $matriculas->count();
+
+            // 3. Cruzamos la lista de estudiantes con su asistencia
+            foreach ($matriculas as $matricula) {
+                $registro = $asistencias->get($matricula->id);
+                // Si no hay registro, el maestro no pasó lista para ese alumno
+                $estado = $registro ? $registro->estado_asistencia : 'Sin Registrar';
+
+                if ($estado === 'Presente' || $estado === 'Actividad Institucional') {
+                    $totales['presentes']++;
+                    $colorTema = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+                } elseif ($estado === 'Ausencia Justificada') {
+                    $totales['justificadas']++;
+                    $colorTema = 'text-amber-700 bg-amber-50 border-amber-200';
+                } elseif ($estado === 'Ausencia') {
+                    $totales['ausentes']++;
+                    $colorTema = 'text-rose-700 bg-rose-50 border-rose-200';
+                } else {
+                    $totales['sin_registrar']++;
+                    $colorTema = 'text-slate-600 bg-slate-100 border-slate-300';
+                }
+
+                $filas[] = [
+                    'estudiante' => $matricula->alumno->nombre_completo,
+                    'cup' => $matricula->alumno->codigo_unico_persona ?? 'S/C',
+                    'estado' => $estado,
+                    'observacion' => $registro && $registro->observaciones ? $registro->observaciones : '-',
+                    'color_tema' => $colorTema,
+                ];
+            }
+        }
+
+        $porcentaje = $totales['total'] > 0 ? round(($totales['presentes'] / $totales['total']) * 100, 1) : 0;
+
+        return [
+            'anio' => $anio,
+            'fecha' => $fecha,
+            'aula' => $aula,
+            'filas' => $filas,
+            'totales' => $totales,
+            'porcentaje' => $porcentaje,
+        ];
+    }
+
     // =========================================================================
     // CONTROL DE INGRESO DE NOTAS
     // =========================================================================
@@ -324,46 +398,83 @@ class ReporteService
     /**
      * Asistencia global: resumen por aula para una fecha.
      */
+    /**
+     * Asistencia global: resumen consolidado diario por aula para una fecha específica.
+     */
     public function asistenciaGlobal(array $filtros): array
     {
         $anio = $this->resolverAnio($filtros['anio_escolar_id'] ?? null);
+        // Por defecto usamos la fecha de hoy si no se envía ninguna
         $fecha = $filtros['fecha'] ?? now()->toDateString();
 
-        $aulas = Aula::with(['grado', 'modalidad'])
+        // 1. Obtener aulas (1 sola consulta)
+        $aulas = \App\Models\Aula::with(['grado', 'modalidad'])
             ->when(!empty($filtros['grado_id']), fn ($q) => $q->where('grado_id', $filtros['grado_id']))
             ->when(!empty($filtros['modalidad_id']), fn ($q) => $q->where('modalidad_id', $filtros['modalidad_id']))
             ->when(!empty($filtros['aula_id']), fn ($q) => $q->where('id', $filtros['aula_id']))
             ->where('anio_escolar_id', $anio?->id)
-            ->orderBy('turno')->orderBy('grado_id')->get();
+            ->orderBy('turno')
+            ->orderBy('grado_id')
+            ->get();
 
-        return $this->calcularAsistenciaPorAulas($aulas, $fecha);
-    }
+        if ($aulas->isEmpty()) {
+            return ['fecha' => $fecha, 'filas' => []];
+        }
 
-    protected function calcularAsistenciaPorAulas($aulas, string $fecha): array
-    {
+        // 2. Obtener matrículas activas de estas aulas (1 sola consulta)
+        $aulaIds = $aulas->pluck('id');
+        $matriculas = \App\Models\Matricula::whereIn('aula_id', $aulaIds)
+            ->where('estado', 'activo')
+            ->get(['id', 'aula_id']);
+        
+        $matriculasPorAula = $matriculas->groupBy('aula_id');
+
+        // 3. Obtener los registros de asistencia de esa fecha (1 sola consulta)
+        $asistencias = \App\Models\AsistenciaAula::whereIn('matricula_id', $matriculas->pluck('id'))
+            ->where('fecha', $fecha)
+            ->get(['matricula_id', 'estado_asistencia'])
+            ->keyBy('matricula_id');
+
         $reporte = [];
         foreach ($aulas as $aula) {
-            $matriculas = Matricula::where('aula_id', $aula->id)->where('estado', 'activo')->get();
-            $asistencias = AsistenciaAula::whereIn('matricula_id', $matriculas->pluck('id'))
-                ->where('fecha', $fecha)->get()->keyBy('matricula_id');
+            $matriculasAula = $matriculasPorAula->get($aula->id, collect());
+            $total = $matriculasAula->count();
 
-            $presentes = 0; $ausentes = 0; $justificadas = 0;
-            foreach ($matriculas as $m) {
-                $e = $asistencias->get($m->id)?->estado_asistencia;
-                if ($e === 'Presente' || $e === 'Actividad Institucional') $presentes++;
-                elseif ($e === 'Ausencia Justificada') $justificadas++;
-                else $ausentes++;
+            $presentes = 0; 
+            $ausentes = 0; 
+            $justificadas = 0;
+
+            foreach ($matriculasAula as $m) {
+                // Si el maestro no pasó lista, se asume como Ausencia para la métrica de control
+                $estado = $asistencias->get($m->id)?->estado_asistencia;
+                
+                if ($estado === 'Presente' || $estado === 'Actividad Institucional') {
+                    $presentes++;
+                } elseif ($estado === 'Ausencia Justificada') {
+                    $justificadas++;
+                } else {
+                    $ausentes++;
+                }
             }
 
-            $total = $matriculas->count();
+            $porcentaje = $total > 0 ? round(($presentes / $total) * 100, 1) : 0;
+
             $reporte[] = [
-                'aula' => $aula->nombre, 'turno' => $aula->turno, 'grado' => $aula->grado->nombre,
-                'modalidad' => $aula->modalidad->nombre, 'total' => $total,
-                'presentes' => $presentes, 'ausentes' => $ausentes, 'justificadas' => $justificadas,
-                'porcentaje' => $total > 0 ? round(($presentes / $total) * 100, 1) : 0,
+                'aula' => ($aula->grado->nombre ?? '') . ' - ' . $aula->nombre,
+                'turno' => $aula->turno ?? 'No definido',
+                'modalidad' => $aula->modalidad->nombre ?? 'Regular',
+                'total' => $total,
+                'presentes' => $presentes,
+                'ausentes' => $ausentes,
+                'justificadas' => $justificadas,
+                'porcentaje' => $porcentaje,
             ];
         }
-        return $reporte;
+
+        return [
+            'fecha' => $fecha,
+            'filas' => collect($reporte)->sortByDesc('porcentaje')->values()->all()
+        ];
     }
 
     /**
@@ -418,32 +529,62 @@ class ReporteService
     public function estadisticasAsistencia(array $filtros): array
     {
         $anio = $this->resolverAnio($filtros['anio_escolar_id'] ?? null);
-        $inicio = $filtros['fecha_inicio'] ?? now()->startOfMonth()->toDateString();
-        $fin = $filtros['fecha_fin'] ?? now()->toDateString();
+        
+        // Por defecto: últimos 7 días hasta hoy
+        $fechaInicio = $filtros['fecha_inicio'] ?? now()->subDays(7)->toDateString();
+        $fechaFin = $filtros['fecha_fin'] ?? now()->toDateString();
+        $modalidadId = $filtros['modalidad_id'] ?? null;
 
-        $aulas = Aula::with(['grado', 'modalidad'])
-            ->when(!empty($filtros['grado_id']), fn ($q) => $q->where('grado_id', $filtros['grado_id']))
-            ->where('anio_escolar_id', $anio?->id)->get();
+        // 1. Extraer todo en una sola consulta optimizada
+        $query = \App\Models\AsistenciaAula::with(['matricula.aula'])
+            ->whereBetween('fecha', [$fechaInicio, $fechaFin])
+            ->whereHas('matricula', function($q) use ($anio, $modalidadId) {
+                $q->where('anio_escolar_id', $anio?->id)
+                  ->where('estado', 'activo');
+                  
+                if ($modalidadId) {
+                    $q->whereHas('aula', fn($q2) => $q2->where('modalidad_id', $modalidadId));
+                }
+            });
 
-        $reporte = [];
-        foreach ($aulas as $aula) {
-            $matriculas = Matricula::where('aula_id', $aula->id)->where('estado', 'activo')->get();
-            $registros = AsistenciaAula::whereIn('matricula_id', $matriculas->pluck('id'))
-                ->whereBetween('fecha', [$inicio, $fin])->get();
+        $asistencias = $query->get();
+        $agrupado = $asistencias->groupBy('fecha');
+        
+        $filas = [];
+        $totalGeneral = 0;
+        $presentesGeneral = 0;
 
-            $totalRegistros = $registros->count();
+        foreach ($agrupado as $fecha => $registros) {
+            $total = $registros->count();
             $presentes = $registros->whereIn('estado_asistencia', ['Presente', 'Actividad Institucional'])->count();
-            $ausentes = $registros->where('estado_asistencia', 'Ausencia Injustificada')->count();
             $justificadas = $registros->where('estado_asistencia', 'Ausencia Justificada')->count();
+            $ausentes = $total - $presentes - $justificadas;
+            
+            $porcentaje = $total > 0 ? round(($presentes / $total) * 100, 1) : 0;
+            
+            $totalGeneral += $total;
+            $presentesGeneral += $presentes;
 
-            $reporte[] = [
-                'aula' => $aula->nombre, 'grado' => $aula->grado->nombre, 'modalidad' => $aula->modalidad->nombre,
-                'total_registros' => $totalRegistros, 'presentes' => $presentes,
-                'ausentes' => $ausentes, 'justificadas' => $justificadas,
-                'porcentaje' => $totalRegistros > 0 ? round(($presentes / $totalRegistros) * 100, 1) : 0,
+            $filas[] = [
+                'fecha' => $fecha,
+                'total' => $total,
+                'presentes' => $presentes,
+                'ausentes' => $ausentes,
+                'justificadas' => $justificadas,
+                'porcentaje' => $porcentaje
             ];
         }
-        return $reporte;
+
+        $filas = collect($filas)->sortByDesc('fecha')->values()->all();
+        $promedioRango = $totalGeneral > 0 ? round(($presentesGeneral / $totalGeneral) * 100, 1) : 0;
+
+        return [
+            'anio' => $anio,
+            'fecha_inicio' => $fechaInicio,
+            'fecha_fin' => $fechaFin,
+            'promedio_rango' => $promedioRango,
+            'filas' => $filas
+        ];
     }
 
     /**
@@ -686,6 +827,73 @@ class ReporteService
     }
 
     /**
+     * Estadísticas de asistencia agrupadas por fecha en un rango específico.
+     */
+    public function estadisticasFechas(array $filtros): array
+    {
+        $anio = $this->resolverAnio($filtros['anio_escolar_id'] ?? null);
+        
+        // Por defecto: últimos 7 días hasta hoy
+        $fechaInicio =$filtros['fecha_inicio'] ?? now()->subDays(7)->toDateString();
+        $fechaFin =$filtros['fecha_fin'] ?? now()->toDateString();
+        $modalidadId =$filtros['modalidad_id'] ?? null;
+
+        // 1. Obtener todas las asistencias en el rango de fechas con su matrícula
+        $query = \App\Models\AsistenciaAula::with(['matricula.aula'])
+            ->whereBetween('fecha', [$fechaInicio,$fechaFin])
+            ->whereHas('matricula', function($q) use ($anio,$modalidadId) {
+                $q->where('anio_escolar_id',$anio?->id)
+                  ->where('estado', 'activo');
+                  
+                if ($modalidadId) {
+                    $q->whereHas('aula', fn($q2) => $q2->where('modalidad_id',$modalidadId));
+                }
+            });
+
+        $asistencias =$query->get();
+
+        // 2. Agrupar los registros por día
+        $agrupado =$asistencias->groupBy('fecha');
+        
+        $filas = [];$totalGeneral = 0;
+        $presentesGeneral = 0;
+
+        foreach ($agrupado as $fecha =>$registros) {
+            $total =$registros->count();
+            $presentes =$registros->whereIn('estado_asistencia', ['Presente', 'Actividad Institucional'])->count();
+            $justificadas =$registros->where('estado_asistencia', 'Ausencia Justificada')->count();
+            $ausentes =$total - $presentes -$justificadas;
+            
+            $porcentaje =$total > 0 ? round(($presentes / $total) * 100, 1) : 0;
+            
+            $totalGeneral +=$total;
+            $presentesGeneral +=$presentes;
+
+            $filas[] = [
+                'fecha' => $fecha,
+                'total' => $total,
+                'presentes' => $presentes,
+                'ausentes' => $ausentes,
+                'justificadas' => $justificadas,
+                'porcentaje' => $porcentaje
+            ];
+        }
+
+        // Ordenamos para que las fechas más recientes salgan arriba
+        $filas = collect($filas)->sortByDesc('fecha')->values()->all();
+
+        $promedioRango =$totalGeneral > 0 ? round(($presentesGeneral / $totalGeneral) * 100, 1) : 0;
+
+        return [
+            'anio' => $anio,
+            'fecha_inicio' => $fechaInicio,
+            'fecha_fin' => $fechaFin,
+            'promedio_rango' => $promedioRango,
+            'filas' => $filas
+        ];
+    }
+
+    /**
      * Rendimiento por corte de un aula específica (para el docente guía).
      * Devuelve un resumen del grado del aula: MI/MA (AS/F), aprobados en todas,
      * aplazados de 1/2/3+, total de docentes, % aprobados y % retención.
@@ -821,19 +1029,243 @@ class ReporteService
             'porcentaje' => $totalEsperadas > 0 ? round(($totalRegistradas / $totalEsperadas) * 100, 1) : 0,
         ];
     }
+
+    public function asistenciaSeccionRango(array $filtros): array
+    {
+        $anio = $this->resolverAnio($filtros['anio_escolar_id'] ?? null);
+        $fechaInicio = $filtros['fecha_inicio'] ?? now()->subDays(7)->toDateString();
+        $fechaFin = $filtros['fecha_fin'] ?? now()->toDateString();
+        $aulaId = $filtros['aula_id'] ?? null;
+
+        $aula = null;
+        $filas = [];
+
+        if ($aulaId) {
+            $aula = \App\Models\Aula::with('grado')->find($aulaId);
+            
+            $matriculas = \App\Models\Matricula::with('alumno')
+                ->where('anio_escolar_id', $anio?->id)
+                ->where('aula_id', $aulaId)
+                ->where('estado', 'activo')
+                ->get()
+                ->sortBy(fn($m) => $m->alumno->nombre_completo ?? '');
+
+            $asistencias = \App\Models\AsistenciaAula::whereIn('matricula_id', $matriculas->pluck('id'))
+                ->whereBetween('fecha', [$fechaInicio, $fechaFin])
+                ->get()
+                ->groupBy('matricula_id');
+
+            foreach ($matriculas as $matricula) {
+                $registrosAlumno = $asistencias->get($matricula->id, collect());
+                
+                $presentes = $registrosAlumno->whereIn('estado_asistencia', ['Presente', 'Actividad Institucional'])->count();
+                $ausentes = $registrosAlumno->where('estado_asistencia', 'Ausencia')->count();
+                $justificadas = $registrosAlumno->where('estado_asistencia', 'Ausencia Justificada')->count();
+                $totalClases = $registrosAlumno->count();
+
+                $porcentaje = $totalClases > 0 ? round(($presentes / $totalClases) * 100, 1) : 0;
+
+                $filas[] = [
+                    'estudiante' => $matricula->alumno->nombre_completo,
+                    'cup' => $matricula->alumno->codigo_unico_persona ?? 'S/C',
+                    'presentes' => $presentes,
+                    'ausentes' => $ausentes,
+                    'justificadas' => $justificadas,
+                    'total' => $totalClases,
+                    'porcentaje' => $porcentaje,
+                ];
+            }
+        }
+
+        return [
+            'anio' => $anio,
+            'fecha_inicio' => $fechaInicio,
+            'fecha_fin' => $fechaFin,
+            'aula' => $aula,
+            'filas' => $filas,
+        ];
+    }
+
+    public function asistenciaEstudiante(array $filtros): array
+    {
+        $anio = $this->resolverAnio($filtros['anio_escolar_id'] ?? null);
+        $fechaInicio = $filtros['fecha_inicio'] ?? now()->subMonth()->toDateString();
+        $fechaFin = $filtros['fecha_fin'] ?? now()->toDateString();
+        $aulaId = $filtros['aula_id'] ?? null;
+        $busqueda = $filtros['buscar'] ?? null;
+
+        // Obtener matrículas activas con filtros aplicados
+        $query = \App\Models\Matricula::with(['alumno', 'aula.grado'])
+            ->where('anio_escolar_id', $anio?->id)
+            ->where('estado', 'activo')
+            ->when($aulaId, fn($q) => $q->where('aula_id', $aulaId))
+            ->when($busqueda, fn($q) => $q->whereHas('alumno', fn($q2) => $q2->where('nombre_completo', 'ilike', "%{$busqueda}%")));
+
+        $matriculas = $query->get()->sortBy(fn($m) => $m->alumno->nombre_completo ?? '');
+
+        // Obtener asistencias en el rango
+        $asistencias = \App\Models\AsistenciaAula::whereIn('matricula_id', $matriculas->pluck('id'))
+            ->whereBetween('fecha', [$fechaInicio, $fechaFin])
+            ->get()
+            ->groupBy('matricula_id');
+
+        $filas = [];
+        foreach ($matriculas as $matricula) {
+            $alumno = $matricula->alumno;
+            $registros = $asistencias->get($matricula->id, collect());
+
+            $total = $registros->count();
+            $presentes = $registros->whereIn('estado_asistencia', ['Presente', 'Actividad Institucional'])->count();
+            $ausentes = $registros->where('estado_asistencia', 'Ausencia')->count();
+            $justificadas = $registros->where('estado_asistencia', 'Ausencia Justificada')->count();
+
+            $porcentaje = $total > 0 ? round(($presentes / $total) * 100, 1) : 0;
+
+            $filas[] = [
+                'cup' => $alumno->codigo_unico_persona ?? 'S/C',
+                'estudiante' => $alumno->nombre_completo,
+                'aula' => ($matricula->aula->grado->nombre ?? '') . ' - ' . ($matricula->aula->nombre ?? ''),
+                'registros' => $total,
+                'presentes' => $presentes,
+                'ausentes' => $ausentes,
+                'justificadas' => $justificadas,
+                'porcentaje' => $porcentaje,
+            ];
+        }
+
+        return [
+            'anio' => $anio,
+            'fecha_inicio' => $fechaInicio,
+            'fecha_fin' => $fechaFin,
+            'filas' => $filas,
+        ];
+    }
+
+    public function rendimientoMinedDetallado(array $filtros): array
+    {
+        $anio = $this->resolverAnio($filtros['anio_escolar_id'] ?? null);
+        $corteId = $filtros['corte_evaluativo_id'] ?? \App\Models\CorteEvaluativo::first()?->id;
+        $tipo = $filtros['tipo'] ?? 'aprobados'; // aprobados, 1_2, 3_mas
+
+        $matriculas = \App\Models\Matricula::with(['alumno', 'aula.grado', 'aula.modalidad'])
+            ->where('anio_escolar_id', $anio?->id)
+            ->where('estado', 'activo')
+            ->when(!empty($filtros['grado_id']), fn($q) => $q->whereHas('aula', fn($q2) => $q2->where('grado_id', $filtros['grado_id'])))
+            ->get();
+
+        // Precargar todas las notas del corte con sus asignaciones y asignaturas en una sola consulta
+        $notasAgrupadas = \App\Models\Nota::with('asignacionDocente.asignatura')
+            ->where('corte_evaluativo_id', $corteId)
+            ->whereIn('matricula_id', $matriculas->pluck('id'))
+            ->get()
+            ->groupBy('matricula_id');
+
+        $filas = [];
+        $contador = 1;
+
+        foreach ($matriculas as $matricula) {
+            $alumno = $matricula->alumno;
+            $aula = $matricula->aula;
+
+            $notasAlumno = $notasAgrupadas->get($matricula->id, collect());
+            $reprobadas = collect();
+
+            foreach ($notasAlumno as $nota) {
+                $nombreAsignatura = $nota->asignacionDocente->asignatura->nombre ?? '';
+                
+                // Excluimos estrictamente materias institucionales (TIC, Biblia, Informática, Computación)
+                if (in_array($nombreAsignatura, ['TIC', 'Biblia', 'Informática', 'Computación'])) {
+                    continue;
+                }
+
+                if ($nota->calificacion < 60) {
+                    $reprobadas->push($nombreAsignatura);
+                }
+            }
+
+            $cantReprobadas = $reprobadas->count();
+
+            $incluir = false;
+            if ($tipo === 'aprobados' && $cantReprobadas === 0) {
+                $incluir = true;
+            } elseif ($tipo === '1_2' && $cantReprobadas >= 1 && $cantReprobadas <= 2) {
+                $incluir = true;
+            } elseif ($tipo === '3_mas' && $cantReprobadas >= 3) {
+                $incluir = true;
+            }
+
+            if ($incluir) {
+                $filas[] = [
+                    'n' => $contador++,
+                    'modalidad' => $aula->modalidad->nombre ?? 'Secundaria Regular',
+                    'nivel' => $aula->grado->nombre ?? '11mo',
+                    'turno' => ucfirst($aula->turno ?? 'Matutino'),
+                    'codigo' => $alumno->codigo_unico_persona ?? 'S/C',
+                    'nombre_completo' => $alumno->nombre_completo,
+                    'sexo' => strtoupper($alumno->sexo ?? 'M'),
+                    'asignaturas' => $reprobadas->implode(', ')
+                ];
+            }
+        }
+
+        return [
+            'anio' => $anio,
+            'tipo' => $tipo,
+            'filas' => $filas,
+        ];
+    }
+
+
     public function estudiantes(?int $anioId): array
     {
         $anio = $this->resolverAnio($anioId);
         $anioId = $anio?->id;
 
+        // Obtener matrículas del año actual con sus relaciones
+        $matriculas = \App\Models\Matricula::with(['alumno', 'aula.grado'])
+            ->where('anio_escolar_id', $anioId)
+            ->get();
+
+        $matriculados = $matriculas->where('estado', 'activo')->count();
+        $retirados = $matriculas->where('estado', 'retirado')->count();
+        $totalAlumnos = \App\Models\Alumno::count();
+
+        // Procesar la lista de expedientes incompletos (solo de alumnos activos)
+        $incompletos = [];
+        foreach ($matriculas->where('estado', 'activo') as $matricula) {
+            $alumno = $matricula->alumno;
+            $faltantes = [];
+
+            if (empty($alumno->direccion_domiciliar)) $faltantes[] = 'Dirección';
+            if (empty($alumno->fecha_nacimiento)) $faltantes[] = 'F. Nacimiento';
+            if (empty($alumno->madre_nombre_completo)) $faltantes[] = 'Datos Madre';
+            if (empty($alumno->madre_telefono)) $faltantes[] = 'Tel. Madre';
+            if (empty($alumno->tutor_nombre_completo)) $faltantes[] = 'Datos Tutor';
+
+            if (!empty($faltantes)) {
+                // Rescatar cualquier teléfono disponible (Madre, Padre o Tutor)
+                $telefonoContacto = $alumno->madre_telefono ?? $alumno->padre_telefono ?? $alumno->tutor_telefono ?? 'Sin número registrado';
+
+                $incompletos[] = [
+                    'cup' => $alumno->codigo_unico_persona ?? 'S/C',
+                    'alumno' => $alumno->nombre_completo,
+                    'grado_aula' => ($matricula->aula->grado->nombre ?? '') . ' - ' . ($matricula->aula->nombre ?? ''),
+                    'faltantes' => implode(', ', $faltantes),
+                    'telefono' => $telefonoContacto,
+                ];
+            }
+        }
+
+        // Ordenar alfabéticamente la lista de incompletos
+        $incompletos = collect($incompletos)->sortBy('alumno')->values()->all();
+
         return [
-            'total_alumnos' => Alumno::count(),
-            'matriculados' => Matricula::where('anio_escolar_id', $anioId)->where('estado', 'activo')->count(),
-            'retirados' => Matricula::where('anio_escolar_id', $anioId)->where('estado', 'retirado')->count(),
-            'expedientes_incompletos' => Alumno::where(function ($q) {
-                $q->whereNull('direccion_domiciliar')->orWhereNull('madre_nombre_completo')
-                  ->orWhereNull('madre_telefono')->orWhereNull('tutor_nombre_completo')->orWhereNull('fecha_nacimiento');
-            })->count(),
+            'anio' => $anio,
+            'total_alumnos' => $totalAlumnos,
+            'matriculados' => $matriculados,
+            'retirados' => $retirados,
+            'expedientes_incompletos' => count($incompletos),
+            'lista_incompletos' => $incompletos,
         ];
     }
 
@@ -863,16 +1295,61 @@ class ReporteService
         return $datos;
     }
 
-    public function padres(): array
+    public function padres(array $filtros = []): array
     {
-        $alumnos = Alumno::all();
-        $conTelefono = $alumnos->filter(fn ($a) => !empty($a->madre_telefono) || !empty($a->padre_telefono) || !empty($a->tutor_telefono))->count();
-        $conEmail = $alumnos->filter(fn ($a) => $a->usuario && !empty($a->usuario->email))->count();
+        $anioId = $filtros['anio_escolar_id'] ?? null;
+        $aulaId = $filtros['aula_id'] ?? null;
+        
+        $anio = $this->resolverAnio($anioId);
+
+        // Buscar solo matrículas activas del ciclo, filtradas por aula si se selecciona una
+        $query = \App\Models\Matricula::with(['alumno.usuario', 'aula.grado'])
+            ->where('anio_escolar_id', $anio?->id)
+            ->where('estado', 'activo');
+
+        if ($aulaId) {
+            $query->where('aula_id', $aulaId);
+        }
+
+        $matriculas = $query->get()->sortBy(fn($m) => $m->alumno->nombre_completo ?? '');
+
+        $conTelefono = 0;
+        $conEmail = 0;
+        $filas = [];
+
+        foreach ($matriculas as $matricula) {
+            $alumno = $matricula->alumno;
+            
+            $tieneTel = !empty($alumno->madre_telefono) || !empty($alumno->padre_telefono) || !empty($alumno->tutor_telefono);
+            // Si el alumno (o responsable) tiene un usuario asociado con email
+            $tieneEmail = $alumno->usuario && !empty($alumno->usuario->email); 
+
+            if ($tieneTel) $conTelefono++;
+            if ($tieneEmail) $conEmail++;
+
+            // Formateamos los contactos para que muestren "Nombre (Teléfono)"
+            $filas[] = [
+                'estudiante' => $alumno->nombre_completo,
+                'cup' => $alumno->codigo_unico_persona ?? 'S/C',
+                'grado_aula' => ($matricula->aula->grado->nombre ?? '') . ' - ' . ($matricula->aula->nombre ?? ''),
+                'madre' => $alumno->madre_nombre_completo ? $alumno->madre_nombre_completo . '<br><span class="text-xs font-bold text-slate-500">' . ($alumno->madre_telefono ?? 'Sin tel') . '</span>' : '-',
+                'padre' => $alumno->padre_nombre_completo ? $alumno->padre_nombre_completo . '<br><span class="text-xs font-bold text-slate-500">' . ($alumno->padre_telefono ?? 'Sin tel') . '</span>' : '-',
+                'tutor' => $alumno->tutor_nombre_completo ? $alumno->tutor_nombre_completo . '<br><span class="text-xs font-bold text-slate-500">' . ($alumno->tutor_telefono ?? 'Sin tel') . '</span>' : '-',
+                'autorizado' => $alumno->autorizado_retirar ? $alumno->autorizado_retirar . '<br><span class="text-xs font-bold text-slate-500">' . ($alumno->autorizado_telefono ?? 'Sin tel') . '</span>' : '-',
+            ];
+        }
+
+        $total = $matriculas->count();
+        $aulaSeleccionada = $aulaId ? \App\Models\Aula::with('grado')->find($aulaId) : null;
+
         return [
-            'total' => $alumnos->count(),
+            'anio' => $anio,
+            'aula' => $aulaSeleccionada,
+            'total' => $total,
             'con_telefono' => $conTelefono,
             'con_email' => $conEmail,
-            'porcentaje_adopcion' => $alumnos->count() > 0 ? round(($conTelefono / $alumnos->count()) * 100, 1) : 0,
+            'porcentaje_adopcion' => $total > 0 ? round(($conTelefono / $total) * 100, 1) : 0,
+            'filas' => $filas,
         ];
     }
 }

@@ -166,7 +166,7 @@
                             </div>
                         </a>
 
-                        <a href="{{ route('academico.reportes.asistencia-seccion-dia') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-400 transition-all flex flex-col justify-between">
+                        <a href="{{ url('/academico/reportes/asistencia-seccion-dia') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-400 transition-all flex flex-col justify-between">
                             <div class="flex items-start gap-4">
                                 <div class="w-12 h-12 shrink-0 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
@@ -201,6 +201,7 @@
                                 </div>
                             </div>
                         </a>
+                        
                     </div>
                 </div>
 
@@ -281,6 +282,48 @@
                             </div>
                         </a>
 
+                        <!-- Tarjeta: Estudiantes Aprobados -->
+                        <a href="{{ url('/academico/reportes/mined-detallado?tipo=aprobados') }}" class="bg-white p-6 rounded-2xl border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all group block">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                    ✓
+                                </div>
+                                <div>
+                                    <span class="block text-[10px] font-black text-emerald-600 uppercase tracking-widest">MINED OFICIAL</span>
+                                    <h4 class="font-black text-[#3d2c1d] group-hover:text-emerald-700 transition-colors">Listado de Aprobados</h4>
+                                </div>
+                            </div>
+                            <p class="text-xs text-slate-500 font-medium">Relación nominal de estudiantes aprobados sin materias reprobadas (excluyendo TIC y Biblia).</p>
+                        </a>
+
+                        <!-- Tarjeta: Aplazados 1 a 2 Asignaturas -->
+                        <a href="{{ url('/academico/reportes/mined-detallado?tipo=1_2') }}" class="bg-white p-6 rounded-2xl border border-slate-200 hover:border-amber-500 hover:shadow-md transition-all group block">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-black group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                                    1-2
+                                </div>
+                                <div>
+                                    <span class="block text-[10px] font-black text-amber-600 uppercase tracking-widest">MINED OFICIAL</span>
+                                    <h4 class="font-black text-[#3d2c1d] group-hover:text-amber-700 transition-colors">Aplazados (1 a 2)</h4>
+                                </div>
+                            </div>
+                            <p class="text-xs text-slate-500 font-medium">Listado oficial de estudiantes con 1 o 2 asignaturas reprobadas y detalle de materias.</p>
+                        </a>
+
+                        <!-- Tarjeta: Aplazados 3 a más Asignaturas -->
+                        <a href="{{ url('/academico/reportes/mined-detallado?tipo=3_mas') }}" class="bg-white p-6 rounded-2xl border border-slate-200 hover:border-rose-500 hover:shadow-md transition-all group block">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-black group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                                    3+
+                                </div>
+                                <div>
+                                    <span class="block text-[10px] font-black text-rose-600 uppercase tracking-widest">MINED OFICIAL</span>
+                                    <h4 class="font-black text-[#3d2c1d] group-hover:text-rose-700 transition-colors">Aplazados (3 a más)</h4>
+                                </div>
+                            </div>
+                            <p class="text-xs text-slate-500 font-medium">Listado oficial de estudiantes con 3 o más asignaturas reprobadas y desglose de materias.</p>
+                        </a>
+
                     </div>
                 </div>
                 
@@ -293,7 +336,7 @@
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         
-                        <a href="{{ route('academico.reportes.estudiantes') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-[#e6ac27] transition-all flex flex-col justify-between">
+                        <a href="{{ url('/academico/reportes/estudiantes') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-[#e6ac27] transition-all flex flex-col justify-between">
                             <div class="flex items-start gap-4">
                                 <div class="w-12 h-12 shrink-0 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition-colors">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
@@ -313,7 +356,7 @@
                                 </div>
                                 <div>
                                     <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-500 uppercase tracking-wider mb-1">Individual</span>
-                                    <h4 class="font-black text-[#3d2c1d] leading-tight">Historial Académico</h4>
+                                    <h4 class="font-black text-[#3d2c1d] leading-tight">Certificado de notas</h4>
                                     <p class="text-xs text-slate-400 mt-1 line-clamp-2">Buscador para ver la trazabilidad completa de calificaciones de un estudiante.</p>
                                 </div>
                             </div>

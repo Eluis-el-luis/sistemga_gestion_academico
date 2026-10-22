@@ -188,10 +188,11 @@ Route::middleware('auth')->group(function () {
         Route::get('reportes/control-notas', [\App\Http\Controllers\ReporteController::class, 'controlNotas'])->name('reportes.control-notas');
         Route::get('reportes/notas-globales', [\App\Http\Controllers\ReporteController::class, 'notasGlobales'])->name('reportes.notas-globales');
         Route::get('reportes/notas-pendientes', [\App\Http\Controllers\ReporteController::class, 'notasPendientes'])->name('reportes.notas-pendientes');        
+        
         // Asistencia (segmentada)
         Route::get('reportes/asistencia-global', [\App\Http\Controllers\ReporteController::class, 'asistenciaGlobal'])->name('reportes.asistencia-global');
         Route::get('reportes/estadisticas-asistencia', [\App\Http\Controllers\ReporteController::class, 'estadisticasAsistencia'])->name('reportes.estadisticas-asistencia');
-        Route::get('reportes/asistencia-seccion-dia', [\App\Http\Controllers\ReporteController::class, 'asistenciaSeccionDia'])->name('reportes.asistencia-seccion-dia');
+        Route::get('reportes/asistencia-seccion-dia', [\App\Http\Controllers\ReporteController::class, 'asistenciaPorSeccion'])->name('reportes.asistencia-seccion-dia');
         Route::get('reportes/asistencia-seccion-rango', [\App\Http\Controllers\ReporteController::class, 'asistenciaSeccionRango'])->name('reportes.asistencia-seccion-rango');
         Route::get('reportes/asistencia-estudiante', [\App\Http\Controllers\ReporteController::class, 'estadisticasPorEstudiante'])->name('reportes.asistencia-estudiante');
         Route::get('reportes/mis-clases', [\App\Http\Controllers\ReporteController::class, 'misClases'])->name('reportes.mis-clases');
@@ -201,17 +202,15 @@ Route::middleware('auth')->group(function () {
         
         // Rendimiento académico
         Route::get('reportes/notas-por-asignatura', [\App\Http\Controllers\ReporteController::class, 'notasPorAsignatura'])->name('reportes.notas-por-asignatura');
-  
-        // Rendimiento académico
-        Route::get('reportes/notas-por-asignatura', [\App\Http\Controllers\ReporteController::class, 'notasPorAsignatura'])->name('reportes.notas-por-asignatura');
         Route::get('reportes/rendimiento-corte', [\App\Http\Controllers\ReporteController::class, 'rendimientoCorte'])->name('reportes.rendimiento-corte');
         Route::get('reportes/historial-estudiante', [\App\Http\Controllers\ReporteController::class, 'historialPorEstudiante'])->name('reportes.historial-estudiante');
-
+        
         // Otros reportes (MINED, estudiantes, padres)
         Route::get('reportes/mined', [\App\Http\Controllers\ReporteController::class, 'mined'])->name('reportes.mined');
+        Route::get('reportes/mined-detallado', [\App\Http\Controllers\ReporteController::class, 'reporteMinedDetallado'])->name('reportes.mined-detallado');
         Route::get('reportes/avance-programatico', [\App\Http\Controllers\ReporteController::class, 'avanceProgramatico'])->name('reportes.avance-programatico');
         Route::get('reportes/asignaturas-aprobadas', [\App\Http\Controllers\ReporteController::class, 'asignaturasAprobadas'])->name('reportes.asignaturas-aprobadas');
-        Route::get('reportes/estudiantes', [\AppRecord::class, 'estudiantes'] ?? [\App\Http\Controllers\ReporteController::class, 'estudiantes'])->name('reportes.estudiantes');
+        Route::get('reportes/estudiantes', [\App\Http\Controllers\ReporteController::class, 'estudiantes'])->name('reportes.estudiantes');
         Route::get('reportes/padres', [\App\Http\Controllers\ReporteController::class, 'padres'])->name('reportes.padres');
         Route::get('reportes/escalas', [\App\Http\Controllers\ReporteController::class, 'escalas'])->name('reportes.escalas');
         

@@ -426,99 +426,124 @@ class ReporteController extends Controller
     // =============================================================
     // ASISTENCIA (segmentada)
     // =============================================================
-    public function asistenciaGlobal(Request $request)
+    public function asistenciaGlobal(\Illuminate\Http\Request $request)
     {
         try {
             $this->autorizarReportes();
-            $filas = $this->reporteService->asistenciaGlobal($this->filtros($request));
+            $filtros = $request->all();
+            $datos = $this->reporteService->asistenciaGlobal($filtros);
             $catalogos = $this->pasarCatalogos($request);
 
-            return view('academico.reportes.asistencia-global', array_merge(compact('filas'), $catalogos));
-
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
-            return redirect()->route('dashboard')->with('error', $e->getMessage());
+            return view('academico.reportes.asistencia-global', array_merge($datos, $catalogos));
         } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return redirect()->route('academico.reportes.index')->with('error', 'Ocurrió un error al cargar la asistencia global.');
+            return redirect()->route('academico.reportes.index')->with('error', 'Error al cargar asistencia global.');
         }
     }
 
-    public function estadisticasAsistencia(Request $request)
+
+
+    public function estadisticasAsistencia(\Illuminate\Http\Request $request)
     {
         try {
             $this->autorizarReportes();
-            $filas = $this->reporteService->estadisticasAsistencia($this->filtros($request));
+            $filtros = $request->all();
+            
+            // Llamamos a la versión optimizada que acabamos de pegar
+            $datos = $this->reporteService->estadisticasAsistencia($filtros);
             $catalogos = $this->pasarCatalogos($request);
 
-            return view('academico.reportes.estadisticas-asistencia', array_merge(compact('filas'), $catalogos));
-
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
-            return redirect()->route('dashboard')->with('error', $e->getMessage());
+            // Pasamos las variables directamente a tu vista
+            return view('academico.reportes.estadisticas-asistencia', array_merge($datos, $catalogos));
         } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return redirect()->route('academico.reportes.index')->with('error', 'No se pudieron calcular las estadísticas de asistencia.');
+            return redirect()->route('academico.reportes.index')->with('error', 'Ocurrió un error al cargar las estadísticas por fechas.');
         }
     }
 
-    public function asistenciaSeccionDia(Request $request)
+    public function asistenciaPorSeccion(\Illuminate\Http\Request $request)
+    {
+        $this->autorizarReportes();
+        $filtros = $request->all();
+        
+        $datos = $this->reporteService->asistenciaPorSeccion($filtros);
+        $catalogos = $this->pasarCatalogos($request);
+
+        return view('academico.reportes.asistencia-por-seccion', array_merge($datos, $catalogos));
+    }
+
+    public function estadisticasFechas(\Illuminate\Http\Request $request)
     {
         try {
             $this->autorizarReportes();
-            $filas = $this->reporteService->asistenciaGlobal($this->filtros($request));
+            $filtros = $request->all();
+            
+            $datos = $this->reporteService->estadisticasFechas($filtros);
             $catalogos = $this->pasarCatalogos($request);
 
-            return view('academico.reportes.asistencia-seccion-dia', array_merge(compact('filas'), $catalogos));
-
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
-            return redirect()->route('dashboard')->with('error', $e->getMessage());
+            return view('academico.reportes.estadisticas-fechas', array_merge($datos, $catalogos));
         } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return redirect()->route('academico.reportes.index')->with('error', 'Ocurrió un problema al generar el reporte de asistencia por sección.');
+            return redirect()->route('academico.reportes.index')->with('error', 'Ocurrió un error al cargar las estadísticas por fechas.');
         }
     }
 
-    public function asistenciaSeccionRango(Request $request)
+    public function asistenciaSeccionRango(\Illuminate\Http\Request $request)
     {
         try {
             $this->autorizarReportes();
-            $filas = $this->reporteService->estadisticasAsistencia($this->filtros($request));
+            $filtros = $request->all();
+            
+            $datos = $this->reporteService->asistenciaSeccionRango($filtros);
             $catalogos = $this->pasarCatalogos($request);
 
-            return view('academico.reportes.asistencia-seccion-rango', array_merge(compact('filas'), $catalogos));
-
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
-            return redirect()->route('dashboard')->with('error', $e->getMessage());
+            return view('academico.reportes.asistencia-seccion-rango', array_merge($datos, $catalogos));
         } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return redirect()->route('academico.reportes.index')->with('error', 'No se pudo cargar el reporte de asistencia en rango.');
+            return redirect()->route('academico.reportes.index')->with('error', 'Ocurrió un error al cargar el reporte por rango.');
         }
     }
 
-    public function estadisticasPorEstudiante(Request $request)
+    public function asistenciaEstudiante(\Illuminate\Http\Request $request)
     {
         try {
             $this->autorizarReportes();
-            $filas = $this->reporteService->estadisticasPorEstudiante($this->filtros($request));
+            $filtros = $request->all();
+            
+            $datos = $this->reporteService->asistenciaEstudiante($filtros);
             $catalogos = $this->pasarCatalogos($request);
 
-            return view('academico.reportes.asistencia-estudiante', array_merge(compact('filas'), $catalogos));
-
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
-            return redirect()->route('dashboard')->with('error', $e->getMessage());
+            return view('academico.reportes.asistencia-estudiante', array_merge($datos, $catalogos));
         } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return redirect()->route('academico.reportes.index')->with('error', 'Ocurrió un error al procesar las estadísticas individuales de asistencia.');
+            return redirect()->route('academico.reportes.index')->with('error', 'Ocurrió un error al cargar la ficha individual.');
         }
+    }
+
+    public function estadisticasPorEstudiante(\Illuminate\Http\Request $request)
+    {
+        try {
+            $this->autorizarReportes();
+            $filtros = $request->all();
+            
+            $datos = $this->reporteService->asistenciaEstudiante($filtros);
+            $catalogos = $this->pasarCatalogos($request);
+
+            // Nos aseguramos de fusionar y pasar las variables de fecha por seguridad
+            return view('academico.reportes.asistencia-estudiante', array_merge([
+                'fecha_inicio' => $filtros['fecha_inicio'] ?? now()->subMonth()->toDateString(),
+                'fecha_fin' => $filtros['fecha_fin'] ?? now()->toDateString(),
+            ], $datos, $catalogos));
+            
+        } catch (\Exception $e) {
+            return redirect()->route('academico.reportes.index')->with('error', 'Ocurrió un error al cargar la ficha individual.');
+        }
+    }
+
+    public function reporteMinedDetallado(\Illuminate\Http\Request $request)
+    {
+        $this->autorizarReportes();
+        $filtros = $request->all();
+        
+        $datos = $this->reporteService->rendimientoMinedDetallado($filtros);
+        $catalogos = $this->pasarCatalogos($request);
+
+        return view('academico.reportes.mined-detallado', array_merge($datos, $catalogos));
     }
 
     // =============================================================
@@ -878,19 +903,21 @@ public function rendimientoCorte(Request $request)
         return view('academico.reportes.avance-programatico', compact('anios', 'anioId', 'anioActual', 'gruposModalidades', 'infoCentro'));
     }
 
-    public function estudiantes(Request $request)
+    public function estudiantes(\Illuminate\Http\Request $request)
     {
         try {
             $this->autorizarReportes();
-            $anio = $this->reporteService->resolverAnio($request->query('anio_escolar_id') ? (int) $request->query('anio_escolar_id') : null);
-            $datos = $this->reporteService->estudiantes($anio?->id);
-            $incompletos = Alumno::where(function ($q) {
-                $q->whereNull('direccion_domiciliar')->orWhereNull('madre_nombre_completo')
-                  ->orWhereNull('madre_telefono')->orWhereNull('tutor_nombre_completo')->orWhereNull('fecha_nacimiento');
-            })->orderBy('nombre_completo')->get();
+            
+            $anioId = $request->query('anio_escolar_id') ? (int) $request->query('anio_escolar_id') : null;
+            
+            // 1. El servicio ahora devuelve TODAS las variables listas (total, matriculados, lista_incompletos, etc.)
+            $datos = $this->reporteService->estudiantes($anioId);
+            
+            // 2. Obtenemos los catálogos para los filtros
             $catalogos = $this->pasarCatalogos($request);
 
-            return view('academico.reportes.estudiantes', array_merge(compact('anio', 'datos', 'incompletos'), $catalogos));
+            // 3. Fusionamos los arreglos directamente para que Blade pueda leer $matriculados, $lista_incompletos, etc.
+            return view('academico.reportes.estudiantes', array_merge($datos, $catalogos));
 
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
             return redirect()->route('dashboard')->with('error', $e->getMessage());
@@ -902,23 +929,22 @@ public function rendimientoCorte(Request $request)
         }
     }
 
-    public function padres(Request $request)
+    public function padres(\Illuminate\Http\Request $request)
     {
         try {
             $this->autorizarReportes();
-            $datos = $this->reporteService->padres();
-            $alumnos = Alumno::orderBy('nombre_completo')->get();
+            
+            // Enviamos los filtros que vienen por URL al servicio
+            $filtros = $request->only(['anio_escolar_id', 'aula_id']);
+            $datos = $this->reporteService->padres($filtros);
+            
+            // Pasamos los catálogos (para tener la variable $aulas en el select de la vista)
             $catalogos = $this->pasarCatalogos($request);
 
-            return view('academico.reportes.padres', array_merge(compact('datos', 'alumnos'), $catalogos));
+            return view('academico.reportes.padres', array_merge($datos, $catalogos));
 
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
-            return redirect()->route('dashboard')->with('error', $e->getMessage());
         } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return redirect()->route('academico.reportes.index')->with('error', 'No se pudo cargar el reporte de padres de familia.');
+            return redirect()->route('academico.reportes.index')->with('error', 'Ocurrió un error al cargar el directorio.');
         }
     }
 
