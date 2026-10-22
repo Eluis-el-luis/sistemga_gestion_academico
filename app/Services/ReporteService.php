@@ -14,6 +14,7 @@ use App\Models\Grado;
 use App\Models\Matricula;
 use App\Models\Modalidad;
 use App\Models\Nota;
+use Illuminate\Support\Facades\DB;
 
 class ReporteService
 {
@@ -92,35 +93,46 @@ class ReporteService
     {
         [$query, $anio] = $this->queryAsignaciones($filtros);
         
-        // Ordenar por grado numérico, luego por sección y luego por asignatura
-        $asignaciones = $query->get()->sortBy([
-            fn ($a, $b) => ($a->aula->grado_id ?? 0) <=> ($b->aula->grado_id ?? 0),
-            fn ($a, $b) => strcmp($a->aula->nombre ?? '', $b->aula->nombre ?? ''),
-            fn ($a, $b) => strcmp($a->asignatura->nombre ?? '', $b->asignatura->nombre ?? ''),
-        ]);
-
         $corteId = $filtros['corte_evaluativo_id'] ?? null;
         $tipo = $filtros['tipo'] ?? 'todos'; // 'todos' | 'pendientes' | 'ingresadas'
 
+        // 1. Obtener las asignaciones con sus relaciones básicas (1 sola consulta)
+        $asignaciones = $query->with(['aula.grado', 'asignatura', 'docente.usuario'])->get();
+        $asignacionIds = $asignaciones->pluck('id');
+
+        if ($asignacionIds->isEmpty()) {
+            return [];
+        }
+
+        // 2. Conteo REAL de notas registradas agrupadas por asignación (1 sola consulta rápida)
+        $notasAgrupadas = \App\Models\Nota::whereIn('aula_asignatura_docente_id', $asignacionIds)
+            ->when($corteId, fn ($q) => $q->where('corte_evaluativo_id', $corteId))
+            ->select('aula_asignatura_docente_id', \Illuminate\Support\Facades\DB::raw('count(distinct matricula_id) as registradas'))
+            ->groupBy('aula_asignatura_docente_id')
+            ->pluck('registradas', 'aula_asignatura_docente_id');
+
+        // 3. Obtener el mapa de matrículas activas por cada aula (1 sola consulta)
+        $aulaIds = $asignaciones->pluck('aula_id')->unique();
+        $matriculasPorAula = \App\Models\Matricula::whereIn('aula_id', $aulaIds)
+            ->where('estado', 'activo')
+            ->select('aula_id', \Illuminate\Support\Facades\DB::raw('count(*) as total'))
+            ->groupBy('aula_id')
+            ->pluck('total', 'aula_id');
+
+        // 4. Obtener el estado de los cortes cerrados en bloque (1 sola consulta)
+        $cortesCerrados = \App\Models\CorteCerrado::whereIn('aula_asignatura_docente_id', $asignacionIds)
+            ->when($corteId, fn ($q) => $q->where('corte_evaluativo_id', $corteId))
+            ->where('bloqueado', true)
+            ->pluck('aula_asignatura_docente_id')
+            ->flip();
+
         $filas = [];
         foreach ($asignaciones as $asignacion) {
-            $total = Matricula::where('aula_id', $asignacion->aula_id)->where('estado', 'activo')->count();
-
-            $notasQuery = Nota::where('aula_asignatura_docente_id', $asignacion->id);
-            if ($corteId) {
-                $notasQuery->where('corte_evaluativo_id', $corteId);
-            }
-            $conNota = $notasQuery->distinct('matricula_id')->count('matricula_id');
-
+            $total = $matriculasPorAula->get($asignacion->aula_id, 0);
+            $conNota = $notasAgrupadas->get($asignacion->id, 0);
             $pendientes = max(0, $total - $conNota);
+            $cerrado = $cortesCerrados->has($asignacion->id);
 
-            // Estado de cierre del parcial (fuente: corte_cerrado)
-            $cerrado = \App\Models\CorteCerrado::where('aula_asignatura_docente_id', $asignacion->id)
-                ->when($corteId, fn ($q) => $q->where('corte_evaluativo_id', $corteId))
-                ->where('bloqueado', true)
-                ->exists();
-
-            // Filtro de estado si se pide explícitamente ingresadas o pendientes
             if ($tipo === 'ingresadas' && $conNota === 0) continue;
             if ($tipo === 'pendientes' && $pendientes === 0) continue;
 
@@ -137,7 +149,15 @@ class ReporteService
             ];
         }
 
-        return $filas;
+        return collect($filas)->sort(function ($a, $b) {
+            $cmpGrado = strcmp($a['grado'], $b['grado']);
+            if ($cmpGrado !== 0) return $cmpGrado;
+
+            $cmpAula = strcmp($a['aula'], $b['aula']);
+            if ($cmpAula !== 0) return $cmpAula;
+
+            return strcmp($a['asignatura'], $b['asignatura']);
+        })->values()->all();
     }
 
     /**
@@ -145,52 +165,78 @@ class ReporteService
      * Devuelve la lista de asignaturas (columnas) y los alumnos con su nota por asignatura.
      * Si se filtra por corte, muestra la nota de ese corte; si no, el promedio final de la asignatura.
      */
+    /**
+     * Sábana de notas (Notas Globales).
+     * Obligatorio filtrar por Aula. Devuelve estudiantes en filas y materias en columnas.
+     */
     public function notasGlobalesPorAlumno(array $filtros): array
     {
         $anio = $this->resolverAnio($filtros['anio_escolar_id'] ?? null);
+        $aulaId = $filtros['aula_id'] ?? null;
+        $corteId = $filtros['corte_evaluativo_id'] ?? null;
 
-        // Asignaciones del año (y filtros opcionales de grado/aula/asignatura)
+        // Si no hay aula seleccionada, retornamos vacío para no romper la vista
+        if (!$aulaId) {
+            return ['asignaturas' => collect(), 'filas' => [], 'aula' => null];
+        }
+
+        $aula = \App\Models\Aula::with('grado')->find($aulaId);
+
+        // 1. Obtener asignaturas exclusivas de esta aula (Omitiendo TIC, Biblia e Informática)
         $asignaciones = \App\Models\AulaAsignaturaDocente::with('asignatura')
             ->where('anio_escolar_id', $anio?->id)
-            ->when(!empty($filtros['aula_id']), fn ($q) => $q->where('aula_id', $filtros['aula_id']))
-            ->when(!empty($filtros['grado_id']), fn ($q) => $q->whereHas('aula', fn ($q2) => $q2->where('grado_id', $filtros['grado_id'])))
-            ->when(!empty($filtros['asignatura_id']), fn ($q) => $q->where('asignatura_id', $filtros['asignatura_id']))
+            ->where('aula_id', $aulaId)
             ->get();
 
-        // Asignaturas únicas (columnas), ordenadas alfabéticamente
-        $asignaturas = $asignaciones->pluck('asignatura')->unique('id')->values();
+        $asignaturas = $asignaciones->pluck('asignatura')->unique('id')
+            ->reject(function ($asig) {
+                $nombreUpper = mb_strtoupper(trim($asig->nombre));
+                return str_contains($nombreUpper, 'TIC') || 
+                       str_contains($nombreUpper, 'BIBLIA') || 
+                       str_contains($nombreUpper, 'INFORMÁTICA');
+            })
+            ->sortBy('nombre')->values();
 
-        // Matrículas activas de las aulas involucradas
-        $aulaIds = $asignaciones->pluck('aula_id')->unique();
-        $matriculas = Matricula::with('alumno', 'aula.grado')
-            ->whereIn('aula_id', $aulaIds)
+        // 2. Obtener matrículas activas del aula ordenadas alfabéticamente
+        $matriculas = \App\Models\Matricula::with('alumno')
+            ->where('aula_id', $aulaId)
             ->where('anio_escolar_id', $anio?->id)
             ->where('estado', 'activo')
-            ->get();
+            ->get()
+            ->sortBy(fn($m) => $m->alumno->nombre_completo ?? '');
 
-        // Notas agrupadas por matrícula
-        $corteId = $filtros['corte_evaluativo_id'] ?? null;
-        $notas = Nota::with('aulaAsignaturaDocente.asignatura')
-            ->whereIn('matricula_id', $matriculas->pluck('id'))
+        // 3. Obtener todas las notas de estos alumnos en bloque
+        $notas = \App\Models\Nota::whereIn('matricula_id', $matriculas->pluck('id'))
             ->when($corteId, fn ($q) => $q->where('corte_evaluativo_id', $corteId))
             ->get()
             ->groupBy('matricula_id');
 
-        // Construir filas por alumno
         $filas = [];
         foreach ($matriculas as $matricula) {
             $notasAlumno = $notas->get($matricula->id, collect());
-
-            // Por cada asignatura, calcular nota (promedio) o usar nota del corte
             $notasPorAsignatura = [];
+            
+            $sumaPromedio = 0;
+            $materiasContadas = 0;
+            $reprobadas = 0;
+
             foreach ($asignaturas as $asignatura) {
+                // Buscar si el alumno tiene nota en la asignación correspondiente a esta materia
                 $notasDeAsignatura = $notasAlumno->filter(function ($n) use ($asignatura) {
                     return $n->aulaAsignaturaDocente->asignatura_id === $asignatura->id;
                 });
 
                 if ($notasDeAsignatura->isNotEmpty()) {
-                    $notaFinal = $notasDeAsignatura->avg('nota_cuantitativa');
-                    $notasPorAsignatura[$asignatura->id] = round((float) $notaFinal, 1);
+                    // Si no hay filtro de corte, hace el promedio anual de la materia; si hay corte, promedia las actividades de ese corte.
+                    $notaFinal = round((float) $notasDeAsignatura->avg('nota_cuantitativa'));
+                    $notasPorAsignatura[$asignatura->id] = $notaFinal;
+                    
+                    $sumaPromedio += $notaFinal;
+                    $materiasContadas++;
+                    
+                    if ($notaFinal < 60) {
+                        $reprobadas++;
+                    }
                 } else {
                     $notasPorAsignatura[$asignatura->id] = null;
                 }
@@ -199,13 +245,15 @@ class ReporteService
             $filas[] = [
                 'matricula_id' => $matricula->id,
                 'alumno' => $matricula->alumno->nombre_completo,
-                'cup' => $matricula->alumno->codigo_unico_persona,
-                'grado' => $matricula->aula->grado->nombre ?? '',
+                'cup' => $matricula->alumno->codigo_unico_persona ?? 'S/C',
                 'notas' => $notasPorAsignatura,
+                'promedio_general' => $materiasContadas > 0 ? round($sumaPromedio / $materiasContadas, 1) : 0,
+                'reprobadas' => $reprobadas,
             ];
         }
 
         return [
+            'aula' => $aula,
             'asignaturas' => $asignaturas,
             'filas' => $filas,
         ];
@@ -214,33 +262,59 @@ class ReporteService
     /**
      * Notas pendientes: matriculas activas sin nota en una asignación y corte.
      */
-    public function notasPendientes(array $filtros)
+    public function notasPendientes(array $filtros): array
     {
-        $anio = $this->resolverAnio($filtros['anio_escolar_id'] ?? null);
+        [$query, $anio] = $this->queryAsignaciones($filtros);
         $corteId = $filtros['corte_evaluativo_id'] ?? null;
-        $docenteId = $filtros['docente_id'] ?? null;
-        $asignaturaId = $filtros['asignatura_id'] ?? null;
 
-        $matriculas = Matricula::with(['alumno', 'aula.grado'])
-            ->where('anio_escolar_id', $anio?->id)
+        // 1. Obtener asignaciones filtradas (1 consulta rápida)
+        $asignaciones = $query->with(['aula.grado', 'asignatura', 'docente.usuario'])->get();
+        if ($asignaciones->isEmpty()) {
+            return [];
+        }
+
+        // 2. Obtener matrículas activas de las aulas involucradas agrupadas por aula (1 consulta)
+        $aulaIds = $asignaciones->pluck('aula_id')->unique();
+        $matriculas = \App\Models\Matricula::with('alumno')
+            ->whereIn('aula_id', $aulaIds)
             ->where('estado', 'activo')
-            ->get();
+            ->get()
+            ->groupBy('aula_id');
+
+        // 3. Obtener notas existentes agrupadas por asignación (1 consulta)
+        $asignacionIds = $asignaciones->pluck('id');
+        $notasExistentes = \App\Models\Nota::whereIn('aula_asignatura_docente_id', $asignacionIds)
+            ->when($corteId, fn ($q) => $q->where('corte_evaluativo_id', $corteId))
+            ->get(['matricula_id', 'aula_asignatura_docente_id'])
+            ->groupBy('aula_asignatura_docente_id');
 
         $pendientes = [];
 
-        foreach ($matriculas as $matricula) {
-            $existe = Nota::where('matricula_id', $matricula->id)
-                ->when($corteId, fn ($q) => $q->where('corte_evaluativo_id', $corteId))
-                ->when($asignaturaId, fn ($q) => $q->whereHas('aulaAsignaturaDocente', fn ($q2) => $q2->where('asignatura_id', $asignaturaId)))
-                ->when($docenteId, fn ($q) => $q->whereHas('aulaAsignaturaDocente', fn ($q2) => $q2->where('docente_id', $docenteId)))
-                ->exists();
+        foreach ($asignaciones as $asignacion) {
+            $alumnosAula = $matriculas->get($asignacion->aula_id, []);
+            
+            // Extraer solo los IDs de matrícula que ya tienen nota en esta asignatura
+            $conNotaIds = $notasExistentes->get($asignacion->id, collect())->pluck('matricula_id')->toArray();
 
-            if (!$existe) {
-                $pendientes[] = $matricula;
+            foreach ($alumnosAula as $matricula) {
+                if (!in_array($matricula->id, $conNotaIds)) {
+                    $pendientes[] = [
+                        'cup' => $matricula->alumno->codigo_unico_persona ?? 'S/C',
+                        'estudiante' => $matricula->alumno->nombre_completo,
+                        'grado_aula' => ($asignacion->aula->grado->nombre ?? '') . ' - ' . $asignacion->aula->nombre,
+                        'asignatura' => $asignacion->asignatura->nombre,
+                        'docente' => $asignacion->docente->usuario->nombre_completo ?? 'Sin asignar',
+                    ];
+                }
             }
         }
 
-        return collect($pendientes);
+        // Ordenar alfabéticamente por docente para facilitar el cobro, luego asignatura y estudiante
+        return collect($pendientes)->sortBy([
+            ['docente', 'asc'],
+            ['asignatura', 'asc'],
+            ['estudiante', 'asc'],
+        ])->values()->all();
     }
 
     // =========================================================================
@@ -410,33 +484,87 @@ class ReporteService
     /**
      * Notas por asignatura: promedio por asignación (aula-asignatura).
      */
+    /**
+     * Rendimiento por Docente y Asignatura (Auditoría de Desempeño y Dificultad).
+     */
     public function notasPorAsignatura(array $filtros): array
     {
         [$query, $anio] = $this->queryAsignaciones($filtros);
         $corteId = $filtros['corte_evaluativo_id'] ?? null;
-        $asignaciones = $query->orderBy('aula_id')->get();
 
-        $reporte = [];
+        // 1. Obtener asignaciones
+        $asignaciones = $query->with(['aula.grado', 'asignatura', 'docente.usuario'])->get();
+        $asignacionIds = $asignaciones->pluck('id');
+
+        if ($asignacionIds->isEmpty()) {
+            return [];
+        }
+
+        // 2. Obtener todas las notas de un solo golpe para evitar N+1
+        $notas = \App\Models\Nota::whereIn('aula_asignatura_docente_id', $asignacionIds)
+            ->when($corteId, fn ($q) => $q->where('corte_evaluativo_id', $corteId))
+            ->get(['aula_asignatura_docente_id', 'nota_cuantitativa'])
+            ->groupBy('aula_asignatura_docente_id');
+
+        $agrupado = [];
+
+        // 3. Consolidar la data agrupando por Docente y Asignatura
         foreach ($asignaciones as $asignacion) {
-            $notasQuery = Nota::where('aula_asignatura_docente_id', $asignacion->id);
-            if ($corteId) $notasQuery->where('corte_evaluativo_id', $corteId);
-            $notas = $notasQuery->get();
+            $docenteNombre = $asignacion->docente->usuario->nombre_completo ?? 'Sin asignar';
+            $asignaturaNombre = $asignacion->asignatura->nombre;
+            $gradoSeccion = ($asignacion->aula->grado->nombre ?? '') . ' "' . ($asignacion->aula->nombre ?? '') . '"';
+            
+            // Llave única para agrupar las materias de un mismo maestro
+            $key = $docenteNombre . '|' . $asignaturaNombre;
 
-            $promedio = (float) $notas->avg('nota_cuantitativa');
-            $aprobados = $notas->where('nota_cuantitativa', '>=', 60)->count();
-            $reprobados = $notas->where('nota_cuantitativa', '<', 60)->count();
+            $notasAsignacion = $notas->get($asignacion->id, collect());
 
+            if (!isset($agrupado[$key])) {
+                $agrupado[$key] = [
+                    'docente' => $docenteNombre,
+                    'asignatura' => $asignaturaNombre,
+                    'aulas' => [],
+                    'evaluados' => 0,
+                    'aprobados' => 0,
+                    'reprobados' => 0,
+                    'suma_notas' => 0,
+                ];
+            }
+
+            if (!in_array($gradoSeccion, $agrupado[$key]['aulas'])) {
+                $agrupado[$key]['aulas'][] = $gradoSeccion;
+            }
+
+            $agrupado[$key]['evaluados'] += $notasAsignacion->count();
+            $agrupado[$key]['aprobados'] += $notasAsignacion->where('nota_cuantitativa', '>=', 60)->count();
+            $agrupado[$key]['reprobados'] += $notasAsignacion->where('nota_cuantitativa', '<', 60)->count();
+            $agrupado[$key]['suma_notas'] += $notasAsignacion->sum('nota_cuantitativa');
+        }
+
+        // 4. Calcular promedios finales y tasas
+        $reporte = [];
+        foreach ($agrupado as $item) {
+            $evaluados = $item['evaluados'];
+            $promedio = $evaluados > 0 ? round($item['suma_notas'] / $evaluados, 2) : 0;
+            $tasaRiesgo = $evaluados > 0 ? round(($item['reprobados'] / $evaluados) * 100, 1) : 0;
+            
             $reporte[] = [
-                'aula' => $asignacion->aula->nombre,
-                'grado' => $asignacion->aula->grado->nombre,
-                'asignatura' => $asignacion->asignatura->nombre,
-                'total' => $notas->count(),
-                'promedio' => $notas->count() > 0 ? round($promedio, 2) : 0,
-                'aprobados' => $aprobados,
-                'reprobados' => $reprobados,
+                'docente' => $item['docente'],
+                'asignatura' => $item['asignatura'],
+                'aulas' => implode(', ', $item['aulas']), // Ej: "1ro A, 1ro B, 2do A"
+                'evaluados' => $evaluados,
+                'aprobados' => $item['aprobados'],
+                'reprobados' => $item['reprobados'],
+                'tasa_riesgo' => $tasaRiesgo,
+                'promedio' => $promedio,
             ];
         }
-        return $reporte;
+
+        // Ordenar alfabéticamente por Docente
+        return collect($reporte)->sortBy([
+            ['docente', 'asc'],
+            ['asignatura', 'asc']
+        ])->values()->all();
     }
 
     /**
@@ -648,20 +776,51 @@ class ReporteService
 
     public function resumenIngresoNotas(?int $anioId): array
     {
-        $filas = $this->controlNotas(['anio_escolar_id' => $anioId, 'tipo' => 'pendientes']);
-        $totalPendientes = array_sum(array_column($filas, 'pendientes'));
-        $totalRegistradas = array_sum(array_column($filas, 'registradas'));
-        $total = array_sum(array_column($filas, 'total'));
+        // 1. Obtener todas las asignaciones activas del año actual
+        $asignacionesQuery = AulaAsignaturaDocente::where('anio_escolar_id', $anioId);
+        $totalAsignaciones = $asignacionesQuery->count();
+        $asignacionesIds = $asignacionesQuery->pluck('id');
+
+        // 2. Calcular cuántas notas "deberían" existir.
+        // Multiplicamos la cantidad de alumnos matriculados en cada aula por la cantidad de materias de esa aula.
+        $totalEsperadas = 0;
+        
+        $aulasConMaterias = AulaAsignaturaDocente::selectRaw('aula_id, count(*) as materias')
+            ->where('anio_escolar_id', $anioId)
+            ->groupBy('aula_id')
+            ->get();
+
+        $aulasIds = $aulasConMaterias->pluck('aula_id');
+        
+        $matriculasPorAula = Matricula::selectRaw('aula_id, count(*) as alumnos')
+            ->where('anio_escolar_id', $anioId)
+            ->where('estado', 'activo')
+            ->whereIn('aula_id', $aulasIds)
+            ->groupBy('aula_id')
+            ->get()
+            ->keyBy('aula_id');
+
+        foreach ($aulasConMaterias as $aulaMateria) {
+            $alumnosEnAula = $matriculasPorAula->get($aulaMateria->aula_id)?->alumnos ?? 0;
+            $totalEsperadas += ($alumnosEnAula * $aulaMateria->materias);
+        }
+
+        // 3. Contar cuántas notas reales únicas (por alumno y materia) existen en la base de datos
+        // Usamos count(distinct) para evitar contar doble si un alumno tiene nota en más de un corte
+        $totalRegistradas = Nota::whereIn('aula_asignatura_docente_id', $asignacionesIds)
+            ->selectRaw('count(distinct concat(matricula_id, \'-\', aula_asignatura_docente_id)) as registradas')
+            ->value('registradas') ?? 0;
+
+        $totalPendientes = max(0, $totalEsperadas - $totalRegistradas);
 
         return [
-            'asignaciones' => count($filas),
-            'total_notas_esperadas' => $total,
+            'asignaciones' => $totalAsignaciones,
+            'total_notas_esperadas' => $totalEsperadas,
             'notas_registradas' => $totalRegistradas,
             'notas_pendientes' => $totalPendientes,
-            'porcentaje' => $total > 0 ? round(($totalRegistradas / $total) * 100, 1) : 0,
+            'porcentaje' => $totalEsperadas > 0 ? round(($totalRegistradas / $totalEsperadas) * 100, 1) : 0,
         ];
     }
-
     public function estudiantes(?int $anioId): array
     {
         $anio = $this->resolverAnio($anioId);

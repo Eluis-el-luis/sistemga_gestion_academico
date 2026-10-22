@@ -84,8 +84,7 @@ Route::middleware('auth')->group(function () {
         Route::post('aulas/{aula}/horarios', [\App\Http\Controllers\HorarioController::class, 'store'])->name('aulas.horarios.store');
         Route::delete('aulas/{aula}/horarios/{horario}', [\App\Http\Controllers\HorarioController::class, 'destroy'])->name('aulas.horarios.destroy');
         
-        Route::resource('malla', \App\Http\Controllers\MallaCurricularController::class)
-        ->only(['index', 'store', 'destroy']);
+        Route::resource('malla', \App\Http\Controllers\MallaCurricularController::class) ->only(['index', 'store', 'destroy']);
         
         // Prematrícula
         Route::get('prematricula', [PrematriculaController::class, 'index'])->name('prematricula.index');
@@ -112,6 +111,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/aulas/{aula}', [\App\Http\Controllers\VisorHorarioController::class, 'horarioAula'])->name('aula.show');
         });
         // ----------------------------------------
+        
         
         // Panel Exclusivo del Maestro Guía
         Route::get('tutor/mis-alumnos', [\App\Http\Controllers\DocenteGuiaController::class, 'misAlumnos'])->name('tutor.mis-alumnos');
@@ -209,9 +209,12 @@ Route::middleware('auth')->group(function () {
 
         // Otros reportes (MINED, estudiantes, padres)
         Route::get('reportes/mined', [\App\Http\Controllers\ReporteController::class, 'mined'])->name('reportes.mined');
-        Route::get('reportes/estudiantes', [\App\Http\Controllers\ReporteController::class, 'estudiantes'])->name('reportes.estudiantes');
+        Route::get('reportes/avance-programatico', [\App\Http\Controllers\ReporteController::class, 'avanceProgramatico'])->name('reportes.avance-programatico');
+        Route::get('reportes/asignaturas-aprobadas', [\App\Http\Controllers\ReporteController::class, 'asignaturasAprobadas'])->name('reportes.asignaturas-aprobadas');
+        Route::get('reportes/estudiantes', [\AppRecord::class, 'estudiantes'] ?? [\App\Http\Controllers\ReporteController::class, 'estudiantes'])->name('reportes.estudiantes');
         Route::get('reportes/padres', [\App\Http\Controllers\ReporteController::class, 'padres'])->name('reportes.padres');
-
+        Route::get('reportes/escalas', [\App\Http\Controllers\ReporteController::class, 'escalas'])->name('reportes.escalas');
+        
         // Agrupaciones de materias (boletín oficial)
         Route::get('grupo-materia', [\App\Http\Controllers\GrupoMateriaController::class, 'index'])->name('grupo-materia.index');
         Route::post('grupo-materia', [\App\Http\Controllers\GrupoMateriaController::class, 'store'])->name('grupo-materia.store');
