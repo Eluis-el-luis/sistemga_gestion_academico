@@ -70,6 +70,8 @@ class ActividadEvaluativaController extends Controller
         ]);
 
         try {
+            $this->authorize('calificar', $asignacion);
+
             $corte = CorteEvaluativo::findOrFail($request->corte_evaluativo_id);
 
             // Sumamos solo las actividades del MISMO TIPO

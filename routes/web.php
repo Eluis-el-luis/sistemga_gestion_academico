@@ -84,8 +84,7 @@ Route::middleware('auth')->group(function () {
         Route::post('aulas/{aula}/horarios', [\App\Http\Controllers\HorarioController::class, 'store'])->name('aulas.horarios.store');
         Route::delete('aulas/{aula}/horarios/{horario}', [\App\Http\Controllers\HorarioController::class, 'destroy'])->name('aulas.horarios.destroy');
         
-        Route::resource('malla', \App\Http\Controllers\MallaCurricularController::class)
-        ->only(['index', 'store', 'destroy']);
+        Route::resource('malla', \App\Http\Controllers\MallaCurricularController::class) ->only(['index', 'store', 'destroy']);
         
         // Prematrícula
         Route::get('prematricula', [PrematriculaController::class, 'index'])->name('prematricula.index');
@@ -112,6 +111,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/aulas/{aula}', [\App\Http\Controllers\VisorHorarioController::class, 'horarioAula'])->name('aula.show');
         });
         // ----------------------------------------
+        
         
         // Panel Exclusivo del Maestro Guía
         Route::get('tutor/mis-alumnos', [\App\Http\Controllers\DocenteGuiaController::class, 'misAlumnos'])->name('tutor.mis-alumnos');
@@ -188,30 +188,47 @@ Route::middleware('auth')->group(function () {
         Route::get('reportes/control-notas', [\App\Http\Controllers\ReporteController::class, 'controlNotas'])->name('reportes.control-notas');
         Route::get('reportes/notas-globales', [\App\Http\Controllers\ReporteController::class, 'notasGlobales'])->name('reportes.notas-globales');
         Route::get('reportes/notas-pendientes', [\App\Http\Controllers\ReporteController::class, 'notasPendientes'])->name('reportes.notas-pendientes');        
+        
         // Asistencia (segmentada)
         Route::get('reportes/asistencia-global', [\App\Http\Controllers\ReporteController::class, 'asistenciaGlobal'])->name('reportes.asistencia-global');
         Route::get('reportes/estadisticas-asistencia', [\App\Http\Controllers\ReporteController::class, 'estadisticasAsistencia'])->name('reportes.estadisticas-asistencia');
-        Route::get('reportes/asistencia-seccion-dia', [\App\Http\Controllers\ReporteController::class, 'asistenciaSeccionDia'])->name('reportes.asistencia-seccion-dia');
+        Route::get('reportes/asistencia-seccion-dia', [\App\Http\Controllers\ReporteController::class, 'asistenciaPorSeccion'])->name('reportes.asistencia-seccion-dia');
         Route::get('reportes/asistencia-seccion-rango', [\App\Http\Controllers\ReporteController::class, 'asistenciaSeccionRango'])->name('reportes.asistencia-seccion-rango');
         Route::get('reportes/asistencia-estudiante', [\App\Http\Controllers\ReporteController::class, 'estadisticasPorEstudiante'])->name('reportes.asistencia-estudiante');
         Route::get('reportes/mis-clases', [\App\Http\Controllers\ReporteController::class, 'misClases'])->name('reportes.mis-clases');
+        
+        // NUEVA ROTA PARA EL DOCENTE GUÍA:
+        Route::get('reportes/mi-aula', [\App\Http\Controllers\ReporteController::class, 'miAula'])->name('reportes.mi-aula');
         
         // Rendimiento académico
         Route::get('reportes/notas-por-asignatura', [\App\Http\Controllers\ReporteController::class, 'notasPorAsignatura'])->name('reportes.notas-por-asignatura');
         Route::get('reportes/rendimiento-corte', [\App\Http\Controllers\ReporteController::class, 'rendimientoCorte'])->name('reportes.rendimiento-corte');
         Route::get('reportes/historial-estudiante', [\App\Http\Controllers\ReporteController::class, 'historialPorEstudiante'])->name('reportes.historial-estudiante');
-
+        
         // Otros reportes (MINED, estudiantes, padres)
         Route::get('reportes/mined', [\App\Http\Controllers\ReporteController::class, 'mined'])->name('reportes.mined');
+        Route::get('reportes/mined-detallado', [\App\Http\Controllers\ReporteController::class, 'reporteMinedDetallado'])->name('reportes.mined-detallado');
+        Route::get('reportes/avance-programatico', [\App\Http\Controllers\ReporteController::class, 'avanceProgramatico'])->name('reportes.avance-programatico');
+        Route::get('reportes/asignaturas-aprobadas', [\App\Http\Controllers\ReporteController::class, 'asignaturasAprobadas'])->name('reportes.asignaturas-aprobadas');
         Route::get('reportes/estudiantes', [\App\Http\Controllers\ReporteController::class, 'estudiantes'])->name('reportes.estudiantes');
         Route::get('reportes/padres', [\App\Http\Controllers\ReporteController::class, 'padres'])->name('reportes.padres');
-
+        Route::get('reportes/escalas', [\App\Http\Controllers\ReporteController::class, 'escalas'])->name('reportes.escalas');
+        
         // Agrupaciones de materias (boletín oficial)
         Route::get('grupo-materia', [\App\Http\Controllers\GrupoMateriaController::class, 'index'])->name('grupo-materia.index');
         Route::post('grupo-materia', [\App\Http\Controllers\GrupoMateriaController::class, 'store'])->name('grupo-materia.store');
         Route::put('grupo-materia/{grupo}', [\App\Http\Controllers\GrupoMateriaController::class, 'update'])->name('grupo-materia.update');
         Route::delete('grupo-materia/{grupo}', [\App\Http\Controllers\GrupoMateriaController::class, 'destroy'])->name('grupo-materia.destroy');
         Route::post('grupo-materia/asignar', [\App\Http\Controllers\GrupoMateriaController::class, 'asignarMaterias'])->name('grupo-materia.asignar');
+
+        // --- RESPALDOS DE LA BASE DE DATOS (Dirección) ---
+        // Creado tras el incidente de Oct 2026 (Contexto.md, sección 16).
+        // Ver/crear/descargar: Director y Subdirector. Eliminar/restaurar: Director.
+        Route::get('respaldos', [\App\Http\Controllers\RespaldoController::class, 'index'])->name('respaldos.index');
+        Route::post('respaldos', [\App\Http\Controllers\RespaldoController::class, 'store'])->name('respaldos.store');
+        Route::get('respaldos/{nombre}/descargar', [\App\Http\Controllers\RespaldoController::class, 'descargar'])->name('respaldos.descargar');
+        Route::post('respaldos/{nombre}/restaurar', [\App\Http\Controllers\RespaldoController::class, 'restaurar'])->name('respaldos.restaurar');
+        Route::delete('respaldos/{nombre}', [\App\Http\Controllers\RespaldoController::class, 'destroy'])->name('respaldos.destroy');
     });
 });
 

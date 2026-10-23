@@ -3,6 +3,8 @@
 .env
 .env.backup
 .env.production
+.env.dusk
+.env.dusk.local
 .phpactor.json
 .phpunit.result.cache
 /.codex
@@ -21,6 +23,10 @@
 /storage/*.key
 /storage/pail
 /vendor
+/database/dusk.sqlite
+/database/dusk.sqlite-journal
+/database/dusk.sqlite-wal
+/database/dusk.sqlite-shm
 _ide_helper.php
 Homestead.json
 Homestead.yaml

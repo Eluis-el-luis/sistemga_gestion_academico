@@ -104,34 +104,35 @@ class PrematriculaController extends Controller
             return back()->with('error', 'Acción denegada: El estudiante tiene asignaturas reprobadas y debe ser evaluado por Dirección.');
         }
 
-        DB::beginTransaction(); // Iniciamos transacción de seguridad para el salto de año/grado
-        try {
+        // La transacción con cierre automático evita fugas en los caminos de
+        // retorno temprano (aula/grado/año no disponibles).
+        $resultado = DB::transaction(function () use ($matricula) {
             $aulaActual = $matricula->aula;
             $nombreSeccion = $aulaActual->nombre; // Ej: "A"
 
-            // 2. Localizar el próximo grado (asumiendo IDs secuenciales)
+            // Localizar el próximo grado (asumiendo IDs secuenciales)
             $proximoGrado = \App\Models\Grado::where('id', '>', $aulaActual->grado_id)->orderBy('id')->first();
             if (!$proximoGrado) {
-                return back()->with('error', 'No existe un grado superior configurado en el sistema para este alumno.');
+                return ['tipo' => 'error', 'mensaje' => 'No existe un grado superior configurado en el sistema para este alumno.'];
             }
 
-            // 3. Localizar el próximo año escolar (ej. 2027)
+            // Localizar el próximo año escolar (ej. 2027)
             $proximoAnio = \App\Models\AnioEscolar::where('id', '>', $matricula->anio_escolar_id)->orderBy('id')->first();
             if (!$proximoAnio) {
-                return back()->with('error', 'El próximo ciclo escolar aún no ha sido aperturado en el sistema.');
+                return ['tipo' => 'error', 'mensaje' => 'El próximo ciclo escolar aún no ha sido aperturado en el sistema.'];
             }
 
-            // 4. Buscar la coincidencia exacta de Aula (Nuevo Grado + Misma Sección + Nuevo Año)
+            // Coincidencia exacta de Aula (Nuevo Grado + Misma Sección + Nuevo Año)
             $proximaAula = \App\Models\Aula::where('grado_id', $proximoGrado->id)
                 ->where('nombre', $nombreSeccion)
                 ->where('anio_escolar_id', $proximoAnio->id)
                 ->first();
 
             if (!$proximaAula) {
-                return back()->with('error', 'El aula para ' . $proximoGrado->nombre . ' - Sección "' . $nombreSeccion . '" aún no ha sido creada para el próximo año.');
+                return ['tipo' => 'error', 'mensaje' => 'El aula para ' . $proximoGrado->nombre . ' - Sección "' . $nombreSeccion . '" aún no ha sido creada para el próximo año.'];
             }
 
-            // 5. Ejecutar la promoción automática
+            // Promoción automática
             Matricula::updateOrCreate(
                 [
                     'alumno_id' => $matricula->alumno_id,
@@ -144,17 +145,10 @@ class PrematriculaController extends Controller
                 ]
             );
 
-            DB::commit();
-            return back()->with('success', 'Alumno promovido automáticamente a ' . $proximoGrado->nombre . ' - Sección "' . $nombreSeccion . '".');
+            return ['tipo' => 'success', 'mensaje' => 'Alumno promovido automáticamente a ' . $proximoGrado->nombre . ' - Sección "' . $nombreSeccion . '".'];
+        });
 
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            DB::rollBack();
-            // CONTINGENCIA: Si la promoción falla en algún punto de la transacción
-            return back()->with('error', 'Ocurrió un error técnico al procesar la promoción automática. El proceso fue cancelado por seguridad.');
-        }
+        return back()->with($resultado['tipo'], $resultado['mensaje']);
     }
 
     public function remitir(Request $request, Matricula $matricula)

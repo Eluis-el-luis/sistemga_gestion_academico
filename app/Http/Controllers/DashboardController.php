@@ -28,14 +28,14 @@ class DashboardController extends Controller
         return $mensajeAmigable;
     }
 
-    public function index()
+   public function index(Request $request)
     {
         try {
             /** @var \App\Models\Usuario $user */
             $user = Auth::user();
             $docente = \App\Models\Docente::where('usuario_id', $user->id)->first();
 
-            // 1. CARGA DE MODALIDADES (Necesario para el select del modal Nuevo Comunicado)
+            // 1. CARGA DE MODALIDADES
             $modalidades = \App\Models\Modalidad::orderBy('id')->get();
 
             // 2. FILTRADO INTELIGENTE DE AVISOS
@@ -44,7 +44,6 @@ class DashboardController extends Controller
                 ->select('aviso.*', 'usuario.nombre_completo as autor_nombre')
                 ->where('aviso.activo', true);
 
-            // Si NO es Directiva, aplicamos el filtro de lectura segmentado
             if (!$user->hasAnyRole(['Director', 'Subdirector'])) {
                 $modalidadesPermitidas = [];
 
@@ -53,7 +52,6 @@ class DashboardController extends Controller
                 }
 
                 if ($user->hasAnyRole(['Docente Guia', 'Docente por Asignatura']) && $docente) {
-                    // Rastrear todas las modalidades donde el maestro tiene carga horaria activa
                     $modalidadesClase = \App\Models\AulaAsignaturaDocente::where('docente_id', $docente->id)
                         ->where('activo', true)
                         ->join('aula', 'aula_asignatura_docente.aula_id', '=', 'aula.id')
@@ -66,9 +64,9 @@ class DashboardController extends Controller
                 $modalidadesPermitidas = array_filter(array_unique($modalidadesPermitidas));
 
                 $queryAvisos->where(function($q) use ($modalidadesPermitidas) {
-                    $q->whereNull('aviso.modalidad_id'); // Siempre ver comunicados globales
+                    $q->whereNull('aviso.modalidad_id'); 
                     if (!empty($modalidadesPermitidas)) {
-                        $q->orWhereIn('aviso.modalidad_id', $modalidadesPermitidas); // Ver comunicados de sus áreas
+                        $q->orWhereIn('aviso.modalidad_id', $modalidadesPermitidas); 
                     }
                 });
             }
@@ -83,6 +81,7 @@ class DashboardController extends Controller
             $diasBD = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
             $diaDisplay = array_combine($diasBD, $diasSemana);
             $dbMetricas = []; 
+            $muralData = []; 
             $aulaGuia = null; 
             $esDocenteGuia = false;
             $bloques = collect();
@@ -92,12 +91,12 @@ class DashboardController extends Controller
             // 4. CARGA DE DATOS PARA DIRECTIVA Y GESTIÓN
             if ($user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
                 $anioActivo = \App\Models\AnioEscolar::where('activo', true)->first();
-                // Ahora el total de matriculados es estrictamente los de este año
                 $totalMatriculados = \App\Models\Matricula::where('estado', 'activo')
                     ->when($anioActivo, fn($q) => $q->where('anio_escolar_id', $anioActivo->id))
                     ->count();
                 $totalPersonal = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count();
                 $dbMetricas = $this->calcularMetricas();
+                $muralData = $this->generarMuralDigital($anioActivo, $request->query('modalidad_mural'));
             }
 
             // 5. CARGA DE DATOS PARA DOCENTES (Guía y Asignatura)
@@ -145,11 +144,13 @@ class DashboardController extends Controller
                 }
             }
 
-            // 5. KPIs POR ROL (datos reales)
+            // 6. KPIs POR ROL
             $docentesSinMarcar = collect();
             $solicitudesPendientes = collect();
             $asistenciaSemanal = null;
             $rendimientoAula = null;
+            $muralAula = []; // NUEVA VARIABLE PARA EL MURAL DEL DOCENTE
+            $rendimientoCortes = []; // NUEVA VARIABLE PARA CORTES DEL MURAL
 
             if ($user->hasRole('Coordinador')) {
                 $hoy = now()->timezone('America/Managua')->toDateString();
@@ -188,11 +189,55 @@ class DashboardController extends Controller
                 ];
 
                 $rendimientoAula = app(\App\Services\ReporteService::class)->rendimientoAula($aulaGuia);
+
+                // =========================================================================
+                // DATOS REALES PARA EL MURAL DE SEGUIMIENTO (MATRIZ MENSUAL DEL AULA)
+                // =========================================================================
+                // Corrección merge: EXTRACT() no existe en SQLite (tests); strftime('%m') no existe en
+                // PostgreSQL. Se elige la expresión según el motor activo (base: nuestro trabajo).
+                $exprMes = DB::getDriverName() === 'sqlite'
+                    ? "CAST(strftime('%m', fecha) AS INTEGER)"
+                    : 'EXTRACT(MONTH FROM fecha)';
+
+                $astEst = DB::table('asistencia_aula')
+                    ->whereIn('matricula_id', $matriculaIds)
+                    ->whereYear('fecha', $anioActivo->nombre ?? now()->year)
+                    ->selectRaw($exprMes . ' as mes, COUNT(CASE WHEN estado_asistencia IN (\'Presente\', \'Actividad Institucional\') THEN 1 END) as presentes, COUNT(*) as total')
+                    ->groupBy('mes')->get()->keyBy('mes');
+
+                $astDoc = DB::table('asistencia_personal')
+                    ->where('usuario_id', $user->id)
+                    ->whereYear('fecha', $anioActivo->nombre ?? now()->year)
+                    ->selectRaw($exprMes . ' as mes, COUNT(CASE WHEN estado = \'Presente\' THEN 1 END) as presentes, COUNT(*) as total')
+                    ->groupBy('mes')->get()->keyBy('mes');
+
+                $cortes = \App\Models\CorteEvaluativo::orderBy('numero')->get();
+                foreach($cortes as $corte) {
+                    $notasCorte = \App\Models\Nota::whereIn('matricula_id', $matriculaIds)
+                                    ->where('corte_evaluativo_id', $corte->id)->get();
+                    
+                    if($notasCorte->count() > 0) {
+                        // Corrección merge: la columna real es nota_cuantitativa (calificacion no existe).
+                        $aplazados = $notasCorte->where('nota_cuantitativa', '<', 60)->groupBy('matricula_id')->count();
+                        $aprobadosLimpios = $matriculaIds->count() - $aplazados;
+                        $rendimientoCortes[$corte->numero] = [
+                            'promedio' => round((float) $notasCorte->avg('nota_cuantitativa'), 1),
+                            'indice' => $matriculaIds->count() > 0 ? round(($aprobadosLimpios / $matriculaIds->count()) * 100, 1) : 0
+                        ];
+                    }
+                }
+
+                for ($m = 1; $m <= 12; $m++) {
+                    $muralAula[$m] = [
+                        'asistencia_est' => isset($astEst[$m]) && $astEst[$m]->total > 0 ? round(($astEst[$m]->presentes / $astEst[$m]->total) * 100, 1) : null,
+                        'asistencia_doc' => isset($astDoc[$m]) && $astDoc[$m]->total > 0 ? round(($astDoc[$m]->presentes / $astDoc[$m]->total) * 100, 1) : null,
+                    ];
+                }
             }
 
             return view('dashboard', compact(
-                'avisos', 'totalMatriculados', 'totalPersonal', 'diasSemana', 'dbMetricas', 'aulaGuia', 'esDocenteGuia', 'bloques', 'matrizHorario', 'esquemaActivo',
-                'docentesSinMarcar', 'solicitudesPendientes', 'asistenciaSemanal', 'rendimientoAula'
+                'avisos', 'totalMatriculados', 'totalPersonal', 'diasSemana', 'dbMetricas', 'muralData', 'aulaGuia', 'esDocenteGuia', 'bloques', 'matrizHorario', 'esquemaActivo',
+                'docentesSinMarcar', 'solicitudesPendientes', 'asistenciaSemanal', 'rendimientoAula', 'muralAula', 'rendimientoCortes'
             ));
 
         } catch (\Exception $e) {
@@ -202,17 +247,129 @@ class DashboardController extends Controller
             return view('dashboard', [
                 'avisos' => collect(), 'totalMatriculados' => 0, 'totalPersonal' => 0,
                 'diasSemana' => ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'],
-                'dbMetricas' => [], 'aulaGuia' => null, 'esDocenteGuia' => false,
+                'dbMetricas' => [], 'muralData' => [], 'aulaGuia' => null, 'esDocenteGuia' => false,
                 'bloques' => collect(), 'matrizHorario' => [], 'esquemaActivo' => 'Regular',
                 'docentesSinMarcar' => collect(), 'solicitudesPendientes' => collect(),
-                'asistenciaSemanal' => null, 'rendimientoAula' => null
+                'asistenciaSemanal' => null, 'rendimientoAula' => null, 'muralAula' => [], 'rendimientoCortes' => []
             ])->with('error', $this->formatearError($e, 'Ocurrió un problema técnico al cargar algunos datos del panel.'));
         }
     }
 
     /**
-     * Calcula las métricas para las gráficas del panel directivo, segmentadas
-     * por modalidad y EXCLUSIVAMENTE limitadas al Año Escolar Activo.
+     * NUEVO: Calcula los porcentajes mensuales y por cortes para el Mural Digital.
+     */
+    /**
+     * NUEVO: Calcula los porcentajes mensuales y por cortes para el Mural Digital.
+     */
+    protected function generarMuralDigital(?\App\Models\AnioEscolar $anioActivo, ?int $modalidadFiltro = null): array
+    {
+        if (!$anioActivo) {
+            return [];
+        }
+
+        $mural = [
+            'asistencia_estudiantes' => [],
+            'asistencia_docentes' => [],
+            'padres' => [],
+            'avance_contenido' => [],
+            'aprobados_cortes' => [],
+            'promedio_cortes' => []
+        ];
+
+        try {
+            // 1. OBTENER AULAS DEL AÑO
+            $aulasQuery = \App\Models\Aula::where('anio_escolar_id', $anioActivo->id);
+            if ($modalidadFiltro) {
+                $aulasQuery->where('modalidad_id', $modalidadFiltro);
+            }
+            $aulas = $aulasQuery->pluck('id');
+            $matriculas = \App\Models\Matricula::whereIn('aula_id', $aulas)->pluck('id');
+
+            // 3. ASISTENCIA DE ALUMNOS (Mensual)
+            $asistenciasAlumnos = \App\Models\AsistenciaAula::whereIn('matricula_id', $matriculas)->get();
+            $asisAgrupada = $asistenciasAlumnos->groupBy(fn($item) => \Carbon\Carbon::parse($item->fecha)->month);
+            
+            foreach ($asisAgrupada as $mes => $registros) {
+                $total = $registros->count();
+                $presentes = $registros->whereIn('estado_asistencia', ['Presente', 'Actividad Institucional'])->count();
+                $mural['asistencia_estudiantes'][$mes] = $total > 0 ? round(($presentes / $total) * 100) : 0;
+            }
+
+            // 4. ASISTENCIA DE DOCENTES (Mensual)
+            $docentesQuery = \App\Models\Docente::query();
+            if ($modalidadFiltro) {
+                $docentesQuery->where('modalidad_id', $modalidadFiltro);
+            }
+            $usuariosDocentes = $docentesQuery->pluck('usuario_id');
+            
+            $fechaInicio = $anioActivo->fecha_inicio ?? now()->startOfYear()->toDateString();
+            $fechaFin = $anioActivo->fecha_fin ?? now()->endOfYear()->toDateString();
+
+            $asistenciasDocentes = \App\Models\AsistenciaPersonal::whereIn('usuario_id', $usuariosDocentes)
+                ->whereBetween('fecha', [$fechaInicio, $fechaFin])
+                ->get();
+                
+            $asisDocAgrupada = $asistenciasDocentes->groupBy(fn($item) => \Carbon\Carbon::parse($item->fecha)->month);
+            
+            foreach ($asisDocAgrupada as $mes => $registros) {
+                $total = $registros->count();
+                $asistencias = $registros->whereIn('estado', ['Presente', 'Retardo'])->count();
+                $mural['asistencia_docentes'][$mes] = $total > 0 ? round(($asistencias / $total) * 100) : 0;
+            }
+
+            // 5. RENDIMIENTO ACADÉMICO (Cortes)
+            $cortes = \App\Models\CorteEvaluativo::all();
+            $mesesCortes = [1 => 6, 2 => 9, 3 => 11]; // Mapeo de corte a mes de evaluación
+            $notasGlobales = \App\Models\Nota::whereIn('matricula_id', $matriculas)->get();
+
+            foreach ($cortes as $corte) {
+                $notasCorte = $notasGlobales->where('corte_evaluativo_id', $corte->id);
+                $mes = $mesesCortes[$corte->numero] ?? ($corte->numero + 5); 
+                
+                if ($notasCorte->count() > 0) {
+                    $mural['promedio_cortes'][$mes] = round((float) $notasCorte->avg('nota_cuantitativa'), 1);
+                    
+                    $agrupadoAlumnos = $notasCorte->groupBy('matricula_id');
+                    $limpios = 0;
+                    foreach ($agrupadoAlumnos as $notasAlumno) {
+                        if ($notasAlumno->where('nota_cuantitativa', '<', 60)->count() == 0) {
+                            $limpios++;
+                        }
+                    }
+                    $mural['aprobados_cortes'][$mes] = round(($limpios / $agrupadoAlumnos->count()) * 100);
+                }
+            }
+
+            // 6. APOYO DE PADRES (Mensual - Agrupado por fecha de creación)
+            $apoyoPadres = \App\Models\ApoyoPadres::whereIn('aula_id', $aulas)->get();
+            $padresAgrupados = $apoyoPadres->groupBy(fn($item) => $item->created_at ? $item->created_at->month : now()->month);
+            
+            foreach ($padresAgrupados as $mes => $registros) {
+                $total = $registros->sum('total_padres');
+                $apoyan = $registros->sum('cantidad_apoyan');
+                if ($total > 0) {
+                    $mural['padres'][$mes] = round(($apoyan / $total) * 100);
+                }
+            }
+
+            // 7. AVANCE CONTENIDOS (Mensual - Agrupado por fecha de creación)
+            $asignaciones = \App\Models\AulaAsignaturaDocente::whereIn('aula_id', $aulas)->pluck('id');
+            $avances = \App\Models\AvanceContenido::whereIn('aula_asignatura_docente_id', $asignaciones)->get();
+            $avancesAgrupados = $avances->groupBy(fn($item) => $item->created_at ? $item->created_at->month : now()->month);
+            
+            foreach ($avancesAgrupados as $mes => $registros) {
+                $mural['avance_contenido'][$mes] = round((float) $registros->avg('porcentaje_avance'));
+            }
+
+        } catch (\Exception $e) {
+            // Registramos silenciosamente si hay un error en algún modelo para que el resto del panel siga funcionando
+            \Illuminate\Support\Facades\Log::warning("Error generando Mural Digital: " . $e->getMessage());
+        }
+
+        return $mural;
+    }
+    /**
+     * Calcula las métricas para las gráficas del panel directivo (Original)
      */
     protected function calcularMetricas(): array
     {

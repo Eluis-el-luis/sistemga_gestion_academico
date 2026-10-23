@@ -33,6 +33,12 @@
                 <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 <span x-show="sidebarOpen" class="whitespace-nowrap">Solicitudes de Notas</span>
             </a>
+
+            <!-- Respaldos de la Base de Datos (Dirección) -->
+            <a href="{{ route('academico.respaldos.index') }}" title="Respaldos de la Base de Datos" class="flex items-center gap-3 px-4 mx-3 py-3 rounded-xl transition-all {{ request()->routeIs('academico.respaldos.*') ? 'bg-[#e6ac27]/15 text-[#e6ac27] font-black border border-[#e6ac27]/30 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-[#3d2c1d] font-bold' }}" :class="sidebarOpen ? 'justify-start' : 'justify-center lg:mx-2 lg:px-0'">
+                <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                <span x-show="sidebarOpen" class="whitespace-nowrap">Respaldos</span>
+            </a>
         </div>
 
         <!-- Académico -->

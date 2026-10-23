@@ -14,8 +14,8 @@ class IndicadorLogroFactory extends Factory
 
     public function definition(): array
     {
-        $codigos = ['AA', 'AS', 'AF', 'AI'];
-        $nombres = ['Aprendizaje Avanzado', 'Aprendizaje Satisfactorio', 'Aprendizaje Fundamental', 'Aprendizaje Inicial'];
+        $codigos = ['AA', 'AS', 'AE', 'AI'];
+        $nombres = ['Aprendizaje Avanzado', 'Aprendizaje Satisfactorio', 'Aprendizaje Esperado', 'Aprendizaje Inicial'];
         $i = array_rand($codigos);
         
         return [

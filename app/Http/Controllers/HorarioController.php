@@ -119,7 +119,6 @@ class HorarioController extends Controller
             $this->authorize('horarios.gestionar');
 
             $asignacion = AulaAsignaturaDocente::with('aula.grado')->findOrFail($request->aula_asignatura_docente_id);
-
             if ($asignacion->aula_id !== $aula->id) {
                 return back()->with('error', 'La materia seleccionada no pertenece a esta aula.');
             }
@@ -170,6 +169,9 @@ class HorarioController extends Controller
             return back()->with('success', 'Clase asignada al horario correctamente.');
 
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return back()->withInput()->with('error', 'Ocurrió un error técnico al intentar guardar el horario.');
         }
     }
@@ -180,8 +182,11 @@ class HorarioController extends Controller
             $this->authorize('horarios.gestionar');
             $horario->delete();
             return back()->with('success', 'Bloque de horario eliminado.');
-            
+
         } catch (\Exception $e) {
+            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                throw $e;
+            }
             return back()->with('error', 'No se pudo eliminar el bloque del horario.');
         }
     }

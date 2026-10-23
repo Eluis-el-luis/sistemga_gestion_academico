@@ -277,14 +277,16 @@ La capa de evaluación se compone de varias entidades:
 - `Nota`: representa el consolidado final del alumno en una asignatura + corte
 - `IndicadorLogro`: convierte la nota cuantitativa en la escala cualitativa del sistema escolar
 
-El servicio `NotaService` encapsula la lógica de conversión y promedios:
+El servicio `NotaService` encapsula la lógica de conversión y promedios (escala oficial MINED vigente 2026):
 
-- 90 a 100 => AA
-- 76 a 89 => AS
-- 60 a 75 => AF
-- 0 a 59 => AI
+- 90 a 100 => AA (Aprendizaje Avanzado)
+- 76 a 89 => AS (Aprendizaje Satisfactorio)
+- 60 a 75 => AE (Aprendizaje Esperado) — antes AF (Aprendizaje Fundamental), renombrado globalmente en Oct 2026 (código, catálogo `indicador_logro`, seeder, factory y migración `2026_10_14_update_indicador_logro_af_a_ae`)
+- 0 a 59 => AI (Aprendizaje Inicial)
 
 Además, calcula promedios semestrales y anuales, y establece aprobado cuando la nota final es mayor o igual a 60.
+
+**Nota Final del Corte (0-100):** se calcula escalando la suma de puntos obtenidos contra el **total oficial del corte** (`peso_acumulado + peso_examen`, normalmente 100), no contra la suma de puntajes configurados: las actividades no configuradas aún valen 0. Esta escala se usa tanto al guardar (`NotaController@store`, `ActividadEvaluativaController::recalcularNotasParcial` — también recalcula al editar el puntaje máximo de una actividad) como en el cálculo en vivo de las vistas `notas/evaluar` y `notas/planilla` (columna "Nota Final del Corte N", donde N = número del corte).
 
 ## 8. Flujos de negocio principales
 
@@ -376,6 +378,65 @@ El sistema incluye procesos de cierre de ciclo y generación de boletines, const
 
 Estos reportes se basan en el historial académico y en los estados de matrícula y notas generadas por las asignaturas y cortes evaluativos.
 
+**Formatos de salida (Oct 2026):**
+
+- **Boletín** y **Constancia de notas**: carta HORIZONTAL (landscape), una página por documento. **Certificado de notas**: carta VERTICAL.
+- Las vistas web con impresión (horarios por aula/docente, reportes) imprimen en horizontal vía `@page landscape`.
+- Todos los PDF se generan con `isRemoteEnabled = false` y el logo embebido en base64 (`BoletinPdfController::logoDataUri`); nunca se cargan recursos vía HTTP durante el render (eso causaba un deadlock con `php artisan serve`, y el request colgado bloqueaba la sesión dejando toda la app sin responder hasta reiniciar el equipo).
+- `BoletinPdfController::masivo` libera el bloqueo de sesión antes de generar el ZIP y amplía límites de tiempo/memoria.
+
+**Certificado de Notas (formato MINED)** — `academico/reportes/historial-estudiante`:
+- Flujo en 3 pasos: buscar estudiante (nombre/CUP) → seleccionarlo → elegir año + grado entre sus matrículas reales.
+- `ReporteService::certificadoNotas()` agrupa el historial: grado seleccionado (en el año elegido, se muestre aprobado o reprobado) + grados inmediatamente anteriores de la misma modalidad. El límite es la constante `ReporteService::CERTIFICADO_LIMITE_GRADOS` (2 por defecto), fácilmente modificable.
+- La NF de años pasados se promedia con los cortes del año real de cada matrícula (no el año activo).
+- Tabla comparativa por asignaturas con NF cuantitativa (0-100) y cualitativa (AA/AS/AE/AI) por grado, promedio por grado, datos del centro y firma.
+
+**Rendimiento por Corte — Formato MINED "III CORTE 2026"** — `ReporteService::rendimientoCorteMined()`:
+- Una tabla por modalidad (Preescolar/Primaria/Secundaria) con fila TOTAL, todas las métricas partidas en AS (ambos sexos) y F (femenino): MI, MA, % DE PERM (MA/MI), APROB (0 materias reprobadas), % DE APROB (APROB/evaluados), APLAZ 1-2, APLAZ 3-MAS, EVALUADO PERIODO OFICIAL (MA con notas en el corte), EVALUADO PERIODO EXTRA (con examen de reparación en el rango del corte/año), NO EVALUADO (= MA − evaluados), ASIST REFORZ y MAEST INT REF (0; no hay módulo de reforzamiento).
+- Sección ESCALA de rendimiento por modalidad: conteo de estudiantes por banda cualitativa del promedio del corte (AA/AS/AE/AI) + VALOR (= total evaluados).
+- Supuestos de cálculo documentados en el docblock del método.
+- **Estado tras el merge del 23 Oct 2026:** el método y su test (`RendimientoMined2026Test`) siguen vigentes como servicio, pero la ruta `reportes/rendimiento-corte` ya NO lo usa: el diseño de la rama `feauture/no` (controller-centric, filas por grado + gráfica Chart.js + `$chartData`) lo reemplazó. Si se quiere recuperar el formato por modalidad, el servicio está listo.
+
+### 8.7.1 Merge de `feauture/no` (23 Oct 2026) — diseño mejorado de reportes
+
+**Estrategia acordada:** el trabajo de `feauture/no` es el DISEÑO (vistas/UI/UX); nuestro trabajo de fase 8 es la BASE lógica. El merge se resolvió adoptando su diseño completo y adaptando nuestros controladores/servicios para alimentarlo; su código muerto o con bugs se corrigió con base en nuestro código. Quedó como merge commit `06935bf`.
+
+**Lo que llegó de `feauture/no`:**
+- Reportes nuevos: `mi-aula` (docente guía), `escalas`, `avance-programatico`, `asignaturas-aprobadas` (+ rutas y métodos de controlador inline).
+- Rediseño de vistas existentes: `index` (hub), `mined` (formato oficial con logos `mined_izq/mined_der.png`, MI/MA por sexo, fila TOTAL y firmas), `notas-globales` (sábana por aula, requerido, excluye TIC/Biblia/Informática), `notas-pendientes`, `control-notas` (auditoría de notas + avance con `tipo_auditoria`/`perspectiva`), `rendimiento-corte`, `notas-por-asignatura`, `estadisticas-asistencia`/`seccion-rango` (filas por FECHA + `promedio_rango`), `asistencia-por-seccion` (nueva, reemplaza al reporte "seccion-dia"), `padres`, `estudiantes`, dashboard (directiva/docente-guía), formularios de aulas y matrículas.
+- **Cupos de matrícula**: `MatriculaController@store` bloquea la matrícula cuando `matriculas_count >= aula->cupo`, y tras guardar redirige a `matriculas.create` (UX para matrículas en cadena; test de fase 4 adaptado).
+- `ReporteController@index` usa `pasarCatalogos($request, false)` (no carga docentes/aulas/alumnos en el hub).
+- Servicio: refactor con `queryAsignaciones()` (1 helper con TODOS los filtros: aula/asignatura/docente/grado/modalidad — conserva el contrato de filtros de fase 8), `auditoriaAvanceContenido()`, `asistenciaSeccionRango()`, `asistenciaEstudiante()` (con búsqueda por nombre), `estadisticasFechas()`.
+
+**Conflictos del merge y cómo se resolvieron:**
+1. `ReporteService.php` (3 conflictos): `notasGlobalesPorAlumno` → HÍBRIDO (sus estructuras y forma de fila `matricula_id/alumno/cup/notas/promedio_general/reprobadas` + nuestros filtros flexibles por docente/modalidad/grado; sin su guard que devolvía vacío sin aula); `notasPendientes` y `estadisticasAsistencia` → suyos (su refactor optimizado; los filtros viven en `queryAsignaciones`/`whereHas`).
+2. `control-notas`, `filtros-notas`, `rendimiento-corte` (vistas) → suyos (diseño).
+3. Adaptaciones controlador↔vista hechas a mano (en su rama las vistas nuevas consumían variables que sus controladores NO pasaban; aquí quedaron coherentes): `notasGlobales` pasa `asignaturas/filas/aula` (el merge de variables pone el catálogo PRIMERO para que las columnas filtradas pisen al catálogo), `notasPendientes` pasa `filas`, `padres`/`estadisticasAsistencia`/`asistenciaSeccionRango`/`asistenciaPorSeccion`/`estadisticasPorEstudiante` propagan el arreglo completo del servicio, `asistenciaSeccionDia` ahora despacha al método `asistenciaPorSeccion` (su renombrado) hacia la vista `asistencia-por-seccion`.
+
+**Bugs de su rama corregidos (base: nuestro trabajo):**
+1. El `reject` de asignaturas excluía por SUBSTRING (`str_contains('TIC')`), lo que mataba "Matemá**tic**a" y "Estadís**tic**a" → ahora coincidencia exacta normalizando acentos (`TIC`, `BIBLIA`, `INFORMATICA`).
+2. `resumenIngresoNotas()` usaba `count(distinct concat(...))` — **`concat()` no existe en SQLite** (la suite de tests revientaba con 500→302 en el hub) y en PostgreSQL exigiría casts → conteo de pares únicos en PHP (`get([...])->unique(fn ...)`), agnóstico al motor.
+3. Regla de la lección: en este proyecto el SQL crudo debe funcionar en pgsql (Supabase) y SQLite (tests) a la vez; evitar `concat()`, `ilike` sin guard, etc. (`ilike` solo aparece en `asistenciaEstudiante` cuando se envía `busqueda` — no se usa en los tests).
+
+**Tests adaptados al nuevo diseño (suite final: 160 tests / 491 aserciones, en verde):**
+- `AlumnoMatriculaTest::test_procesar_matricula` → espera redirect a `matriculas.create` (UX de matrículas masivas).
+- `ReporteFiltrosTest::test_estadisticas_asistencia_filtra_por_modalidad` → crea registros reales de `AsistenciaAula` (no hay factory) y verifica el filtro por modalidad con filas por fecha.
+- `ReporteFiltrosTest::test_notas_pendientes_filtra_por_modalidad` → nueva forma de retorno (arreglo de filas con `estudiante`).
+
+### 8.7.2 Segundo merge de `feauture/no` (23 Oct 2026) — Mural del Docente Guía
+
+Merge commit `3df973e` (sobre `434f300 "Reportes finalizados ahora si"`). Mismo criterio: su diseño + nuestra base para bugs.
+
+**Lo que llegó:**
+- **Mural de seguimiento** en el dashboard del Docente Guía (`DashboardController` + componente `docente-guia`): matriz mensual 1-12 con % de asistencia de estudiantes (`asistencia_aula`) y del propio docente (`asistencia_personal`), y `rendimientoCortes` (promedio e índice de aprobados por corte) — variables `muralAula`/`rendimientoCortes`.
+- **Bloqueo de seguridad en `reporteMinedDetallado`** (`ReporteController`): si el usuario es EXCLUSIVAMENTE Docente Guía (sin rol de Dirección), se fuerza `grado_id` al grado de su aula guía (aunque manipulen la URL) y se le pasa `esDocenteGuia`/`aulaGuia` a la vista para ocultar el select.
+
+**Correcciones aplicadas sobre su código (base: nuestro trabajo):**
+1. `EXTRACT(MONTH FROM fecha)` no existe en SQLite (tests) → expresión de mes elegida por motor: `CAST(strftime('%m', fecha) AS INTEGER)` en SQLite / `EXTRACT(MONTH FROM fecha)` en PostgreSQL (`DB::getDriverName()`).
+2. Su mural leía la columna `calificacion`, que NO existe en `nota` (la real es `nota_cuantitativa`) → promedios e índices falsos (0% y 100%) → corregido con la columna real y `round((float) ...)`.
+3. **Restaurado el método `reporteMinedDetallado`**: el primer merge lo había perdido porque el controlador se regeneró con `merge-file` usando la versión b01bb03 de su archivo (el método llegó después con f13f0b1). La ruta `reportes/mined-detallado` existía y apuntaba a un método inexistente (500 latente). Se extrajo verbatim de su rama (con el bloqueo del punto anterior).
+4. Lección reforzada: tras cada merge, validar el par ruta→método del controlador (script de verificación) y el SQL crudo contra pgsql Y SQLite.
+
 ### 8.8 Apoyo y disciplina
 
 La aplicación también incluye módulos orientados a soporte institucional y convivencia:
@@ -459,6 +520,33 @@ El proyecto tiene un conjunto inicial de pruebas basado en Laravel, pero no se t
 
 Lo importante es no tratar la validación y autorización como un detalle opcional; en este proyecto, son una parte esencial del modelo de seguridad.
 
+### 11.1 Campaña de pruebas integral (Oct 2026)
+
+Estado de la suite regular (`php artisan test`, SQLite en memoria): **160 tests / 491 aserciones, todos en verde** (actualizado tras el merge de `feauture/no` del 23 Oct 2026; incluye los tests de módulos de las fases 2-8 y del módulo de respaldos).
+
+| Módulo | Archivo de prueba | Cobertura |
+|---|---|---|
+| Servicios de notas (MINED 2026) | `Unit/NotaServiceTest` | Indicadores AA/AS/AE/AI, semestral, final |
+| Autenticación Breeze | `Feature/Auth/*` | Login, reset, verificación, confirmación |
+| Reportes | `Feature/Reporte*Test` | 14 reportes, filtros, certificado MINED |
+| Idempotencia | `Feature/IdempotenciaTest` | Notas y asistencia por claves de negocio |
+| Fase 7 (reparación/avance/apoyo) | `Feature/Fase7Test` | Registro y reglas |
+| **Usuarios (Fase 2)** | `Feature/UsuarioModuleTest` | CRUD, jerarquía (Gestor no ve Dirección), blindajes de policies, reset de contraseña, validaciones |
+| **Aulas y asignaciones (Fase 3)** | `Feature/AulaModuleTest` | Apertura con clonación de malla (11 materias para 1ro), anti-duplicados (regla en `StoreAulaRequest`), docente guía único por año, re-sincronización al cambiar grado, coordinador por modalidad, eliminación en cascada, materia extra, asignación masiva, choque de horario al reasignar docente |
+| **Malla, bloques y horarios (Fase 3)** | `Feature/MallaBloquesHorarioTest` | Límite de horas por grado, duplicados en malla, autoincremento de bloques, recreo sin número, bloque en uso no se elimina, choques de aula y de maestro, recreo no programable, materia sin docente, permisos `horarios.gestionar` vs `horarios.ver` |
+| **Alumnos, matrículas y prematrícula (Fase 4)** | `Feature/AlumnoMatriculaTest` | Expediente (creación solo Dirección), código único, borrado lógico, bloqueo de doble matrícula por año, formulario excluye matriculados, retiro/reactivación (jerarquía: Secretaria no retira), promoción de año (aula destino, denegado en reparación) |
+| **Notas (Fase 5)** | `Feature/NotasModuleTest` | Policy `calificar` (titular/guía sí, tercero no), límites por tipo vs peso del corte (acumulado 60/examen 40), edición y eliminación de actividades con recalculo, bloqueo por corte cerrado, escalado MINED en el endpoint, pesos de corte suman 100, validación de fechas |
+
+**Bugs de aplicación encontrados y corregidos por la campaña:**
+1. `UsuarioController@store/update`: fuga de transacción al fallar la autorización (refactor a `DB::transaction()`).
+2. `PrematriculaController@promover`: retornos tempranos dentro de `DB::beginTransaction()` sin commit/rollBack (mismo refactor).
+3. `ActividadEvaluativaController@store`: no llamaba `authorize('calificar')` — cualquier usuario autenticado podía crear actividades. Corregido.
+4. `HorarioController@store/destroy`: se tragaban las `AuthorizationException` (302 en vez de 403). Corregido.
+
+**Deuda de autorización detectada (pendiente de decisión):** `PrematriculaController` (index/promover/remitir) no llama `authorize()`; solo exige perfil de docente guía en `index`. `promover` es alcanzable por cualquier usuario autenticado — conviene definir la política esperada (¿solo Docente Guía del aula? ¿Dirección?) y añadir el chequeo.
+
+Regla de diseño para pruebas de estructura: las aulas de prueba se aperturan con `AulaService::crearAulaConMalla()` (no con `Aula::create()`), porque la clonación de malla es responsabilidad del servicio.
+
 ## 12. Operación local y despliegue
 
 El flujo de arranque recomendado, según el proyecto, es:
@@ -531,7 +619,144 @@ La aplicación usa vistas Blade y controladores con lógica de estado y validaci
 9. No asumir que la presencia de Sanctum implica una API REST disponible.
 10. Priorizar comprobación de permisos sobre comprobaciones de UI.
 
-## 15. Conclusión arquitectónica
+## 15. Pruebas E2E con Laravel Dusk (Oct 2026)
+
+El proyecto cuenta con una suite de pruebas end-to-end reales (navegador Chrome + Selenium/ChromeDriver) que recorre los flujos de negocio completos por la interfaz. Esta sección documenta su infraestructura, convenciones y reglas críticas.
+
+### 15.1 Stack y archivos
+
+- **Laravel Dusk 8.7** (ya estaba en `composer.json`, require-dev) sobre **php-webdriver**; ChromeDriver viene incluido en `vendor/laravel/dusk/bin` y `DuskTestCase::prepare()` lo levanta en el puerto 9515.
+- `.env.dusk`: entorno dedicado de pruebas E2E (`APP_ENV=dusk`, `APP_URL=http://127.0.0.1:8299`, **SQLite en archivo** `database/dusk.sqlite`, sesión `file`, correo `array`, `E2E_SEED=1`). **NUNCA apunta a la BD real de Supabase.**
+- `phpunit.dusk.xml`: configuración PHPUnit de la suite Browser. Importante: los comentarios XML no pueden contener `--` (rompe el parseo).
+- `database/seeders/E2eSeeder.php`: siembra **catálogos base** (los mismos de `DatabaseSeeder`); idempotente.
+- `database/seeders/E2eScenarioSeeder.php`: siembra el **escenario de negocio** (cuentas de todos los roles con dominio `*.e2e@ccn.test`, password `password`, docentes, aula "1ro A" con asignaciones y 3 alumnos matriculados). Idempotente; se ejecuta en cada test.
+- `tests/Browser/E2eTestCase.php`: clase base. Verifica que el servidor dedicado esté arriba, gestiona la BD con el trait `DatabaseTruncation` (primer test: `migrate:fresh` + escenario; siguientes: trunca solo tablas de negocio preservando catálogos y tablas de Spatie vía `exceptTables`) y provee helpers: `loginComo` (limpia la cookie de sesión antes de loguear porque Dusk reutiliza el navegador), `comoInvitado`, `logoutDe` (POST real `/logout` con el CSRF del layout), `marcarRadio` (radios `sr-only` por JS) y `abrirModal` (despacha el evento de ventana que usa la UI Alpine).
+
+### 15.2 Cómo ejecutar
+
+```bash
+# Terminal 1: servidor dedicado (obligatorio; los tests NO lo levantan solos
+# porque en Windows un proceso hijo de PHPUnit cuelga la ejecución)
+php artisan serve --env=dusk --host=127.0.0.1 --port=8299 --no-reload
+
+# Terminal 2: correr la suite E2E
+php artisan dusk
+```
+
+Atajos: `composer e2e` (levanta el servidor con `start /B` y corre `php artisan dusk`). El script `scripts/activar-wal-dusk.php` activa **WAL** sobre `dusk.sqlite` (una sola vez por archivo): sin WAL, los INSERT en SQLite/Windows cuestan ~0.25 s c/u y la suite tarda 3-4 veces más.
+
+### 15.3 Los flujos cubiertos (8 tests)
+
+| Archivo (tests/Browser) | Flujo | Actor |
+|---|---|---|
+| `ExampleTest.php` | Humo: login válido/inválido, redirección de invitados, logout real | Director |
+| `CicloAcademicoCompletoTest.php` | Aperturar aula (clona malla de 1ro: 11 asignaturas), asignar docente masivo, registrar alumno, matricular, crear actividad, evaluar notas, cerrar parcial, ver boletín | Director + Docente por Asignatura |
+| `FlujoDocenteTest.php` | Panel del tutor (mis alumnos), asistencia de aula con estados, evaluación con actividad acumulada (20 pts) + examen (40 pts), verificación del escalado MINED (NF = suma/100; 60 => AE, 28 => AI) y rendimiento | Docente Guía |
+| `FlujoDesbloqueoTest.php` | Cerrar parcial → solicitar desbloqueo (modal) → Dirección aprueba (elimina `CorteCerrado`) → docente corrige nota; y el rechazo (el parcial permanece cerrado) | Docente + Director/Subdirectora |
+| `FlujoReparacionTest.php` | Alumno de 7mo (los grados 1-5 son auto-promovidos y NO reparan) con nota anual reprobada → Dirección registra examen de reparación (acordeón Alpine) → queda `aprobado` → el PDF del boletín genera (200 + `application/pdf`) | Director |
+
+### 15.4 Reglas críticas aprendidas (leer antes de escribir tests E2E)
+
+1. **Base de datos**: el navegador habla con el servidor (`.env.dusk`); el proceso de tests apunta a la misma BD por las variables de `phpunit.dusk.xml`. Nunca mezclar con `.env` (Supabase).
+2. **`--no-reload` es obligatorio**: `php artisan serve` vigila la carpeta `database/` y se reinicia con cada escritura en `dusk.sqlite`, causando `ERR_CONNECTION_REFUSED` intermitente.
+3. **No levantar el servidor desde PHPUnit**: el proceso hijo cuelga la ejecución en Windows (la tool espera al árbol completo).
+4. **`assertSee` compara contra `innerText` (texto renderizado)**: los títulos con clase Tailwind `uppercase` se ven "MAYÚSCULAS" aunque el HTML tenga mayúsculas/minúsculas. Aserción segura: nombres propios sin clase uppercase, o `mb_strtoupper($texto)`.
+5. **Modales y acordeones Alpine**: los formularios viven en contenedores `x-show` (modales de cerrar parcial, solicitud de desbloqueo, acordeón de reparación). Abrirlos con `abrirModal($browser, 'abrir-modal-cierre')` (despacha el mismo evento que el botón) o por JS; de lo contrario WebDriver falla con "element not interactable".
+6. **Radios `sr-only`**: marcarlos con `marcarRadio` (JS `.click()`), no con `radio()` de Dusk ("element click intercepted").
+7. **Selectores de formulario ambiguos**: en una misma página puede haber un form GET de filtros y el POST de acción con URLs similares (`asistencia/aula`). Desambiguar con `[method="POST"]`.
+8. **Fechas fijas** en pruebas de asistencia (`?fecha=2026-10-19`): "hoy" implícito se rompe si la suite cruza la medianoche.
+9. **Parámetros de corte**: la página de actividades filtra con `?corte_id=N` y la planilla/evaluar con `?corte_evaluativo_id=N`. Por defecto eligen el **primer** corte, no el vigente por fecha.
+10. **`waitUsing` enmascara el error real**: preferir `waitForText('<flash de éxito>')` + aserción de BD directa en el cuerpo del test.
+11. Los flashes de éxito usados por los tests: "Actividad guardada correctamente", "Calificaciones actualizadas", "Calificaciones cerradas", "Solicitud enviada", "Solicitud aprobada", "Solicitud rechazada", "Examen de reparación registrado correctamente".
+12. **ChromeDriver tarda ~3 s en enlazar el puerto 9515** y `startChromeDriver` no espera: los primeros tests fallarían con "Failed to connect to localhost port 9515". `DuskTestCase::prepare()` ya incluye una espera activa del puerto (fsockopen hasta 20 s).
+13. `.env.dusk` y `.env.dusk.local` están en `.gitignore` (pueden contener APP_KEY y credenciales). En un clon nuevo, crear `.env.dusk` copiando `.env.example` y ajustando: `APP_ENV=dusk`, `APP_URL=http://127.0.0.1:8299`, `DB_CONNECTION=sqlite` con `DB_DATABASE=<ruta absoluta a database/dusk.sqlite>`, `SESSION_DRIVER=file`, `MAIL_MAILER=array`, `E2E_SEED=1`.
+
+### 15.5 Deuda detectada por las pruebas E2E
+
+- El mojibake en algunas vistas/seeders (`GestiA3n`, `SA-,`) es solo de visualización de consola; en BD los textos son UTF-8 limpios. El `login.blade.php` sí tiene texto fuente dañado (cosmético).
+- La tabla `actividad_evaluativa` conserva columna `tipo` (una migración la agrega y otra la elimina; el controlador escribe en ella).
+- `composer e2e` usa `start /B` de cmd: si el puerto 8299 queda ocupado por una ejecución anterior, cerrar ese proceso antes de reintentar.
+
+### 15.6 INCIDENTE y salvaguardas de base de datos (Oct 2026) — LEER SÍ O SÍ
+
+**Ocurrió:** al correr `php artisan dusk` desde una terminal con variables `DB_*` heredadas, PHPUnit (sin `force`) no sobreescribió esas variables, el entorno resolvió la conexión **pgsql (Supabase)** y `migrate:fresh` de `DatabaseTruncation` ejecutó `db:wipe` **sobre la BD real** (borró todas las tablas) antes de fallar al intentar cargar `database/schema/pgsql-schema.sql` con `psql`. Ese archivo (vacío) era el detonante: con conexión pgsql, `migrate:fresh` intenta cargar el dump vía binario `psql`.
+
+**Causas combinadas:** (1) `<env>` de PHPUnit sin `force="true"` no gana a variables del shell; (2) un dump `pgsql-schema.sql` presente en `database/schema/` activa la carga por `psql`; (3) no existía verificación runtime de la conexión activa.
+
+**Salvaguardas aplicadas (defensa en profundidad):**
+1. `database/schema/pgsql-schema.sql` eliminado (estaba en 0 bytes).
+2. `phpunit.xml` y `phpunit.dusk.xml`: TODAS las variables `env` usan `force="true"` (ganan a cualquier shell).
+3. `tests/TestCase.php`: guarda que aborta si la conexión activa no es SQLite `:memory:`.
+4. `tests/Browser/E2eTestCase::setUp`: guarda que aborta si la conexión no es `database/dusk.sqlite`.
+5. **Centinela de login** en `setUpBeforeClass`: antes de que cualquier test escriba por la UI, hace un login HTTP real contra el servidor dedicado; si falla, el servidor NO está leyendo `dusk.sqlite` y se aborta todo. El escenario E2E se siembra (subproceso `migrate:fresh --seed` + `db:seed --class=E2eScenarioSeeder`) ANTES del centinela, para que el usuario del centinela exista.
+6. `scripts/servidor-e2e.cmd`: lanzador que (a) FUERZA las variables `DB_*` a SQLite antes de arrancar `php artisan serve --env=dusk` y (b) usa el PHP de Laragon completo, no el del PATH (el php del PATH puede ser otra versión sin extensiones → errores 500 por `openssl`). `composer e2e` lo usa. Arrancar el servidor SIEMPRE con este script.
+7. `DuskTestCase::prepare()` es autorreparable: si ChromeDriver murió entre clases, lo re-lanza y espera el puerto (2 intentos); si sigue caído, falla con mensaje claro.
+8. `E2eTestCase::servidorResponde()` reintenta 3 veces (timeout 8 s): el `php -S` es mono-hilo y una conexión keep-alive del navegador puede retrasar `/up` varios segundos (falsos "no hay servidor").
+
+**Estado final (Oct 2026):** la BD de Supabase fue restaurada por el equipo (44 tablas verificadas en `public`) y se implementó un **módulo de backup** propio para prepararse ante futuros incidentes. El incidente quedó documentado como caso de estudio: ninguna prueba automatizada debe poder alcanzar jamás la BD real; las salvaguardas de esta sección lo impiden en tres capas (config `force`, guardas de conexión y centinela de login).
+
+**Regla inviolable:** jamás correr `migrate`, `db:seed`, `db:wipe` ni `migrate:fresh` sin verificar antes la conexión activa (`php artisan config:show database.default`). En este proyecto, las pruebas automatizadas SOLO corren sobre SQLite.
+
+## 16. Módulo de Respaldos de la Base de Datos (Oct 2026) — LEER SÍ O SÍ
+
+Creado como respuesta directa al incidente de la sección 15.6 (se perdió el contenido de la BD de Supabase y solo existían las migraciones para recuperar la estructura). Este módulo protege el CONTENIDO.
+
+### 16.1 Diseño del motor (`app/Services/RespaldoService.php`)
+
+- **100% PHP, sin binarios externos**: en Laragon local no existe `pg_dump`/`psql` (Laragon solo trae MySQL/MariaDB) y el plan de Supabase no ofrece backups automáticos; el volcado se genera leyendo las tablas vía PDO y escribiendo sentencias SQL estándar.
+- **Formato del volcado** (`.sql` dentro de un `.zip` en `storage/app/respaldos/`): cabecera de metadatos (`-- SGA-RESPALDO v1`, FECHA, MOTOR, HOST, BASE, GENERADO_POR, MOTIVO, TABLAS, FILAS con ancho fijo de 12 dígitos), una sola transacción `BEGIN … COMMIT`, DELETEs en orden INVERSO de dependencias de FKs, INSERTs multi-row (200 filas/statement, configurable) en orden TOPOLOGICO de FKs (algoritmo de Kahn, padres primero; ante un ciclo, el resto se vuelca alfabético) y `setval` para sincronizar secuencias (solo pgsql).
+- **Restauración atómica**: se ejecuta el SQL completo en UNA sola llamada `DB::unprepared()` (consulta multi-statement con `BEGIN/COMMIT` embebidos). Si un statement falla, Postgres revierte TODO (el `COMMIT` final sobre transacción abortada actúa como rollback). Esto además es compatible con el pooler de Supabase en modo transacción (puerto 6543): la consulta entera viaja por una única conexión física.
+- **Compatible con pgsql (Supabase) y SQLite (tests)**: introspección por `information_schema` o `PRAGMA` según driver; el quoting de valores usa el `PDO::quote` del motor activo (booleans como `'1'/'0'` citado: válido en ambos motores).
+- **Retención**: al crear un respaldo se eliminan los que excedan `BACKUP_RETENCION` (default 20). Nombres únicos: si dos respaldos caen en el mismo segundo, se numera (`respaldo_..._2.zip`).
+- **Validación de nombres**: `RespaldoService::PATRON_NOMBRE` estricto (regex) + `basename()`, evita path traversal en las rutas `{nombre}`.
+
+### 16.2 Salvaguardas de restauración (lecciones del incidente)
+
+1. `restaurar()` rechaza el archivo si el MOTOR del respaldo no coincide con la conexión activa.
+2. Siempre crea un **respaldo de seguridad del estado actual** (`-- MOTIVO: previo-a-restauracion`) ANTES de restaurar → la operación es reversible.
+3. Restaurar exige confirmación escrita **RESTAURAR**: modal en la UI (botón deshabilitado hasta coincidir) o prompt interactivo en CLI (o flag `--confirmar`).
+4. Antes de operar, tanto la UI como los comandos muestran SIEMPRE la conexión activa (driver/host/base) — transparencia del destino, regla de la sección 15.6.
+5. Todos los eventos de restauración se registran en `storage/logs/laravel.log`.
+
+### 16.3 Superficie del módulo
+
+| Componente | Archivo | Notas |
+|---|---|---|
+| Rutas web | `routes/web.php` → `academico/respaldos*` (`academico.respaldos.*`) | index/store/descargar/restaurar/destroy |
+| Controller | `app/Http/Controllers/RespaldoController.php` | Roles inline (convención del proyecto): ver/crear/descargar = Director+Subdirector; eliminar/restaurar = **solo Director** |
+| Vista | `resources/views/academico/respaldos/index.blade.php` | Card de "Conexión activa", historial, modal de restauración (Alpine + SweetAlert2, scripts inline: el layout NO tiene `@stack('scripts')`) |
+| Sidebar | `layouts/navigation.blade.php` | Enlace "Respaldos" en la sección Administración |
+| Comando crear | `php artisan respaldos:crear --motivo=X` | Muestra conexión destino; SOLO lectura |
+| Comando restaurar | `php artisan respaldos:restaurar {archivo}` | Doble confirmación; muestra metadatos del respaldo y destino |
+| Schedule | `routes/console.php` → `respaldos:crear --motivo=automatico-diario` | Diario a `BACKUP_HORA` (02:00); requiere `schedule:work`, ya incluido en `composer dev` |
+| Config | `config/respaldos.php` + variables `BACKUP_*` en `.env.example` | directorio, retención, hora, filas/insert, tablas excluidas |
+| Tests | `tests/Feature/RespaldoServiceTest.php` | 6 pruebas sobre SQLite `:memory:`: ciclo completo crear→destruir→restaurar con Unicode/emojis/saltos de línea/apóstrofes/NULLs/booleans/decimales, tabla sin `id`, restauración repetible, retención, path traversal y rechazo de motor cruzado |
+
+### 16.4 Cómo operar (procedimiento del colegio)
+
+```bash
+# Respaldar AHORA (solo lectura, seguro):
+php artisan respaldos:crear --motivo="antes-de-actualizar"
+
+# Listar respaldos disponibles: UI → /academico/respaldos (solo Dirección)
+
+# RESTAURAR (destructivo; exige escribir RESTAURAR):
+php artisan respaldos:restaurar respaldo_2026-10-21_055955.zip
+```
+
+**Reglas de oro:**
+1. **Un respaldo que vive en el mismo disco que la BD no es un respaldo completo**: descargar el `.zip` y guardarlo en otro medio (USB/nube) con regularidad; la UI lo recuerda en su card de conexión.
+2. Ejecutar los comandos SIEMPRE con el PHP de Laragon completo (`E:\laragon\bin\php\php-8.3.30-Win32-vs16-x64\php.exe`), no el del PATH (el 8.5 de winget no tiene `pdo_pgsql` ni `zip` — misma lección del punto 6 de la sección 15.6).
+3. Verificar SIEMPRE la conexión mostrada antes de restaurar (¿es Supabase? ¿es la base correcta?).
+4. Primer respaldo real generado: `respaldo_2026-10-21_055955.zip` (44 tablas, 444 filas — estado post-reconstrucción del incidente).
+
+### 16.5 Deuda / mejoras futuras del módulo
+
+- **Copia externa automática** a Supabase Storage (o nube) usando la REST API + `service_role` key: hoy los respaldos solo viven en `storage/app/respaldos`. Prioridad alta.
+- **Dump de ESTRUCTURA (DDL)**: el volcado cubre datos+DELETEs; el esquema se recupera con las migraciones (ya probado en el incidente). Si el esquema del respaldo difiere del actual, los INSERT con columnas inexistentes fallan y la restauración revierte entera (comportamiento seguro pero conviene saberlo).
+- Excluir `sessions`/`cache` opcionalmente vía `BACKUP_EXCLUIR` si el volumen crece.
+
+## 17. Conclusión arquitectónica
 
 Este proyecto es un sistema escolar monolítico con una lógica de negocio altamente especializada y una capa de acceso bien organizada en torno a modelos académicos, roles y permisos. Tiene un diseño serio y un dominio muy definido, pero requiere disciplina para evitar que la lógica de autorización, validación y filtrado por contexto se disperse en controladores.
 

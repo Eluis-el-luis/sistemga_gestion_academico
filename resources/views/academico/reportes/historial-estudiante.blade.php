@@ -162,7 +162,7 @@
 
                 <!-- Escala cualitativa MINED -->
                 <div class="mt-4 text-[10px] font-bold text-slate-600 uppercase tracking-wide">
-                    Escala de logro: AA = Aprendizaje Avanzado (90-100) · AS = Aprendizaje Satisfactorio (76-89) · AF = Aprendizaje Fundamental (60-75) · AI = Aprendizaje Inicial (0-59)
+                    Escala de logro: AA = Aprendizaje Avanzado (90-100) · AS = Aprendizaje Satisfactorio (76-89) · AE = Aprendizaje Esperado (60-75) · AI = Aprendizaje Inicial (0-59)
                 </div>
 
                 <!-- Firmas -->

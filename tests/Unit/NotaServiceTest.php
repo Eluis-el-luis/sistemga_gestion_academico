@@ -34,9 +34,9 @@ class NotaServiceTest extends TestCase
     
     public function testcalcularIndicadorLogro_retorna_AF_para_60_a_75(): void
     {
-        $this->assertEquals('AF', $this->service->calcularIndicadorLogro(60));
-        $this->assertEquals('AF', $this->service->calcularIndicadorLogro(67));
-        $this->assertEquals('AF', $this->service->calcularIndicadorLogro(75));
+        $this->assertEquals('AE', $this->service->calcularIndicadorLogro(60));
+        $this->assertEquals('AE', $this->service->calcularIndicadorLogro(67));
+        $this->assertEquals('AE', $this->service->calcularIndicadorLogro(75));
     }
 
     

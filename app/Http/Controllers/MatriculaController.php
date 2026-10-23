@@ -57,7 +57,6 @@ class MatriculaController extends Controller
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
                 throw $e;
             }
-            // CONTINGENCIA: Si falla alguna relación o la consulta con ILIKE
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al intentar cargar el listado de matrículas.');
         }
     }
@@ -70,14 +69,21 @@ class MatriculaController extends Controller
             $anioActivo = AnioEscolar::where('activo', true)->first();
             
             // 🔒 BLOQUEO DE DOBLE MATRÍCULA: 
-            // Solo traemos alumnos que NO tengan matrícula en el año activo
             $alumnos = Alumno::whereDoesntHave('matriculas', function($q) use ($anioActivo) {
                 if ($anioActivo) {
                     $q->where('anio_escolar_id', $anioActivo->id);
                 }
             })->orderBy('nombre_completo')->get();
 
-            $aulas = Aula::with(['grado', 'modalidad'])->get();
+            // 📊 CONTROL REAL DE CUPOS: Añadimos el conteo de matrículas activas por aula
+            $aulas = Aula::with(['grado', 'modalidad'])
+                ->withCount(['matriculas' => function($query) use ($anioActivo) {
+                    $query->where('estado', 'activo');
+                    if ($anioActivo) {
+                        $query->where('anio_escolar_id', $anioActivo->id);
+                    }
+                }])->get();
+
             $anios = AnioEscolar::where('activo', true)->get();
             
             $alumnoSeleccionado = $request->query('alumno_id');
@@ -88,29 +94,38 @@ class MatriculaController extends Controller
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
                 throw $e;
             }
-            // CONTINGENCIA: Si falla la carga del formulario de inscripción
             return redirect()->route('academico.matriculas.index')->with('error', 'No se pudo abrir el formulario de matrícula.');
         }
     }
 
     public function store(StoreMatriculaRequest $request)
     {
-        // La validación del StoreMatriculaRequest se ejecuta de forma segura antes de entrar aquí
         $datosValidados = $request->validated();
 
         try {
             $this->authorize('create', Matricula::class);
             
+            // Verificamos el cupo antes de guardar para evitar sobrecupos lógicos
+            $aula = Aula::withCount(['matriculas' => function($query) use ($datosValidados) {
+                $query->where('estado', 'activo')
+                      ->where('anio_escolar_id', $datosValidados['anio_escolar_id'] ?? null);
+            }])->findOrFail($datosValidados['aula_id']);
+
+            if ($aula->matriculas_count >= $aula->cupo) {
+                return back()->withInput()->with('error', 'Lo sentimos, esta aula ha alcanzado su cupo máximo (' . $aula->cupo . ').');
+            }
+
             Matricula::create($datosValidados);
 
-            return redirect()->route('academico.matriculas.index')
-                             ->with('success', 'Matrícula procesada exitosamente.');
+            // UX MEJORADA: Redirigimos de vuelta al formulario de creación para agilizar matrículas masivas 
+            // con un mensaje de éxito, evitando mandarte directo al historial general.
+            return redirect()->route('academico.matriculas.create')
+                             ->with('success', '¡Estudiante matriculado exitosamente! Puedes registrar al siguiente.');
 
         } catch (\Exception $e) {
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
                 throw $e;
             }
-            // CONTINGENCIA: Si la base de datos rechaza la creación de la matrícula
             return back()->withInput()->with('error', 'Ocurrió un problema técnico al procesar la matrícula en la base de datos.');
         }
     }
@@ -128,7 +143,6 @@ class MatriculaController extends Controller
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
                 throw $e;
             }
-            // CONTINGENCIA: Si falla el cambio de estado
             return back()->with('error', 'No se pudo actualizar el estado del estudiante a retirado.');
         }
     }
@@ -146,7 +160,6 @@ class MatriculaController extends Controller
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
                 throw $e;
             }
-            // CONTINGENCIA: Si la base de datos rechaza la reactivación
             return back()->with('error', 'No se pudo reactivar la matrícula debido a un error de conexión.');
         }
     }
@@ -164,7 +177,6 @@ class MatriculaController extends Controller
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
                 throw $e;
             }
-            // CONTINGENCIA: Si el registro tiene dependencias que impiden borrarlo
             return back()->with('error', 'No se pudo eliminar la matrícula. Es posible que el sistema la proteja por tener calificaciones asociadas.');
         }
     }

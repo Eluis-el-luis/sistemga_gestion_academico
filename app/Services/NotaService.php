@@ -49,8 +49,8 @@ class NotaService
     }
 
     /**
-     * Convierte la nota cuantitativa (0-100) en el Indicador de Logro Cualitativo (MINED)
-     * Basado en los rangos oficiales del MINED.
+     * Convierte la nota cuantitativa (0-100) en el Indicador de Logro Cualitativo (MINED).
+     * Basado en los rangos oficiales del MINED (formato vigente 2026: AA, AS, AE, AI).
      */
     public function calcularIndicadorLogro(?int $nota): ?string
     {
@@ -63,7 +63,7 @@ class NotaService
         } elseif ($nota >= 76 && $nota <= 89) {
             return 'AS'; // Aprendizaje Satisfactorio
         } elseif ($nota >= 60 && $nota <= 75) {
-            return 'AF'; // Aprendizaje Fundamental
+            return 'AE'; // Aprendizaje Esperado
         } elseif ($nota >= 0 && $nota <= 59) {
             return 'AI'; // Aprendizaje Inicial
         }
@@ -127,7 +127,7 @@ class NotaService
      */
     public function estaAprobado(int $notaFinal): bool
     {
-        return $notaFinal >= 60; // 60 es la nota mínima para aprobar (Aprendizaje Fundamental)
+        return $notaFinal >= 60; // 60 es la nota mínima para aprobar (Aprendizaje Esperado)
     }
 
     /**

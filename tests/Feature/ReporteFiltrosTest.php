@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Alumno;
 use App\Models\AnioEscolar;
 use App\Models\Asignatura;
+use App\Models\AsistenciaAula;
 use App\Models\Aula;
 use App\Models\AulaAsignaturaDocente;
 use App\Models\Docente;
@@ -119,13 +120,21 @@ class ReporteFiltrosTest extends TestCase
 
     public function test_estadisticas_asistencia_filtra_por_modalidad(): void
     {
-        $filas = $this->service->estadisticasAsistencia([
+        // Registros en ambas modalidades para probar el filtro con datos reales.
+        $matA = Matricula::where('aula_id', $this->aulaA->id)->first();
+        $matB = Matricula::where('aula_id', $this->aulaB->id)->first();
+        AsistenciaAula::create(['matricula_id' => $matA->id, 'fecha' => '2026-10-19', 'estado_asistencia' => 'Presente']);
+        AsistenciaAula::create(['matricula_id' => $matB->id, 'fecha' => '2026-10-19', 'estado_asistencia' => 'Presente']);
+
+        // Diseño de la rama feauture/no: retorna filas agregadas por fecha.
+        $resultado = $this->service->estadisticasAsistencia([
             'anio_escolar_id' => $this->anio->id,
             'modalidad_id' => $this->modalidadA->id,
         ]);
 
-        $this->assertCount(1, $filas);
-        $this->assertSame('Primaria Regular', $filas[0]['modalidad']);
+        $this->assertCount(1, $resultado['filas']);
+        $this->assertSame(1, $resultado['filas'][0]['total']);
+        $this->assertSame(1, $resultado['filas'][0]['presentes']);
     }
 
     public function test_control_notas_filtra_por_aula(): void
@@ -147,7 +156,8 @@ class ReporteFiltrosTest extends TestCase
             'modalidad_id' => $this->modalidadB->id,
         ]);
 
+        // Diseño de la rama feauture/no: retorna filas asociativas (cup/estudiante/grado_aula/asignatura/docente).
         $this->assertCount(1, $pendientes);
-        $this->assertSame('Beto Secundaria', $pendientes->first()->alumno->nombre_completo);
+        $this->assertSame('Beto Secundaria', $pendientes[0]['estudiante']);
     }
 }
