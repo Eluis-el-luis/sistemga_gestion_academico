@@ -423,6 +423,20 @@ Estos reportes se basan en el historial académico y en los estados de matrícul
 - `ReporteFiltrosTest::test_estadisticas_asistencia_filtra_por_modalidad` → crea registros reales de `AsistenciaAula` (no hay factory) y verifica el filtro por modalidad con filas por fecha.
 - `ReporteFiltrosTest::test_notas_pendientes_filtra_por_modalidad` → nueva forma de retorno (arreglo de filas con `estudiante`).
 
+### 8.7.2 Segundo merge de `feauture/no` (23 Oct 2026) — Mural del Docente Guía
+
+Merge commit `3df973e` (sobre `434f300 "Reportes finalizados ahora si"`). Mismo criterio: su diseño + nuestra base para bugs.
+
+**Lo que llegó:**
+- **Mural de seguimiento** en el dashboard del Docente Guía (`DashboardController` + componente `docente-guia`): matriz mensual 1-12 con % de asistencia de estudiantes (`asistencia_aula`) y del propio docente (`asistencia_personal`), y `rendimientoCortes` (promedio e índice de aprobados por corte) — variables `muralAula`/`rendimientoCortes`.
+- **Bloqueo de seguridad en `reporteMinedDetallado`** (`ReporteController`): si el usuario es EXCLUSIVAMENTE Docente Guía (sin rol de Dirección), se fuerza `grado_id` al grado de su aula guía (aunque manipulen la URL) y se le pasa `esDocenteGuia`/`aulaGuia` a la vista para ocultar el select.
+
+**Correcciones aplicadas sobre su código (base: nuestro trabajo):**
+1. `EXTRACT(MONTH FROM fecha)` no existe en SQLite (tests) → expresión de mes elegida por motor: `CAST(strftime('%m', fecha) AS INTEGER)` en SQLite / `EXTRACT(MONTH FROM fecha)` en PostgreSQL (`DB::getDriverName()`).
+2. Su mural leía la columna `calificacion`, que NO existe en `nota` (la real es `nota_cuantitativa`) → promedios e índices falsos (0% y 100%) → corregido con la columna real y `round((float) ...)`.
+3. **Restaurado el método `reporteMinedDetallado`**: el primer merge lo había perdido porque el controlador se regeneró con `merge-file` usando la versión b01bb03 de su archivo (el método llegó después con f13f0b1). La ruta `reportes/mined-detallado` existía y apuntaba a un método inexistente (500 latente). Se extrajo verbatim de su rama (con el bloqueo del punto anterior).
+4. Lección reforzada: tras cada merge, validar el par ruta→método del controlador (script de verificación) y el SQL crudo contra pgsql Y SQLite.
+
 ### 8.8 Apoyo y disciplina
 
 La aplicación también incluye módulos orientados a soporte institucional y convivencia:
