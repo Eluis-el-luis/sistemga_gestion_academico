@@ -23,7 +23,7 @@ class UsuarioSeeder extends Seeder
 
         // 2. SUBDIRECTOR (Pilar 2)
         $subdirector = Usuario::firstOrCreate(
-            ['email' => 'guillermina.matamoros@ccn.edu.ni'],
+            ['email' => 'guillermina.matamoro@ccn.edu.ni'],
             [
                 'nombre_completo' => 'Guillermina Matamoros',
                 'password' => Hash::make('password'),

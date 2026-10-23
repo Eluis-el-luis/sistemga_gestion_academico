@@ -245,6 +245,7 @@ class AlumnoMatriculaTest extends TestCase
     {
         $alumno = Alumno::create($this->payloadAlumno());
 
+        // UX de la rama feauture/no: redirige al formulario de creación para agilizar matrículas masivas.
         $this->actingAs($this->secretaria)
             ->post(route('academico.matriculas.store'), [
                 'alumno_id' => $alumno->id,
@@ -253,7 +254,7 @@ class AlumnoMatriculaTest extends TestCase
                 'estado' => 'activo',
                 'fecha_matricula' => now()->toDateString(),
             ])
-            ->assertRedirect(route('academico.matriculas.index'))
+            ->assertRedirect(route('academico.matriculas.create'))
             ->assertSessionHas('success');
 
         $this->assertDatabaseHas('matricula', [

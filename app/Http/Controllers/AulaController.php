@@ -95,16 +95,20 @@ class AulaController extends Controller
 
             $modalidades = \App\Models\Modalidad::all();
             $grados = \App\Models\Grado::all();
-            $anios = \App\Models\AnioEscolar::where('activo', true)->get();
             
-            $aniosActivosIds = $anios->pluck('id');
+            // Traemos TODOS los años escolares ordenados del más reciente al más antiguo
+            $anios = \App\Models\AnioEscolar::orderBy('nombre', 'desc')->get();
+            
+            // Si aún necesitas saber cuáles están activos para calcular los docentes ocupados vigentes:
+            $aniosActivosIds = \App\Models\AnioEscolar::where('activo', true)->pluck('id');
+            
             $docentesOcupados = Aula::whereIn('anio_escolar_id', $aniosActivosIds)
-                                    ->pluck('docente_guia_id')
-                                    ->toArray();
+                                        ->pluck('docente_guia_id')
+                                        ->toArray();
 
             $docentes = \App\Models\Docente::with('usuario')
-                            ->whereNotIn('id', $docentesOcupados)
-                            ->get();
+                                        ->whereNotIn('id', $docentesOcupados)
+                                        ->get();
 
             return view('academico.aulas.create', compact('modalidades', 'grados', 'anios', 'docentes'));
         } catch (\Exception $e) {

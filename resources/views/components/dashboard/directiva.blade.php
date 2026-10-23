@@ -93,148 +93,192 @@
     </button>
 </div>
 
-<!-- VISOR DINÁMICO DE ESTADÍSTICAS (Actualizado a Datos Reales) -->
-<div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm" x-data="panelEstadisticas()">
-    <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+
+<!-- ========================================================================= -->
+<!-- MURAL DIGITAL INTERACTIVO (Con Datos Reales) -->
+<!-- ========================================================================= -->
+
+@php
+    // MOTOR DE COLORES: Analiza el porcentaje y asigna el color correspondiente (Verde, Amarillo, Rojo)
+    $badgeColor = function($valor) {
+        if ($valor === null || $valor === '') return 'bg-slate-100 text-slate-400 opacity-50'; // Sin datos
+        if ($valor >= 90) return 'bg-emerald-100 text-emerald-700 shadow-sm'; // Óptimo
+        if ($valor >= 75) return 'bg-amber-100 text-amber-700 shadow-sm'; // Alerta
+        return 'bg-rose-100 text-rose-700 shadow-sm'; // Peligro
+    };
+
+    // Estructura de meses estándar MINED (Enero a Diciembre)
+    $meses = [
+        1 => 'Ene', 2 => 'Feb', 3 => 'Mar', 4 => 'Abr', 5 => 'May', 6 => 'Jun (C1)', 
+        7 => 'Jul', 8 => 'Ago', 9 => 'Sep (C2)', 10 => 'Oct', 11 => 'Nov (C3)', 12 => 'Dic'
+    ];
+@endphp
+
+<div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden mt-8">
+    <div class="bg-[#FFFDF5] border-b border-[#e6ac27]/20 px-6 py-5 sm:px-8 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <div>
+            <h3 class="text-lg font-black text-[#3d2c1d] flex items-center gap-2">
+                <svg class="w-6 h-6 text-[#e6ac27]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                Mural de Seguimiento Institucional
+            </h3>
+            <p class="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest">Basado en registros oficiales del sistema</p>
+        </div>
         
-        <!-- Seleccionador 1: Tipo de Dato -->
-        <div class="w-full md:w-2/3">
-            <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">1. Indicador a Analizar</label>
-            <select x-model="indicador" class="w-full border-slate-200 bg-slate-50 rounded-xl focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm text-[#3d2c1d] shadow-sm font-bold cursor-pointer">
-                <option value="matriculados">Alumnos Matriculados Activos</option>
-                <option value="asistencia_alumnos">Promedio de asistencia de alumnos</option>
-                <option value="asistencia_docentes">Rendimiento de asistencia de docentes</option>
-                <option value="rendimiento_modalidad">Rendimiento académico por modalidad</option>
-                <option value="apoyo_padres">Nivel de participación de padres de familia</option>
-                <option value="aprobados">Promedio de alumnos aprobados limpios</option>
-                <option value="reprobados_leves">Promedio de reprobados (1 a 2 asignaturas)</option>
-                <option value="reprobados_graves">Promedio de reprobados (3 a más asignaturas)</option>
-                <option value="promedio_notas">Promedio general de calificaciones</option>
-                <option value="avances_silabo">Avance de contenido programático (Docentes)</option>
-                <option value="retencion">Tasa de Retención Estudiantil</option>
-                <option value="puntualidad">Índice de Puntualidad Diaria</option>
+        <!-- El filtro de nivel (si quieres conectarlo en el futuro por Request) -->
+        <form method="GET" class="w-full sm:w-auto">
+            <select name="modalidad_mural" onchange="this.form.submit()" class="w-full sm:w-64 border-slate-200 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-600 focus:ring-[#e6ac27] focus:border-[#e6ac27] cursor-pointer">
+                <option value="">Vista Global (Centro Educativo)</option>
+                @foreach(\App\Models\Modalidad::all() as $mod)
+                    <option value="{{ $mod->id }}" {{ request('modalidad_mural') == $mod->id ? 'selected' : '' }}>
+                        Solo {{ $mod->nombre }}
+                    </option>
+                @endforeach
             </select>
-        </div>
-
-        <!-- Seleccionador 2: Tipo de Gráfica -->
-        <div class="w-full md:w-1/3">
-            <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">2. Tipo de Gráfica</label>
-            <select x-model="tipoGrafica" class="w-full border-slate-200 bg-slate-50 rounded-xl focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm text-[#3d2c1d] shadow-sm font-bold cursor-pointer">
-                <option value="bar">Gráfica de Barras</option>
-                <option value="line">Gráfica de Líneas</option>
-                <option value="pie">Gráfica de Pastel (Pie)</option>
-                <option value="doughnut">Gráfica Circular (Doughnut)</option>
-                <option value="polarArea">Área Polar (Dispersión alternativa)</option>
-            </select>
-        </div>
-
+        </form>
     </div>
 
-    <!-- Contenedor del Canvas 3 -->
-    <div class="relative w-full h-[400px]">
-        <canvas id="visorEstadisticasCanvas"></canvas>
+    <div class="overflow-x-auto pb-4">
+        <table class="w-full text-left text-sm whitespace-nowrap min-w-[1000px]">
+            <thead>
+                <tr class="bg-slate-50/80 border-b border-slate-100 text-[10px] uppercase tracking-widest text-slate-400 font-black">
+                    <th class="px-6 py-4 sticky left-0 bg-slate-50/90 backdrop-blur-sm z-10 w-1/4 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Indicador de Desempeño</th>
+                    @foreach($meses as $num => $nombreMes)
+                        <th class="px-3 py-4 text-center {{ str_contains($nombreMes, 'C') ? 'border-x border-slate-200 bg-slate-100/50 text-slate-600' : '' }}">
+                            {{ $nombreMes }}
+                        </th>
+                    @endforeach
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                
+                <!-- 1. Asistencia Estudiantes (Métricas Mensuales) -->
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4 font-bold text-[#3d2c1d] sticky left-0 bg-white z-10 border-r border-slate-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.02)]">
+                        1. Asistencia Estudiantil
+                    </td>
+                    @foreach($meses as $num => $nombreMes)
+                        @php $valor = $muralData['asistencia_estudiantes'][$num] ?? null; @endphp
+                        <td class="px-3 py-4 text-center {{ str_contains($nombreMes, 'C') ? 'border-x border-slate-100 bg-slate-50/50' : '' }}">
+                            @if($valor !== null)
+                                <span class="inline-flex w-12 items-center justify-center px-2 py-1 rounded-md font-black text-xs {{ $badgeColor($valor) }}">
+                                    {{ $valor }}%
+                                </span>
+                            @else
+                                <span class="text-slate-300 font-black text-xs">---</span>
+                            @endif
+                        </td>
+                    @endforeach
+                </tr>
+
+                <!-- 2. Asistencia Docente -->
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4 font-bold text-[#3d2c1d] sticky left-0 bg-white z-10 border-r border-slate-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.02)]">
+                        2. Asistencia Docente
+                    </td>
+                    @foreach($meses as $num => $nombreMes)
+                        @php $valor = $muralData['asistencia_docentes'][$num] ?? null; @endphp
+                        <td class="px-3 py-4 text-center {{ str_contains($nombreMes, 'C') ? 'border-x border-slate-100 bg-slate-50/50' : '' }}">
+                            @if($valor !== null)
+                                <span class="inline-flex w-12 items-center justify-center px-2 py-1 rounded-md font-black text-xs {{ $badgeColor($valor) }}">
+                                    {{ $valor }}%
+                                </span>
+                            @else
+                                <span class="text-slate-300 font-black text-xs">---</span>
+                            @endif
+                        </td>
+                    @endforeach
+                </tr>
+
+                <!-- 3. Índices de Aprobados (Solo en meses de Corte) -->
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4 font-bold text-[#3d2c1d] sticky left-0 bg-white z-10 border-r border-slate-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.02)]">
+                        3. Índices de Aprobados Limpios
+                    </td>
+                    @foreach($meses as $num => $nombreMes)
+                        @php $valor = $muralData['aprobados_cortes'][$num] ?? null; @endphp
+                        
+                        @if(str_contains($nombreMes, 'C'))
+                            <td class="px-3 py-4 text-center border-x border-slate-100 bg-slate-50/50">
+                                @if($valor !== null)
+                                    <span class="inline-flex w-12 items-center justify-center px-2 py-1 rounded-md font-black text-xs {{ $badgeColor($valor) }}">
+                                        {{ $valor }}%
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 text-slate-400 text-[10px] font-bold tracking-widest uppercase">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Pnd
+                                    </span>
+                                @endif
+                            </td>
+                        @else
+                            <td class="px-3 py-4 text-center text-slate-200 text-xs font-black">·</td>
+                        @endif
+                    @endforeach
+                </tr>
+
+                <!-- 4. Promedio General de Notas (Solo en meses de Corte) -->
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4 font-bold text-[#3d2c1d] sticky left-0 bg-white z-10 border-r border-slate-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.02)]">
+                        4. Promedio de Calificaciones
+                    </td>
+                    @foreach($meses as $num => $nombreMes)
+                        @php $valor = $muralData['promedio_cortes'][$num] ?? null; @endphp
+                        
+                        @if(str_contains($nombreMes, 'C'))
+                            <td class="px-3 py-4 text-center border-x border-slate-100 bg-slate-50/50">
+                                @if($valor !== null)
+                                    <span class="inline-flex w-12 items-center justify-center px-2 py-1 rounded-md font-black text-xs {{ $badgeColor($valor) }}">
+                                        {{ $valor }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 text-slate-400 text-[10px] font-bold tracking-widest uppercase">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Pnd
+                                    </span>
+                                @endif
+                            </td>
+                        @else
+                            <td class="px-3 py-4 text-center text-slate-200 text-xs font-black">·</td>
+                        @endif
+                    @endforeach
+                </tr>
+
+                <!-- 5. Participación de Padres -->
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4 font-bold text-[#3d2c1d] sticky left-0 bg-white z-10 border-r border-slate-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.02)]">
+                        5. Participación de Padres
+                    </td>
+                    @foreach($meses as $num => $nombreMes)
+                        @php $valor = $muralData['padres'][$num] ?? null; @endphp
+                        <td class="px-3 py-4 text-center {{ str_contains($nombreMes, 'C') ? 'border-x border-slate-100 bg-slate-50/50' : '' }}">
+                            @if($valor !== null)
+                                <span class="inline-flex w-12 items-center justify-center px-2 py-1 rounded-md font-black text-xs {{ $badgeColor($valor) }}">
+                                    {{ $valor }}%
+                                </span>
+                            @else
+                                <span class="text-slate-300 font-black text-xs">---</span>
+                            @endif
+                        </td>
+                    @endforeach
+                </tr>
+
+                <!-- 6. Avance de Contenido -->
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4 font-bold text-[#3d2c1d] sticky left-0 bg-white z-10 border-r border-slate-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.02)]">
+                        6. Avance Programático
+                    </td>
+                    @foreach($meses as $num => $nombreMes)
+                        @php $valor = $muralData['avance_contenido'][$num] ?? null; @endphp
+                        <td class="px-3 py-4 text-center {{ str_contains($nombreMes, 'C') ? 'border-x border-slate-100 bg-slate-50/50' : '' }}">
+                            @if($valor !== null)
+                                <span class="inline-flex w-12 items-center justify-center px-2 py-1 rounded-md font-black text-xs {{ $badgeColor($valor) }}">
+                                    {{ $valor }}%
+                                </span>
+                            @else
+                                <span class="text-slate-300 font-black text-xs">---</span>
+                            @endif
+                        </td>
+                    @endforeach
+                </tr>
+            </tbody>
+        </table>
     </div>
 </div>
-
-<!-- Lógica del Visor (Alpine.js + Chart.js) -->
-<script>
-document.addEventListener('alpine:init', () => {
-    Alpine.data('panelEstadisticas', () => ({
-        indicador: 'matriculados',
-        tipoGrafica: 'bar',
-        chartInstance: null,
-        
-        // RECIBIMOS LOS DATOS REALES DIRECTO DEL CONTROLADOR DE LARAVEL
-        dbMetricas: {!! json_encode($dbMetricas ?? []) !!},
-
-        init() {
-            // Protección en caso de que dbMetricas venga vacío de Laravel
-            if (!this.dbMetricas || Object.keys(this.dbMetricas).length === 0) {
-                this.dbMetricas = {
-                    matriculados: { titulo: 'Sin datos registrados', datos: [0, 0, 0] }
-                };
-            }
-
-            this.$watch('indicador', () => this.dibujarGrafica());
-            this.$watch('tipoGrafica', () => this.dibujarGrafica());
-            
-            setTimeout(() => this.dibujarGrafica(), 100);
-        },
-
-        dibujarGrafica() {
-            const ctx = document.getElementById('visorEstadisticasCanvas');
-            if (!ctx) return;
-
-            if (this.chartInstance) {
-                this.chartInstance.destroy();
-            }
-
-            // Datos Seguros
-            const dataSeleccionada = this.dbMetricas[this.indicador] || { titulo: 'Dato no disponible', datos: [0, 0, 0] };
-            const etiquetas = {!! json_encode(\App\Models\Modalidad::orderBy('id')->pluck('nombre')->toArray()) !!};
-            
-            const coloresRelleno = ['#fbbf24', '#60a5fa', '#34d399'];
-            const coloresBorde = ['#f59e0b', '#3b82f6', '#10b981'];
-
-            const config = {
-                type: this.tipoGrafica,
-                data: {
-                    labels: etiquetas,
-                    datasets: [{
-                        label: dataSeleccionada.titulo,
-                        data: dataSeleccionada.datos,
-                        backgroundColor: this.tipoGrafica === 'line' ? 'rgba(230, 172, 39, 0.15)' : coloresRelleno,
-                        borderColor: this.tipoGrafica === 'line' ? '#e6ac27' : coloresBorde,
-                        borderWidth: 2,
-                        fill: this.tipoGrafica === 'line',
-                        tension: 0.4,
-                        borderRadius: this.tipoGrafica === 'bar' ? 8 : 0,
-                        barPercentage: 0.5
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { 
-                            display: ['pie', 'doughnut', 'polarArea'].includes(this.tipoGrafica),
-                            position: 'bottom',
-                            labels: { font: { family: "'Figtree', sans-serif", weight: 'bold' } }
-                        },
-                        tooltip: {
-                            backgroundColor: '#3d2c1d',
-                            padding: 12,
-                            cornerRadius: 8,
-                            titleFont: { size: 13, family: "'Figtree', sans-serif" },
-                            bodyFont: { size: 14, weight: 'bold', family: "'Figtree', sans-serif" },
-                            callbacks: { 
-                                label: context => {
-                                    // Usamos context.raw que funciona en TODAS las gráficas (barras, líneas, polar, pie, etc.)
-                                    let valor = context.raw; 
-                                    let sufijo = (this.indicador !== 'promedio_notas' && this.indicador !== 'matriculados') ? '%' : '';
-                                    return ' Valor: ' + valor + sufijo;
-                                }
-                            }
-                        }
-                    },
-                    scales: ['pie', 'doughnut', 'polarArea'].includes(this.tipoGrafica) ? {} : {
-                        y: { 
-                            beginAtZero: true, 
-                            border: { display: false }, 
-                            grid: { borderDash: [4, 4], color: '#f1f5f9' }, 
-                            ticks: { font: { family: "'Figtree', sans-serif" }, color: '#94a3b8' } 
-                        },
-                        x: { 
-                            border: { display: false }, 
-                            grid: { display: false }, 
-                            ticks: { font: { family: "'Figtree', sans-serif", weight: 'bold' }, color: '#64748b' } 
-                        }
-                    }
-                }
-            };
-
-            this.chartInstance = new Chart(ctx, config);
-        }
-    }));
-});
-</script>
