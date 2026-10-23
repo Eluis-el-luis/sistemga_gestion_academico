@@ -440,8 +440,6 @@ class ReporteController extends Controller
         }
     }
 
-
-
     public function estadisticasAsistencia(\Illuminate\Http\Request $request)
     {
         try {
@@ -535,15 +533,46 @@ class ReporteController extends Controller
         }
     }
 
+    // =============================================================
+    // ESTA ES LA FUNCIÓN CLAVE DEL REPORTE MINED QUE MODIFICAMOS
+    // =============================================================
     public function reporteMinedDetallado(\Illuminate\Http\Request $request)
     {
         $this->autorizarReportes();
         $filtros = $request->all();
         
+        $esDocenteGuia = false;
+        $aulaGuia = null;
+        $user = auth()->user();
+
+        // 1. Verificamos si es EXCLUSIVAMENTE Docente Guía (y no alguien de Dirección)
+        if ($user->hasRole('Docente Guia') && !$user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
+            $esDocenteGuia = true;
+            $docente = \App\Models\Docente::where('usuario_id', $user->id)->first();
+            $anioActivo = \App\Models\AnioEscolar::where('activo', true)->first();
+
+            if ($docente && $anioActivo) {
+                // Buscamos cuál es su aula guía asignada
+                $aulaGuia = \App\Models\Aula::with('grado')
+                    ->where('docente_guia_id', $docente->id)
+                    ->where('anio_escolar_id', $anioActivo->id)
+                    ->first();
+
+                if ($aulaGuia) {
+                    // BLOQUEO CRÍTICO: Sobrescribimos el filtro de grado_id a la fuerza por el de su aula
+                    // Así, aunque modifiquen la URL, solo verán los datos de su grado.
+                    $filtros['grado_id'] = $aulaGuia->grado_id;
+                } else {
+                    return redirect()->route('dashboard')->with('error', 'No tienes un aula asignada como tutor en este año escolar.');
+                }
+            }
+        }
+
         $datos = $this->reporteService->rendimientoMinedDetallado($filtros);
         $catalogos = $this->pasarCatalogos($request);
 
-        return view('academico.reportes.mined-detallado', array_merge($datos, $catalogos));
+        // Retornamos también esDocenteGuia y aulaGuia a la vista para ocultar el select
+        return view('academico.reportes.mined-detallado', array_merge($datos, $catalogos, compact('esDocenteGuia', 'aulaGuia')));
     }
 
     // =============================================================
@@ -568,7 +597,7 @@ class ReporteController extends Controller
         }
     }
 
-public function rendimientoCorte(Request $request)
+    public function rendimientoCorte(Request $request)
     {
         $anioId = $request->anio_escolar_id;
         $modalidadId = $request->modalidad_id;

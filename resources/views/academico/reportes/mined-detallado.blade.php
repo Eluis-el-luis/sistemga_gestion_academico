@@ -48,13 +48,23 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Grado / Sección (Opcional)</label>
-                    <select name="grado_id" class="w-full border-slate-200 rounded-xl text-sm font-medium">
-                        <option value="">Todo el Colegio (General)</option>
-                        @foreach(\App\Models\Grado::all() as $grado)
-                            <option value="{{ $grado->id }}" @selected($grado->id == request('grado_id'))>{{ $grado->nombre }}</option>
-                        @endforeach
-                    </select>
+                    <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Grado / Sección @if(!isset($esDocenteGuia) || !$esDocenteGuia) (Opcional) @endif</label>
+                    
+                    @if(isset($esDocenteGuia) && $esDocenteGuia && isset($aulaGuia))
+                        <!-- BLOQUEO VISUAL: Solo texto estático para el Docente Guía -->
+                        <div class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 flex items-center cursor-not-allowed">
+                            Mi Aula: {{ $aulaGuia->grado->nombre ?? '' }} "{{ $aulaGuia->nombre ?? '' }}"
+                        </div>
+                        <input type="hidden" name="grado_id" value="{{ $aulaGuia->grado_id }}">
+                    @else
+                        <!-- DESPLEGABLE ORIGINAL: Para Director / Subdirector -->
+                        <select name="grado_id" class="w-full border-slate-200 rounded-xl text-sm font-medium">
+                            <option value="">Todo el Colegio (General)</option>
+                            @foreach(\App\Models\Grado::all() as $grado)
+                                <option value="{{ $grado->id }}" @selected($grado->id == request('grado_id'))>{{ $grado->nombre }}</option>
+                            @endforeach
+                        </select>
+                    @endif
                 </div>
                 <div>
                     <button type="submit" class="bg-[#3d2c1d] text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-black w-full shadow-sm">Generar Reporte</button>
