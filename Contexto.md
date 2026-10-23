@@ -395,6 +395,33 @@ Estos reportes se basan en el historial académico y en los estados de matrícul
 - Una tabla por modalidad (Preescolar/Primaria/Secundaria) con fila TOTAL, todas las métricas partidas en AS (ambos sexos) y F (femenino): MI, MA, % DE PERM (MA/MI), APROB (0 materias reprobadas), % DE APROB (APROB/evaluados), APLAZ 1-2, APLAZ 3-MAS, EVALUADO PERIODO OFICIAL (MA con notas en el corte), EVALUADO PERIODO EXTRA (con examen de reparación en el rango del corte/año), NO EVALUADO (= MA − evaluados), ASIST REFORZ y MAEST INT REF (0; no hay módulo de reforzamiento).
 - Sección ESCALA de rendimiento por modalidad: conteo de estudiantes por banda cualitativa del promedio del corte (AA/AS/AE/AI) + VALOR (= total evaluados).
 - Supuestos de cálculo documentados en el docblock del método.
+- **Estado tras el merge del 23 Oct 2026:** el método y su test (`RendimientoMined2026Test`) siguen vigentes como servicio, pero la ruta `reportes/rendimiento-corte` ya NO lo usa: el diseño de la rama `feauture/no` (controller-centric, filas por grado + gráfica Chart.js + `$chartData`) lo reemplazó. Si se quiere recuperar el formato por modalidad, el servicio está listo.
+
+### 8.7.1 Merge de `feauture/no` (23 Oct 2026) — diseño mejorado de reportes
+
+**Estrategia acordada:** el trabajo de `feauture/no` es el DISEÑO (vistas/UI/UX); nuestro trabajo de fase 8 es la BASE lógica. El merge se resolvió adoptando su diseño completo y adaptando nuestros controladores/servicios para alimentarlo; su código muerto o con bugs se corrigió con base en nuestro código. Quedó como merge commit `06935bf`.
+
+**Lo que llegó de `feauture/no`:**
+- Reportes nuevos: `mi-aula` (docente guía), `escalas`, `avance-programatico`, `asignaturas-aprobadas` (+ rutas y métodos de controlador inline).
+- Rediseño de vistas existentes: `index` (hub), `mined` (formato oficial con logos `mined_izq/mined_der.png`, MI/MA por sexo, fila TOTAL y firmas), `notas-globales` (sábana por aula, requerido, excluye TIC/Biblia/Informática), `notas-pendientes`, `control-notas` (auditoría de notas + avance con `tipo_auditoria`/`perspectiva`), `rendimiento-corte`, `notas-por-asignatura`, `estadisticas-asistencia`/`seccion-rango` (filas por FECHA + `promedio_rango`), `asistencia-por-seccion` (nueva, reemplaza al reporte "seccion-dia"), `padres`, `estudiantes`, dashboard (directiva/docente-guía), formularios de aulas y matrículas.
+- **Cupos de matrícula**: `MatriculaController@store` bloquea la matrícula cuando `matriculas_count >= aula->cupo`, y tras guardar redirige a `matriculas.create` (UX para matrículas en cadena; test de fase 4 adaptado).
+- `ReporteController@index` usa `pasarCatalogos($request, false)` (no carga docentes/aulas/alumnos en el hub).
+- Servicio: refactor con `queryAsignaciones()` (1 helper con TODOS los filtros: aula/asignatura/docente/grado/modalidad — conserva el contrato de filtros de fase 8), `auditoriaAvanceContenido()`, `asistenciaSeccionRango()`, `asistenciaEstudiante()` (con búsqueda por nombre), `estadisticasFechas()`.
+
+**Conflictos del merge y cómo se resolvieron:**
+1. `ReporteService.php` (3 conflictos): `notasGlobalesPorAlumno` → HÍBRIDO (sus estructuras y forma de fila `matricula_id/alumno/cup/notas/promedio_general/reprobadas` + nuestros filtros flexibles por docente/modalidad/grado; sin su guard que devolvía vacío sin aula); `notasPendientes` y `estadisticasAsistencia` → suyos (su refactor optimizado; los filtros viven en `queryAsignaciones`/`whereHas`).
+2. `control-notas`, `filtros-notas`, `rendimiento-corte` (vistas) → suyos (diseño).
+3. Adaptaciones controlador↔vista hechas a mano (en su rama las vistas nuevas consumían variables que sus controladores NO pasaban; aquí quedaron coherentes): `notasGlobales` pasa `asignaturas/filas/aula` (el merge de variables pone el catálogo PRIMERO para que las columnas filtradas pisen al catálogo), `notasPendientes` pasa `filas`, `padres`/`estadisticasAsistencia`/`asistenciaSeccionRango`/`asistenciaPorSeccion`/`estadisticasPorEstudiante` propagan el arreglo completo del servicio, `asistenciaSeccionDia` ahora despacha al método `asistenciaPorSeccion` (su renombrado) hacia la vista `asistencia-por-seccion`.
+
+**Bugs de su rama corregidos (base: nuestro trabajo):**
+1. El `reject` de asignaturas excluía por SUBSTRING (`str_contains('TIC')`), lo que mataba "Matemá**tic**a" y "Estadís**tic**a" → ahora coincidencia exacta normalizando acentos (`TIC`, `BIBLIA`, `INFORMATICA`).
+2. `resumenIngresoNotas()` usaba `count(distinct concat(...))` — **`concat()` no existe en SQLite** (la suite de tests revientaba con 500→302 en el hub) y en PostgreSQL exigiría casts → conteo de pares únicos en PHP (`get([...])->unique(fn ...)`), agnóstico al motor.
+3. Regla de la lección: en este proyecto el SQL crudo debe funcionar en pgsql (Supabase) y SQLite (tests) a la vez; evitar `concat()`, `ilike` sin guard, etc. (`ilike` solo aparece en `asistenciaEstudiante` cuando se envía `busqueda` — no se usa en los tests).
+
+**Tests adaptados al nuevo diseño (suite final: 160 tests / 491 aserciones, en verde):**
+- `AlumnoMatriculaTest::test_procesar_matricula` → espera redirect a `matriculas.create` (UX de matrículas masivas).
+- `ReporteFiltrosTest::test_estadisticas_asistencia_filtra_por_modalidad` → crea registros reales de `AsistenciaAula` (no hay factory) y verifica el filtro por modalidad con filas por fecha.
+- `ReporteFiltrosTest::test_notas_pendientes_filtra_por_modalidad` → nueva forma de retorno (arreglo de filas con `estudiante`).
 
 ### 8.8 Apoyo y disciplina
 
@@ -481,7 +508,7 @@ Lo importante es no tratar la validación y autorización como un detalle opcion
 
 ### 11.1 Campaña de pruebas integral (Oct 2026)
 
-Estado de la suite regular (`php artisan test`, SQLite en memoria): **130 tests / 397 aserciones, todos en verde**.
+Estado de la suite regular (`php artisan test`, SQLite en memoria): **160 tests / 491 aserciones, todos en verde** (actualizado tras el merge de `feauture/no` del 23 Oct 2026; incluye los tests de módulos de las fases 2-8 y del módulo de respaldos).
 
 | Módulo | Archivo de prueba | Cobertura |
 |---|---|---|
