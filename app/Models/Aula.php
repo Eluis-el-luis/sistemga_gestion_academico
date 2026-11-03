@@ -35,4 +35,9 @@ class Aula extends Model
         return $this->hasMany(Matricula::class, 'aula_id');
     }
 
+    public function asignaciones()
+    {
+        return $this->hasMany(AulaAsignaturaDocente::class, 'aula_id');
+    }
+
 }

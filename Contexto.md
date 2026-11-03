@@ -67,12 +67,13 @@ Ejemplos observados:
 - `Usuario` => `usuario`
 - `Alumno` => `alumno`
 - `Docente` => `docente`
-- `Aula` => `aula`
+- `Aula` => `aula` (relaciones: `docenteGuia`, `grado`, `modalidad`, `anioEscolar`, `matriculas`, `asignaciones`)
 - `Matricula` => `matricula`
 - `Asignatura` => `asignatura`
 - `CorteEvaluativo` => `corte_evaluativo`
-- `AulaAsignaturaDocente` => `aula_asignatura_docente`
+- `AulaAsignaturaDocente` => `aula_asignatura_docente` (relaciones: `aula`, `asignatura`, `docente`, `horarios`)
 - `BloqueHorario` => `bloque_horario`
+- `Horario` => `horario` (relaciones: `aulaAsignaturaDocente`, `bloque` / `bloqueHorario`)
 - `IndicadorLogro` => `indicador_logro`
 
 Esto implica que la aplicación no se apoya en convenciones plurales automáticas de Laravel; se ha diseñado para un esquema académico específico y no genérico. Es relevante para:
@@ -165,6 +166,17 @@ La regla general del proyecto es: el rol operativo define la capacidad, y la pol
 - editar horarios
 - supervisar matrículas
 - revisar boletines
+
+### 5.4 Rol de Secretaría
+
+La Secretaría es un rol operativo con alcance sobre procesos cotidianos de atención al estudiante y administración escolar:
+
+- **Gestión de Alumnos y Matrículas:** puede crear expedientes de nuevos ingresos (`alumnos.gestionar` vía `AlumnoPolicy@create`) y matricular estudiantes (reingresos y nuevos) gracias al permiso `alumnos.gestionar` validado por `MatriculaPolicy@create`. También consulta la información demográfica de los alumnos (`alumnos.ver`).
+- **Gestión de Usuarios:** puede crear y dar de alta cuentas de usuarios (alumnos, docentes o personal auxiliar) y gestionar el reseteo de contraseñas. Está autorizada en `UsuarioPolicy` para `viewAny`, `create` y `update`, con los mismos blindajes de seguridad que el resto del personal: no puede editar ni eliminar cuentas de Director (salvo la propia) ni de Subdirector (solo Dirección). En el formulario de creación/edición, el rol `Alumno` está disponible para la Secretaría.
+- **Consulta Operativa:** accede a la visualización de aulas (`aulas.ver`), horarios (`horarios.ver`) y catálogos académicos (`malla.ver`, `asignaturas_aula.ver`) necesarios para la atención de padres y la administración diaria.
+
+Permisos asignados (ver `database/seeders/PermisoSeeder.php`):
+`alumnos.gestionar`, `alumnos.ver`, `notas.ver`, `asistencia.ver`, `boletines.ver`, `reportes.ver`, `reportes.gestionar`, `aulas.ver`, `horarios.ver`, `malla.ver`, `asignaturas_aula.ver`.
 
 ## 6. Rutas y estructura de navegación HTTP
 
@@ -263,7 +275,37 @@ El modelo `Aula` también es central porque almacena la relación con:
 - año escolar
 - docente guía
 
-### 7.5 Matricula
+### 7.5 Detalles del Aula (módulo actualizado)
+
+El método `AulaController@show` expone la vista `academico.aulas.show` con tres pestañas (Alpine.js): Alumnos Matriculados, Horario del Aula y Asignaturas y Docentes.
+
+**Control de acceso:**
+- `Director` y `Subdirector`: pueden ver cualquier aula (policy `before` concede poder absoluto).
+- `Docente Guia`: solo puede ver la información completa (alumnos, horario y materias) del aula de la cual es titular (`docente_guia_id` coincide con su registro de `Docente`). Cualquier otra aula devuelve `abort(403)`.
+- Se mantiene `authorize('viewAny', Aula::class)` como permiso base (`aulas.ver` / `aulas.gestionar`).
+
+**Carga óptima (Eloquent eager loading):**
+- `$aula->load(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario', 'matriculas.alumno'])` filtrando matrículas por `estado = 'activo'`.
+- `AulaAsignaturaDocente::with(['asignatura', 'docente.usuario', 'horarios.bloque'])` para la carga académica y la matriz de bloques horarios del aula.
+
+**Relaciones del modelo `Aula`:** se agregó `asignaciones()` (`hasMany` a `AulaAsignaturaDocente` por `aula_id`) para consulta de carga académica.
+
+**Corrección de acceso para Subdirectora:** el método `show` ahora usa `authorize('viewAny', Aula::class)` (lectura) en lugar de `authorize('update', $aula)` (escritura), que era el método que bloqueaba el acceso de la Subdirectora al intentar ver detalles de un aula. Con `viewAny` y el `before()` de `AulaPolicy`, la Subdirectora puede ver cualquier aula.
+
+### 7.6 Detalles de Mi Aula (Docente Guía)
+
+Nuevo módulo exclusivo para el rol **Docente Guía**, accesible desde el dashboard (pestaña "Docente Guía", tarjeta "Detalles de Mi Aula") mediante la ruta `tutor.detalles-mi-aula` → `DocenteGuiaController@detallesMiAula()` → vista `academico.docente-guia.detalles-mi-aula`.
+
+**Contenido mostrado:**
+1. **Tarjeta de resumen:** ciclo escolar, modalidad, sección, turno, total de alumnos matriculados y nombre del Docente Guía titular.
+2. **Alumnos Matriculados:** tabla con nombre, código (CUP) y estado (activo) de todos los estudiantes con matrícula activa en el aula.
+3. **Horario del Aula:** matriz semanal (hora × día) con asignatura y profesor por celda, bloques de recreo resaltados, botón imprimir/PDF.
+4. **Asignaturas y Docentes Asignados:** tabla con asignatura, horas/semana, docente asignado (o "Sin docente") y estado (Activa/Inactiva).
+5. **Evaluaciones por Corte:** tarjetas por corte evaluativo con promedio, alumnos con nota, aprobados/reprobados y barra de avance de cobertura de notas.
+
+**Control de acceso:** solo el usuario con rol `Docente Guia` puede acceder, y únicamente al aula de la cual es titular (`docente_guia_id` coincide con su registro de `Docente`). Si no tiene aula asignada en el ciclo activo, se redirige al dashboard con mensaje de error.
+
+### 7.7 Matricula
 
 `Matricula` conecta a un alumno con una aula y con un año escolar. El estado de la matrícula define si el alumno se encuentra activo, retirado o reactivado. El sistema usa ese estado para filtrar alumnos en planillas y para controlar el acceso a evaluaciones y reportes.
 

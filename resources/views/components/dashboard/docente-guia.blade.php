@@ -40,6 +40,17 @@
             </div>
         </a>
 
+        <!-- 2. Detalles de Mi Aula -->
+        <a href="{{ route('academico.tutor.detalles-mi-aula') }}" class="group bg-[#FFFDF5] p-5 rounded-2xl border border-[#e6ac27]/30 shadow-sm hover:border-[#e6ac27] hover:shadow-md transition-all flex flex-col justify-between min-h-[130px]">
+            <div class="w-10 h-10 rounded-xl bg-amber-100 border border-amber-200 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+            </div>
+            <div class="mt-4">
+                <span class="block font-black text-[#3d2c1d]">Detalles de Mi Aula</span>
+                <span class="block text-[10px] font-bold text-[#e6ac27] uppercase tracking-widest mt-1">Alumnos, Horario y Materias</span>
+            </div>
+        </a>
+
         <!-- 2. Boletines Oficiales -->
         <a href="{{ route('academico.boletines.index') }}" class="group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] hover:shadow-md transition-all flex flex-col justify-between min-h-[130px]">
             <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 text-[#e6ac27] flex items-center justify-center group-hover:bg-[#e6ac27] group-hover:text-white transition-colors">

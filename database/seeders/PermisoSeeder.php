@@ -116,11 +116,16 @@ class PermisoSeeder extends Seeder
         ]);
 
         // 10. LA SECRETARÍA (Nuevo)
-        // Gestiona expedientes, matrículas y genera reportes oficiales.
+        // Gestiona expedientes, matrículas, usuarios operativos y genera reportes oficiales.
         $secretaria->syncPermissions([
             'alumnos.gestionar', 'alumnos.ver',
             'notas.ver', 'asistencia.ver', 'boletines.ver',
             'reportes.ver', 'reportes.gestionar',
+            // Consulta operativa para atención de padres y administración diaria
+            'aulas.ver',
+            'horarios.ver',
+            'malla.ver',
+            'asignaturas_aula.ver',
         ]);
     }
 }

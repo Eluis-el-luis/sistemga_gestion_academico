@@ -32,8 +32,8 @@ class AlumnoPolicy
 
     public function create(Usuario $usuario): bool
     {
-        // Solo Dirección y Subdirección pueden registrar nuevos ingresos en el sistema
-        return $usuario->hasRole(['Director', 'Subdirector']);
+        // Dirección, Subdirección y Secretaría pueden registrar nuevos ingresos en el sistema
+        return $usuario->hasAnyRole(['Director', 'Subdirector', 'Secretaria']);
     }
 
     /**

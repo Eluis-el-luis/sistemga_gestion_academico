@@ -117,6 +117,7 @@ Route::middleware('auth')->group(function () {
         Route::get('tutor/mis-alumnos', [\App\Http\Controllers\DocenteGuiaController::class, 'misAlumnos'])->name('tutor.mis-alumnos');
         Route::get('tutor/rendimiento', [\App\Http\Controllers\DocenteGuiaController::class, 'rendimiento'])->name('tutor.rendimiento');
         Route::get('tutor/mi-horario', [\App\Http\Controllers\DocenteGuiaController::class, 'miHorario'])->name('tutor.horario');
+        Route::get('tutor/detalles-mi-aula', [\App\Http\Controllers\DocenteGuiaController::class, 'detallesMiAula'])->name('tutor.detalles-mi-aula');
         
         // Fase 5: Calificaciones
         Route::get('notas', [\App\Http\Controllers\NotaController::class, 'index'])->name('notas.index');
