@@ -305,6 +305,12 @@ Nuevo módulo exclusivo para el rol **Docente Guía**, accesible desde el dashbo
 
 **Control de acceso:** solo el usuario con rol `Docente Guia` puede acceder, y únicamente al aula de la cual es titular (`docente_guia_id` coincide con su registro de `Docente`). Si no tiene aula asignada en el ciclo activo, se redirige al dashboard con mensaje de error.
 
+**Corrección (Nov 2026):** Se agregó la importación de `BloqueHorario` en `DocenteGuiaController` (faltaba el `use App\Models\BloqueHorario;`) que provocaba error 500 "Class 'BloqueHorario' not found" al intentar cargar la vista de detalles del aula.
+
+**Corrección (Nov 2026):** Se corrigió la carga de relaciones en `detallesMiAula()`: se estaba aplicando `where('estado', 'activo')` a la relación `alumno` en lugar de a `matriculas`. La columna `estado` existe en la tabla `matricula`, no en `alumno`. Se cambió a `$aula->load(['matriculas' => fn($q) => $q->where('estado', 'activo')->with('alumno')])`.
+
+**Corrección (Nov 2026):** Se agregó la importación de `AulaAsignaturaDocente` (faltaba `use App\Models\AulaAsignaturaDocente;`) que provocaba error 500 "Class 'AulaAsignaturaDocente' not found" en la línea 230 al consultar la carga académica del aula.
+
 ### 7.7 Matricula
 
 `Matricula` conecta a un alumno con una aula y con un año escolar. El estado de la matrícula define si el alumno se encuentra activo, retirado o reactivado. El sistema usa ese estado para filtrar alumnos en planillas y para controlar el acceso a evaluaciones y reportes.

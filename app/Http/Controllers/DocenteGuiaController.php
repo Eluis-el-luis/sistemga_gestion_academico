@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Docente;
 use App\Models\Aula;
 use App\Models\Alumno;
+use App\Models\BloqueHorario;
+use App\Models\AulaAsignaturaDocente;
 use Illuminate\Http\Request;
 
 class DocenteGuiaController extends Controller
@@ -219,8 +221,8 @@ class DocenteGuiaController extends Controller
             }
 
             // 1. Alumnos matriculados (matrículas activas)
-            $aula->load(['matriculas.alumno' => function ($q) {
-                $q->where('estado', 'activo');
+            $aula->load(['matriculas' => function ($q) {
+                $q->where('estado', 'activo')->with('alumno');
             }]);
             $matriculas = $aula->matriculas->sortBy(fn ($m) => $m->alumno->nombre_completo ?? '');
             $totalAlumnos = $matriculas->count();
