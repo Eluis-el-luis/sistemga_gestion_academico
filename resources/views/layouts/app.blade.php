@@ -152,7 +152,11 @@
 
             <!-- CONTENIDO PRINCIPAL -->
             <main class="flex-1 w-full">
-                {{ $slot }}
+                @isset($slot)
+                    {{ $slot }}
+                @else
+                    @yield('content')
+                @endisset
                 <!-- Pie de página automático para cualquier impresión del sistema -->
                 <div class="hidden print:flex justify-between items-center mt-4 px-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
                     <span>Documento generado el {{ now()->timezone('America/Managua')->format('d/m/Y h:i A') }}</span>

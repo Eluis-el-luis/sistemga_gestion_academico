@@ -73,7 +73,7 @@ class PermisoSeeder extends Seeder
             'alumnos.supervisar','alumnos.ver', 'notas.ver', 'asistencia.ver', 'asistencia.gestionar','indicadores.ver', 
             'boletines.ver', 'malla.gestionar', 'aulas.gestionar', 'aulas.ver', 'asignaturas_aula.gestionar', 
             'horarios.ver', 'horarios.gestionar', 'avance.ver', 'apoyo_padres.ver', 'reparacion.ver', 
-            'reportes.supervisar', 'configuracion.ver'
+            'reportes.supervisar', 'configuracion.gestionar', 'configuracion.ver'
         ]);
 
         // 6. EL DOCENTE GUÍA

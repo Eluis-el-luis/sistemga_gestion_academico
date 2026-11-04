@@ -10,6 +10,7 @@ use App\Http\Controllers\DocenteGuiaController;
 use App\Http\Controllers\NotaController;
 use App\Http\Controllers\PrematriculaController;
 use App\Http\Controllers\GestorBoletinController;
+use App\Http\Controllers\Academico\AnioEscolarController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -54,6 +55,17 @@ Route::middleware('auth')->group(function () {
         Route::resource('matriculas', MatriculaController::class);
         Route::patch('matriculas/{matricula}/retirar', [MatriculaController::class, 'retirar'])->name('matriculas.retirar');
         Route::patch('matriculas/{matricula}/reactivar', [MatriculaController::class, 'reactivar'])->name('matriculas.reactivar');
+        
+        // --- GESTIÓN DE AÑOS ESCOLARES ---
+        Route::resource('anios-escolares', AnioEscolarController::class)
+            ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])
+            ->parameters(['anios-escolares' => 'anioEscolar']);
+        Route::put('anios-escolares/{anioEscolar}/cambiar-estado', [AnioEscolarController::class, 'cambiarEstado'])
+            ->name('anios-escolares.cambiar-estado');
+        Route::get('anios-escolares/{anioEscolar}/validaciones-cierre', [AnioEscolarController::class, 'validacionesCierre'])
+            ->name('anios-escolares.validaciones-cierre');
+        Route::get('anios-escolares/activo', [AnioEscolarController::class, 'activo'])
+            ->name('anios-escolares.activo');
         
         // Ruta para actualizar el límite de horas del grado desde la malla
         Route::put('malla/grado/{grado}/horas', [\App\Http\Controllers\MallaCurricularController::class, 'actualizarHorasGrado'])->name('malla.grado.horas');

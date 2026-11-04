@@ -28,4 +28,9 @@ class AulaAsignaturaDocente extends Model
     {
         return $this->hasMany(Horario::class, 'aula_asignatura_docente_id');
     }
+
+    public function cortesCerrados()
+    {
+        return $this->hasMany(CorteCerrado::class, 'aula_asignatura_docente_id');
+    }
 }

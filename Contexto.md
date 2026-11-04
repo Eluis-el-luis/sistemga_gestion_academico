@@ -216,6 +216,7 @@ Este paquete incluye módulos de:
 - reportes
 - gestión de usuarios
 - grupo-materias
+- **años escolares** (nuevo Nov 2026)
 
 El diseño del router es un reflejo del dominio escolar y define claramente los puntos de entrada de cada operación.
 
@@ -335,6 +336,115 @@ El servicio `NotaService` encapsula la lógica de conversión y promedios (escal
 Además, calcula promedios semestrales y anuales, y establece aprobado cuando la nota final es mayor o igual a 60.
 
 **Nota Final del Corte (0-100):** se calcula escalando la suma de puntos obtenidos contra el **total oficial del corte** (`peso_acumulado + peso_examen`, normalmente 100), no contra la suma de puntajes configurados: las actividades no configuradas aún valen 0. Esta escala se usa tanto al guardar (`NotaController@store`, `ActividadEvaluativaController::recalcularNotasParcial` — también recalcula al editar el puntaje máximo de una actividad) como en el cálculo en vivo de las vistas `notas/evaluar` y `notas/planilla` (columna "Nota Final del Corte N", donde N = número del corte).
+
+### 7.7 Gestión del Año Escolar (Nuevo - Nov 2026)
+
+El módulo de **Gestión del Año Escolar** es el eje central que controla el ciclo de vida académico de la institución. Implementa una máquina de estados estricta con tres estados y transiciones controladas.
+
+#### 7.7.1 Modelo de Datos (`AnioEscolar`)
+
+**Tabla:** `anio_escolar` (actualizada via migración `2026_11_04_000001_update_anio_escolar_add_estados_y_cierre`)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `id` | bigIncrements | PK |
+| `nombre` | string(9) | Formato AAAA-AAAA (ej: 2026-2027) |
+| `fecha_inicio` | date | Inicio del ciclo lectivo |
+| `fecha_fin` | date | Fin del ciclo lectivo |
+| `estado` | enum | `planificacion`, `activo`, `cerrado` |
+| `fecha_cierre` | timestamp | Auditoría: cuándo se cerró |
+| `cerrado_por` | foreignId | Usuario que ejecutó el cierre (nullable) |
+| `observaciones_cierre` | text | Observaciones del proceso de cierre |
+| `created_at` / `updated_at` | timestamps | Auditoría estándar |
+
+**Estados válidos:**
+- **Planificación** (`planificacion`): Año futuro en configuración. Permite crear aulas, asignar docentes, configurar malla curricular y realizar nuevas matrículas sin afectar el año en curso.
+- **Activo** (`activo`): Año actual en operaciones. **Solo puede haber UN (1) año escolar en este estado a la vez**. Aquí se registran asistencias, calificaciones y operaciones diarias.
+- **Cerrado** (`cerrado`): Año finalizado (Solo lectura). **Ninguna calificación, asistencia o registro vinculado a este año puede ser modificado**. Garantiza la inmutabilidad del historial académico.
+
+#### 7.7.2 Reglas de Negocio y Transiciones
+
+| Desde \ Hacia | Planificación | Activo | Cerrado |
+|---------------|---------------|--------|---------|
+| **Planificación** | — | ✅ Si no hay otro activo | ❌ |
+| **Activo** | ✅ Volver a planificación | — | ✅ Con validación estricta |
+| **Cerrado** | ❌ Inmutable | ❌ Inmutable | — |
+
+#### 7.7.3 Lógica de Cierre (Validación Estricta)
+
+El sistema **NO permite** pasar un año de "Activo" a "Cerrado" con un simple clic. El servicio `AnioEscolarService::cerrar()` ejecuta un validador que comprueba **obligatoriamente**:
+
+1. **Todos los docentes han subido y cerrado sus actas de calificaciones**
+   - Verifica que para cada `AulaAsignaturaDocente` activa exista un registro en `corte_cerrado` con `bloqueado=true` para **todos** los cortes evaluativos del año.
+
+2. **Los promedios finales definitivos están generados**
+   - Verifica que cada matrícula activa tenga `nota_cuantitativa` en el IV Corte (corte número 4) para **todas** sus asignaturas.
+
+3. **El estado final de los estudiantes está definido**
+   - Para cada estudiante en cada asignatura: si la nota final ≥ 60 → **Aprobado**; si < 60 → debe tener examen de reparación registrado en `examen_reparacion` con resultado `aprobado`/`reprobado` → **Reparación/Aprobado/Reprobado**.
+
+#### 7.7.4 Arquitectura del Módulo
+
+| Componente | Archivo | Responsabilidad |
+|------------|---------|-----------------|
+| **Migración** | `database/migrations/2026_11_04_000001_update_anio_escolar_add_estados_y_cierre.php` | Esquema BD con enum estado + auditoría |
+| **Modelo** | `app/Models/AnioEscolar.php` | Constantes, scopes, accesores, relaciones, validaciones de estado |
+| **Servicio** | `app/Services/AnioEscolarService.php` | Lógica de negocio: activar, cerrar, validar, auditoría |
+| **Controlador** | `app/Http/Controllers/Academico/AnioEscolarController.php` | HTTP, vistas, formularios, API |
+| **Policy** | `app/Policies/AnioEscolarPolicy.php` | Autorización por recurso (Director/Subdirector para cierre) |
+| **Requests** | `app/Http/Requests/AnioEscolar/*.php` | Validación de entrada y transiciones |
+| **Vistas** | `resources/views/academico/anios-escolares/*.blade.php` | UI: index, create, edit, show (con reporte de validaciones) |
+
+#### 7.7.5 Rutas (prefijo `academico.anios-escolares.*`)
+
+| Método | URI | Acción | Nombre | Permiso |
+|--------|-----|--------|--------|---------|
+| GET | `/anios-escolares` | index | `anios-escolares.index` | `configuracion.ver` |
+| GET | `/anios-escolares/create` | create | `anios-escolares.create` | `configuracion.gestionar` |
+| POST | `/anios-escolares` | store | `anios-escolares.store` | `configuracion.gestionar` |
+| GET | `/anios-escolares/{anioEscolar}` | show | `anios-escolares.show` | `configuracion.ver` |
+| GET | `/anios-escolares/{anioEscolar}/edit` | edit | `anios-escolares.edit` | `configuracion.gestionar` |
+| PUT | `/anios-escolares/{anioEscolar}` | update | `anios-escolares.update` | `configuracion.gestionar` |
+| PUT | `/anios-escolares/{anioEscolar}/cambiar-estado` | cambiarEstado | `anios-escolares.cambiar-estado` | `configuracion.gestionar` |
+| DELETE | `/anios-escolares/{anioEscolar}` | destroy | `anios-escolares.destroy` | `configuracion.gestionar` + Director |
+| GET | `/anios-escolares/activo` | activo (API) | `anios-escolares.activo` | `configuracion.ver` |
+| GET | `/anios-escolares/{anioEscolar}/validaciones-cierre` | validacionesCierre (API) | `anios-escolares.validaciones-cierre` | `configuracion.ver` |
+
+#### 7.7.6 Permisos y Roles
+
+| Acción | Permiso | Roles autorizados |
+|--------|---------|-------------------|
+| Ver listado/detalle | `configuracion.ver` | Director, Subdirector, Coordinador, Secretaría |
+| Crear/Editar/Activar/Planificación | `configuracion.gestionar` | Director, Subdirector |
+| Cerrar año escolar | `configuracion.gestionar` | **Solo Director, Subdirector** (policy `cerrar`) |
+| Eliminar (solo Planificación) | `configuracion.gestionar` | **Solo Director** (policy `delete`) |
+
+#### 7.7.7 API para Otros Módulos
+
+```php
+// Obtener año activo (singleton)
+$anioActivo = AnioEscolar::obtenerActivo(); // retorna null si no hay
+
+// Forzar obtención (lanza excepción si no existe)
+$anioActivo = AnioEscolar::obtenerActivoOFail();
+
+// Verificar si hay año activo
+if (AnioEscolar::existeActivo()) { ... }
+
+// En el servicio (inyectado)
+$anioEscolarService->obtenerOcrearActivo(); // Para desarrollo/testing
+```
+
+#### 7.7.8 Integración con Módulos Existentes
+
+- **Matrículas**: Filtradas por `anio_escolar_id` y `estado = 'activo'`
+- **Aulas**: Pertenecen a un `anio_escolar_id`
+- **Asignaciones** (`AulaAsignaturaDocente`): Vinculadas a `anio_escolar_id`
+- **Cortes Evaluativos**: Pertenecen a un `anio_escolar_id`
+- **Notas**: A través de matrícula → aula → año escolar
+- **Cierre de Cortes** (`CorteCerrado`): Valida cierre por asignación + corte del año activo
+
+---
 
 ## 8. Flujos de negocio principales
 
