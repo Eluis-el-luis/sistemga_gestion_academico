@@ -14,7 +14,7 @@ class Usuario extends Authenticatable implements MustVerifyEmail
     use HasApiTokens, HasFactory, HasRoles, Notifiable, SoftDeletes;
 
     protected $table = 'usuario';
-    protected $fillable = ['nombre_completo', 'email', 'password', 'activo', 'email_verified_at'];
+    protected $fillable = ['nombre_completo', 'email', 'password', 'activo', 'email_verified_at', 'avatar'];
     protected $hidden = ['password', 'remember_token'];
 
     protected $guard_name = 'web';
