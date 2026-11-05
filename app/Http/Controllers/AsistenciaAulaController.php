@@ -92,7 +92,7 @@ class AsistenciaAulaController extends Controller
             }
 
             $aula = Aula::where('docente_guia_id', $docente->id)
-                        ->whereHas('anioEscolar', function($q) { $q->where('activo', true); })
+                        ->whereHas('anioEscolar', function($q) { $q->where('estado', 'activo'); })
                         ->first();
 
             if (!$aula) {

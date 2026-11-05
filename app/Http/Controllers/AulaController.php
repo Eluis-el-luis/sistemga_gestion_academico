@@ -204,7 +204,7 @@ class AulaController extends Controller
             $anios = \App\Models\AnioEscolar::orderBy('nombre', 'desc')->get();
             
             // Si aún necesitas saber cuáles están activos para calcular los docentes ocupados vigentes:
-            $aniosActivosIds = \App\Models\AnioEscolar::where('activo', true)->pluck('id');
+            $aniosActivosIds = \App\Models\AnioEscolar::where('estado', 'activo')->pluck('id');
             
             $docentesOcupados = Aula::whereIn('anio_escolar_id', $aniosActivosIds)
                                         ->pluck('docente_guia_id')
@@ -261,7 +261,7 @@ class AulaController extends Controller
 
             $modalidades = \App\Models\Modalidad::all();
             $grados = \App\Models\Grado::all();
-            $anios = \App\Models\AnioEscolar::where('activo', true)->get();
+            $anios = \App\Models\AnioEscolar::where('estado', 'activo')->get();
             
             $docentesOcupados = Aula::where('anio_escolar_id', $aula->anio_escolar_id)
                                     ->where('id', '!=', $aula->id)
@@ -346,7 +346,7 @@ class AulaController extends Controller
 
             // Datos para el Asignador Masivo por Materia y Nivel
             $todasAulasActivas = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
-                ->whereHas('anioEscolar', fn($q) => $q->where('activo', true))
+                ->whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))
                 ->orderBy('modalidad_id')
                 ->orderBy('grado_id')
                 ->orderBy('nombre')

@@ -444,6 +444,40 @@ $anioEscolarService->obtenerOcrearActivo(); // Para desarrollo/testing
 - **Notas**: A través de matrícula → aula → año escolar
 - **Cierre de Cortes** (`CorteCerrado`): Valida cierre por asignación + corte del año activo
 
+### 7.7.9 Corrección Crítica: Migración de campo `activo` a `estado` (Nov 2026)
+
+**Problema:** La migración `2026_11_04_000001_update_anio_escolar_add_estados_y_cierre` eliminó la columna booleana `activo` y la reemplazó por el enum `estado` (`planificacion`, `activo`, `cerrado`). Esto rompió **15+ consultas** en controladores y servicios que aún usaban `AnioEscolar::where('activo', true)`.
+
+**Archivos corregidos (1ra ola - Nov 2026):**
+| Archivo | Método/Línea | Cambio |
+|---------|--------------|--------|
+| `ReporteService.php` | `anioActivo()` | `where('estado', 'activo')` |
+| `DashboardController.php` | 3 ubicaciones | `where('estado', 'activo')` |
+| `ReporteController.php` | 3 ubicaciones | `where('estado', 'activo')` |
+| `CorteEvaluativoController.php` | `index()` | `where('estado', 'activo')` |
+| `MatriculaController.php` | 3 ubicaciones | `where('estado', 'activo')` |
+| `GestorBoletinController.php` | `bandeja()` | `where('estado', 'activo')` |
+| `ExamenReparacionController.php` | `index()` | `where('estado', 'activo')` |
+| `AulaController.php` | 2 ubicaciones | `where('estado', 'activo')` |
+
+**Archivos corregidos (2da ola - Nov 2026):**
+| Archivo | Método/Línea | Cambio |
+|---------|--------------|--------|
+| `BoletinController.php` | `index()` | `where('estado', 'activo')` |
+| `ApoyoPadresController.php` | `index()` | `where('estado', 'activo')` |
+| `ApoyoFamiliarController.php` | `index()` | `where('estado', 'activo')` |
+| `ActividadEvaluativaController.php` | `index()` | `where('estado', 'activo')` |
+| `AsistenciaAulaController.php` | `create()`, `store()` | `where('estado', 'activo')` |
+| `AulaController.php` | `indexAsignaciones()` | `where('estado', 'activo')` |
+| `DocenteGuiaController.php` | `rendimiento()`, `miHorario()`, `detallesMiAula()` | `where('estado', 'activo')` |
+| `NotaController.php` | `create()`, `evaluar()` | `where('estado', 'activo')` |
+| `PrematriculaController.php` | `index()` | `where('estado', 'activo')` |
+| `NotaService.php` | `calcularResumenAsignatura()` | `where('estado', 'activo')` |
+
+**Total: 18 archivos / ~25 consultas corregidas**
+
+**Regla:** Tras cambiar el esquema de BD (migraciones), **siempre buscar y actualizar** todas las referencias al campo anterior en controladores, servicios, models, policies, seeders, factories, tests.
+
 ---
 
 ## 8. Flujos de negocio principales

@@ -34,7 +34,7 @@ class PrematriculaController extends Controller
 
             // 1. Obtener el aula activa del docente guía
             $aula = Aula::with(['grado', 'anioEscolar'])
-                ->whereHas('anioEscolar', fn ($q) => $q->where('activo', true))
+                ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'))
                 ->where('docente_guia_id', $usuario->docente->id)
                 ->first();
 

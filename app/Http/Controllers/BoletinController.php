@@ -34,7 +34,7 @@ class BoletinController extends Controller
             $usuario = auth()->user();
 
             $aulas = Aula::with(['grado', 'anioEscolar'])
-                ->whereHas('anioEscolar', fn ($q) => $q->where('activo', true))
+                ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'))
                 ->when($usuario->docente && !$usuario->hasRole(['Director', 'Subdirector']), function ($q) use ($usuario) {
                     $q->where('docente_guia_id', $usuario->docente->id);
                 })

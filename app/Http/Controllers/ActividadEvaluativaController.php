@@ -22,7 +22,7 @@ class ActividadEvaluativaController extends Controller
             $modoSupervision = $user->hasAnyRole(['Director', 'Subdirector']);
 
             // 2. Obtener los cortes evaluativos del año activo
-            $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('activo', true))->get();
+            $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))->get();
             
             // IMPORTANTE: La vista manda el filtro como 'corte_id' en el select
             $corteSeleccionado = $request->query('corte_id', $cortes->first()->id ?? null);

@@ -18,7 +18,7 @@ class GestorBoletinController extends Controller
             // Solo personal autorizado puede acceder a la bandeja de impresión
             // $this->authorize('viewBandeja', \App\Models\Boletin::class);
 
-            $anioActivo = \App\Models\AnioEscolar::where('activo', true)->first();
+            $anioActivo = \App\Models\AnioEscolar::where('estado', 'activo')->first();
             
             if (!$anioActivo) {
                 return redirect()->route('dashboard')->with('error', 'No hay un año escolar activo configurado.');

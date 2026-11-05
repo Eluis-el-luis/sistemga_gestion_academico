@@ -17,7 +17,7 @@ class ApoyoFamiliarController extends Controller
             
             // 1. Identificar el aula a cargo del Maestro Guía
             $aula = Aula::with('grado')
-                ->whereHas('anioEscolar', fn ($q) => $q->where('activo', true))
+                ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'))
                 ->where('docente_guia_id', $usuario->docente->id ?? 0)
                 ->first();
 

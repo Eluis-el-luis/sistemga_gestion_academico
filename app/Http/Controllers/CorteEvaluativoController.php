@@ -16,7 +16,7 @@ class CorteEvaluativoController extends Controller
         }
 
         try {
-            $anioActivo = AnioEscolar::where('activo', true)->first();
+            $anioActivo = AnioEscolar::where('estado', 'activo')->first();
             
             $cortes = $anioActivo 
                 ? CorteEvaluativo::where('anio_escolar_id', $anioActivo->id)->orderBy('numero')->get() 
