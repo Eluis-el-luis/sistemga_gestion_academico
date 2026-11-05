@@ -4,10 +4,15 @@
     <!-- Encabezado de Contexto con Botón de Horario -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2 px-2">
         <div>
-            <h3 class="text-xl font-black text-[#3d2c1d]">
-                Tutoría Activa: <span class="text-[#e6ac27]">{{ $aulaGuia?->grado?->nombre ?? 'Sin Grado' }} Sección "{{ $aulaGuia?->nombre ?? 'N/A' }}"</span>
-            </h3>
-            <p class="text-sm text-slate-500 font-medium mt-1">Panel de control y seguimiento integral del grupo asignado.</p>
+            @if($aulaGuia)
+                <h3 class="text-xl font-black text-[#3d2c1d]">
+                    Tutoría Activa: <span class="text-[#e6ac27]">{{ $aulaGuia->grado->nombre ?? 'Sin Grado' }} Sección "{{ $aulaGuia->nombre ?? 'N/A' }}"</span>
+                </h3>
+                <p class="text-sm text-slate-500 font-medium mt-1">Panel de control y seguimiento integral del grupo asignado.</p>
+            @else
+                <h3 class="text-xl font-black text-[#3d2c1d]">Tutoría Activa: <span class="text-slate-400">Sin aula asignada</span></h3>
+                <p class="text-sm text-slate-500 font-medium mt-1">No tienes un aula asignada como docente guía. Contacta al administrador para que te asigne un grupo.</p>
+            @endif
         </div>
 
         @if($aulaGuia)
@@ -25,6 +30,8 @@
             </a>
         @endif
     </div>
+
+    @if($aulaGuia)
 
     <!-- 5 Accesos Rápidos Operativos -->
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
@@ -206,7 +213,7 @@
                     <tr class="hover:bg-slate-50 transition-colors">
                         <td class="py-4 px-4 text-sm font-bold text-[#3d2c1d]">1. Asistencia Estudiantil</td>
                         @for($i = 1; $i <= 12; $i++)
-                            <td class="py-4 px-2 text-center text-xs border-l border-slate-100 {{ isset($muralAula[$i]['asistencia_est']) && $muralAula[$i]['asistencia_est'] >= 80 ? 'font-black text-emerald-600' : (isset($muralAula[$i]['asistencia_est']) ? 'font-black text-rose-600' : 'text-slate-300') }}">
+                            <td class="py-4 px-2 text-center text-xs border-l border-slate-100 {{ isset($muralAula[$i]['asistencia_est']) && $muralAula[$i]['asistencia_est'] >= 80 ? 'font-black text-emerald-600' : (isset($muralAula[$i]['asistencia_est']) && $muralAula[$i]['asistencia_est'] !== null ? 'font-black text-rose-600' : 'text-slate-300') }}">
                                 {{ $muralAula[$i]['asistencia_est'] !== null ? $muralAula[$i]['asistencia_est'].'%' : '---' }}
                             </td>
                         @endfor
@@ -216,7 +223,7 @@
                     <tr class="hover:bg-slate-50 transition-colors">
                         <td class="py-4 px-4 text-sm font-bold text-[#3d2c1d]">2. Asistencia Docente</td>
                         @for($i = 1; $i <= 12; $i++)
-                            <td class="py-4 px-2 text-center text-xs border-l border-slate-100 {{ isset($muralAula[$i]['asistencia_doc']) && $muralAula[$i]['asistencia_doc'] == 100 ? 'font-black text-emerald-600' : (isset($muralAula[$i]['asistencia_doc']) ? 'font-black text-amber-600' : 'text-slate-300') }}">
+                            <td class="py-4 px-2 text-center text-xs border-l border-slate-100 {{ isset($muralAula[$i]['asistencia_doc']) && $muralAula[$i]['asistencia_doc'] == 100 ? 'font-black text-emerald-600' : (isset($muralAula[$i]['asistencia_doc']) && $muralAula[$i]['asistencia_doc'] !== null ? 'font-black text-amber-600' : 'text-slate-300') }}">
                                 {{ $muralAula[$i]['asistencia_doc'] !== null ? $muralAula[$i]['asistencia_doc'].'%' : '---' }}
                             </td>
                         @endfor
@@ -314,6 +321,23 @@
             </a>
         </div>
     </div>
+
+@else
+    <!-- Estado vacío cuando no hay aula asignada -->
+    <div class="bg-white p-12 rounded-3xl border border-slate-200 shadow-sm text-center">
+        <div class="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-6">
+            <svg class="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+        </div>
+        <h3 class="text-xl font-black text-[#3d2c1d] mb-2">Sin Aula Asignada</h3>
+        <p class="text-slate-500 mb-6 max-w-md mx-auto">No tienes ningún aula asignada como docente guía para el año escolar actual. Contacta al administrador o coordinador para que te asignen un grupo.</p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="{{ route('academico.aulas.index') }}" class="inline-flex items-center gap-2 px-6 py-3 bg-[#3d2c1d] hover:bg-stone-800 text-white rounded-2xl text-sm font-black shadow-sm transition-all">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                Ver Aulas Disponibles
+            </a>
+        </div>
+    </div>
+@endif
 
 </div>
 @endhasanyrole
