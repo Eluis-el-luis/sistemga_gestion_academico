@@ -10,6 +10,7 @@ use App\Http\Controllers\DocenteGuiaController;
 use App\Http\Controllers\NotaController;
 use App\Http\Controllers\PrematriculaController;
 use App\Http\Controllers\GestorBoletinController;
+use App\Http\Controllers\Academico\AnioEscolarController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -17,20 +18,25 @@ Route::get('/', function () {
 
 // --- RUTAS DEL PANEL PRINCIPAL Y TABLERO DE AVISOS ---
 Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'role'])
     ->name('dashboard');
+
+// Ruta para usuarios sin rol asignado
+Route::get('/sin-rol', function () {
+    return view('auth.sin-rol');
+})->middleware(['auth'])->name('sin-rol');
 
 // Gestión de Avisos
 Route::post('/dashboard/avisos', [\App\Http\Controllers\DashboardController::class, 'storeAviso'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'role'])
     ->name('dashboard.avisos.store');
 
 Route::put('/dashboard/avisos/{id}', [\App\Http\Controllers\DashboardController::class, 'updateAviso'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'role'])
     ->name('dashboard.avisos.update');
 
 Route::delete('/dashboard/avisos/{id}', [\App\Http\Controllers\DashboardController::class, 'destroyAviso'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'role'])
     ->name('dashboard.avisos.destroy');
 // -----------------------------------------------------
 
@@ -54,6 +60,17 @@ Route::middleware('auth')->group(function () {
         Route::resource('matriculas', MatriculaController::class);
         Route::patch('matriculas/{matricula}/retirar', [MatriculaController::class, 'retirar'])->name('matriculas.retirar');
         Route::patch('matriculas/{matricula}/reactivar', [MatriculaController::class, 'reactivar'])->name('matriculas.reactivar');
+        
+        // --- GESTIÓN DE AÑOS ESCOLARES ---
+        Route::resource('anios-escolares', AnioEscolarController::class)
+            ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])
+            ->parameters(['anios-escolares' => 'anioEscolar']);
+        Route::put('anios-escolares/{anioEscolar}/cambiar-estado', [AnioEscolarController::class, 'cambiarEstado'])
+            ->name('anios-escolares.cambiar-estado');
+        Route::get('anios-escolares/{anioEscolar}/validaciones-cierre', [AnioEscolarController::class, 'validacionesCierre'])
+            ->name('anios-escolares.validaciones-cierre');
+        Route::get('anios-escolares/activo', [AnioEscolarController::class, 'activo'])
+            ->name('anios-escolares.activo');
         
         // Ruta para actualizar el límite de horas del grado desde la malla
         Route::put('malla/grado/{grado}/horas', [\App\Http\Controllers\MallaCurricularController::class, 'actualizarHorasGrado'])->name('malla.grado.horas');
@@ -117,6 +134,7 @@ Route::middleware('auth')->group(function () {
         Route::get('tutor/mis-alumnos', [\App\Http\Controllers\DocenteGuiaController::class, 'misAlumnos'])->name('tutor.mis-alumnos');
         Route::get('tutor/rendimiento', [\App\Http\Controllers\DocenteGuiaController::class, 'rendimiento'])->name('tutor.rendimiento');
         Route::get('tutor/mi-horario', [\App\Http\Controllers\DocenteGuiaController::class, 'miHorario'])->name('tutor.horario');
+        Route::get('tutor/detalles-mi-aula', [\App\Http\Controllers\DocenteGuiaController::class, 'detallesMiAula'])->name('tutor.detalles-mi-aula');
         
         // Fase 5: Calificaciones
         Route::get('notas', [\App\Http\Controllers\NotaController::class, 'index'])->name('notas.index');

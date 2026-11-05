@@ -14,17 +14,39 @@ class AulaPolicy
      */
     public function before(Usuario $usuario, $ability): ?bool
     {
+        \Illuminate\Support\Facades\Log::info('AulaPolicy@before', [
+            'user_id' => $usuario->id,
+            'roles' => $usuario->getRoleNames()->toArray(),
+            'ability' => $ability
+        ]);
+
         if ($usuario->hasRole(['Director', 'Subdirector'])) {
+            \Illuminate\Support\Facades\Log::info('AulaPolicy@before: Access GRANTED by role');
             return true;
         }
         return null;
     }
 
     /**
-     * Equivalente a (V)er en la Matriz.
+     * Equivalente a (V)er en la Matriz (listado).
      */
     public function viewAny(Usuario $usuario): bool
     {
+        return $usuario->hasPermissionTo('aulas.ver') || $usuario->hasPermissionTo('aulas.gestionar');
+    }
+
+    /**
+     * Ver un aula en específico (detalles/show).
+     * Director y Subdirector tienen poder absoluto via before().
+     * Docente Guía solo su propio aula (validado en el controlador).
+     */
+    public function view(Usuario $usuario, Aula $aula): bool
+    {
+        \Illuminate\Support\Facades\Log::info('AulaPolicy@view', [
+            'user_id' => $usuario->id,
+            'has_ver' => $usuario->hasPermissionTo('aulas.ver'),
+            'has_gestionar' => $usuario->hasPermissionTo('aulas.gestionar'),
+        ]);
         return $usuario->hasPermissionTo('aulas.ver') || $usuario->hasPermissionTo('aulas.gestionar');
     }
 

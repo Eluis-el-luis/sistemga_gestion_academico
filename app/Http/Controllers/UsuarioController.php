@@ -80,8 +80,9 @@ class UsuarioController extends Controller
         try {
             $this->authorize('create', Usuario::class);
 
-            // 1. Ocultamos 'Alumno' por defecto en el panel de personal
-            $rolesExcluidos = ['Alumno']; 
+            // 1. Ocultamos 'Alumno' por defecto en el panel de personal,
+            //    excepto para la Secretaría que debe poder dar de alta cuentas de alumnos.
+            $rolesExcluidos = auth()->user()->hasRole('Secretaria') ? [] : ['Alumno'];
             
             // 2. Si ya hay Director, ocultamos la casilla
             if (\App\Models\Usuario::role('Director')->exists()) {
@@ -115,7 +116,8 @@ class UsuarioController extends Controller
         try {
             $this->authorize('update', $usuario);
 
-            $rolesExcluidos = ['Alumno'];
+            // La Secretaría puede asignar el rol 'Alumno' al editar cuentas operativas.
+            $rolesExcluidos = auth()->user()->hasRole('Secretaria') ? [] : ['Alumno'];
             
             // En la edición, ocultamos el rol SOLO si está ocupado por OTRA persona.
             if (\App\Models\Usuario::role('Director')->where('id', '!=', $usuario->id)->exists()) {

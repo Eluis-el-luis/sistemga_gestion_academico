@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Log;
 
-abstract class Controller
+abstract class Controller extends BaseController
 {
     /**
      * Registra el error real en storage/logs/laravel.log y devuelve el detalle

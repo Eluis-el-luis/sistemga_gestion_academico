@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Docente;
 use App\Models\Aula;
 use App\Models\Alumno;
+use App\Models\BloqueHorario;
+use App\Models\AulaAsignaturaDocente;
 use Illuminate\Http\Request;
 
 class DocenteGuiaController extends Controller
@@ -103,7 +105,7 @@ class DocenteGuiaController extends Controller
 
             $aula = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
                 ->where('docente_guia_id', $docente->id)
-                ->whereHas('anioEscolar', fn ($q) => $q->where('activo', true))
+                ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'))
                 ->first();
 
             if (!$aula) {
@@ -142,7 +144,7 @@ class DocenteGuiaController extends Controller
             // Busca estrictamente el aula activa asignada a este Docente Guía
             $aula = Aula::with(['grado', 'modalidad', 'docenteGuia.usuario'])
                 ->where('docente_guia_id', $docente->id)
-                ->whereHas('anioEscolar', fn ($q) => $q->where('activo', true))
+                ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'))
                 ->first();
 
             if (!$aula) {
@@ -186,6 +188,109 @@ class DocenteGuiaController extends Controller
 
         } catch (\Exception $e) {
             return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al cargar el horario de tu aula.');
+        }
+    }
+
+    /**
+     * Detalles completos del aula que guía el Docente Guía.
+     * Muestra: alumnos matriculados, docente guía, horario del aula,
+     * asignaturas/docentes asignados y resumen de evaluaciones (notas por corte).
+     */
+    public function detallesMiAula()
+    {
+        try {
+            $usuario = auth()->user();
+
+            if (!$usuario->hasRole('Docente Guia')) {
+                return redirect()->route('dashboard')->with('error', 'Solo el Docente Guía puede acceder a los detalles de su aula.');
+            }
+
+            $docente = Docente::where('usuario_id', $usuario->id)->first();
+            if (!$docente) {
+                return redirect()->route('dashboard')->with('error', 'No se encontró su perfil de docente asociado.');
+            }
+
+            // Busca estrictamente el aula activa asignada a este Docente Guía
+            $aula = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
+                ->where('docente_guia_id', $docente->id)
+                ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'))
+                ->first();
+
+            if (!$aula) {
+                return redirect()->route('dashboard')->with('error', 'No tiene un aula asignada como Maestro Guía en el ciclo activo.');
+            }
+
+            // 1. Alumnos matriculados (matrículas activas)
+            $aula->load(['matriculas' => function ($q) {
+                $q->where('estado', 'activo')->with('alumno');
+            }]);
+            $matriculas = $aula->matriculas->sortBy(fn ($m) => $m->alumno->nombre_completo ?? '');
+            $totalAlumnos = $matriculas->count();
+
+            // 2. Asignaturas y docentes asignados (carga académica) con horarios
+            $asignaciones = AulaAsignaturaDocente::with(['asignatura', 'docente.usuario', 'horarios.bloque'])
+                ->where('aula_id', $aula->id)
+                ->orderBy('id')
+                ->get();
+
+            // 3. Matriz de horario del aula
+            $bloques = BloqueHorario::where('modalidad_id', $aula->modalidad_id)
+                ->where('turno', $aula->turno)
+                ->where('tipo_jornada', 'Regular')
+                ->orderBy('hora_inicio')
+                ->get();
+
+            $dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+            $diasBD = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
+
+            $horarios = $asignaciones->pluck('horarios')->flatten();
+            $horariosIndex = [];
+            foreach ($horarios as $h) {
+                $horariosIndex[$h->bloque_horario_id][$h->dia_semana] = $h;
+            }
+
+            $matriz = [];
+            foreach ($bloques as $bloque) {
+                $fila = ['bloque' => $bloque, 'dias' => []];
+                foreach ($dias as $i => $dia) {
+                    $diaBD = $diasBD[$i];
+                    $fila['dias'][$dia] = $bloque->es_recreo
+                        ? null
+                        : ($horariosIndex[$bloque->id][$diaBD] ?? null);
+                }
+                $matriz[] = $fila;
+            }
+
+            // 4. Resumen de evaluaciones por corte (notas del aula)
+            $matriculaIds = $matriculas->pluck('id');
+            $cortes = \App\Models\CorteEvaluativo::where('anio_escolar_id', $aula->anio_escolar_id)
+                ->orderBy('numero')
+                ->get();
+
+            $evaluacionesPorCorte = [];
+            foreach ($cortes as $corte) {
+                $notasCorte = \App\Models\Nota::whereIn('matricula_id', $matriculaIds)
+                    ->where('corte_evaluativo_id', $corte->id)
+                    ->get();
+
+                $evaluacionesPorCorte[] = [
+                    'corte' => $corte,
+                    'total_alumnos' => $matriculaIds->count(),
+                    'alumnos_con_nota' => $notasCorte->count(),
+                    'promedio' => $notasCorte->count() > 0 ? round((float) $notasCorte->avg('nota_cuantitativa'), 1) : null,
+                    'aprobados' => $notasCorte->where('nota_cuantitativa', '>=', 60)->count(),
+                    'reprobados' => $notasCorte->where('nota_cuantitativa', '<', 60)->count(),
+                ];
+            }
+
+            return view('academico.docente-guia.detalles-mi-aula', compact(
+                'aula', 'matriculas', 'totalAlumnos',
+                'asignaciones', 'matriz', 'dias', 'diasBD', 'bloques',
+                'cortes', 'evaluacionesPorCorte'
+            ));
+
+        } catch (\Exception $e) {
+            return redirect()->route('dashboard')->with('error', 'Ocurrió un problema al cargar los detalles de tu aula. Por favor, intenta de nuevo.');
         }
     }
 }

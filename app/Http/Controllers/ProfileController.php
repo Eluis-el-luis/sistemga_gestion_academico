@@ -29,31 +29,34 @@ class ProfileController extends Controller
         }
     }
 
-    /**
-     * Update the user's profile information.
-     */
+
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        // La validación del ProfileUpdateRequest ya se ejecuta de forma segura antes de entrar aquí
-        try {
-            $user = $request->user();
-            $user->fill($request->validated());
+        $user = $request->user();
+        
+        // Llena el modelo con los datos validados (nombre_completo)
+        $user->fill($request->validated());
 
-            if ($user->isDirty('email')) {
-                $user->email_verified_at = null;
+        // --- LÓGICA PARA GUARDAR EL AVATAR ---
+        if ($request->hasFile('avatar')) {
+            // Si el usuario ya tenía una foto, la borramos del disco para no acumular basura
+            if ($user->avatar) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->avatar);
             }
-
-            $user->save();
-
-            return Redirect::route('profile.edit')->with('status', 'profile-updated');
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si la base de datos rechaza la actualización del perfil
-            return Redirect::route('profile.edit')->with('error', 'Hubo un error técnico al intentar actualizar tu información. Inténtalo de nuevo.');
+            
+            // Guardamos la nueva foto en la carpeta "avatars" dentro del disco público
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $user->avatar = $path;
         }
+        // -------------------------------------
+
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
+        }
+
+        $user->save();
+
+        return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
 
     /**

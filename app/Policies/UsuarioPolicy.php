@@ -11,12 +11,12 @@ class UsuarioPolicy
 
     public function viewAny(Usuario $authUser): bool
     {
-        return $authUser->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios']);
+        return $authUser->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Secretaria']);
     }
 
     public function create(Usuario $authUser): bool
     {
-        return $authUser->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios']);
+        return $authUser->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Secretaria']);
     }
 
     public function update(Usuario $authUser, Usuario $targetUser): bool
@@ -31,8 +31,8 @@ class UsuarioPolicy
             return $authUser->hasAnyRole(['Director', 'Subdirector']);
         }
 
-        // 3. REGLA GENERAL: Para el resto del personal, los tres roles tienen acceso.
-        return $authUser->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios']);
+        // 3. REGLA GENERAL: Para el resto del personal, los roles autorizados tienen acceso.
+        return $authUser->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Secretaria']);
     }
 
     public function delete(Usuario $authUser, Usuario $targetUser): bool

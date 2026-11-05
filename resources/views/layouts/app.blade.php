@@ -113,11 +113,16 @@
                             @php
                                 $nombreCorto = explode(' ', Auth::user()->nombre_completo ?? Auth::user()->name ?? 'Usuario')[0];
                                 $inicial = substr($nombreCorto, 0, 1);
+                                $avatarNav = Auth::user()->avatar ? asset('storage/' . Auth::user()->avatar) : null;
                             @endphp
                             <button class="inline-flex items-center p-1.5 pr-3 border border-[#e6ac27]/30 text-sm font-bold rounded-full text-amber-900 dark:text-amber-100 bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition shadow-sm gap-2">
-                                <div class="w-7 h-7 rounded-full bg-[#e6ac27] text-white flex items-center justify-center text-xs">
-                                    {{ $inicial }}
-                                </div>
+                                @if($avatarNav)
+                                    <img src="{{ $avatarNav }}" class="w-7 h-7 rounded-full object-cover border border-[#e6ac27]/50" alt="Avatar">
+                                @else
+                                    <div class="w-7 h-7 rounded-full bg-[#e6ac27] text-white flex items-center justify-center text-xs">
+                                        {{ $inicial }}
+                                    </div>
+                                @endif
                                 <span class="hidden sm:block">{{ $nombreCorto }}</span>
                                 <svg class="fill-current h-4 w-4 text-[#e6ac27]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                             </button>
@@ -152,7 +157,11 @@
 
             <!-- CONTENIDO PRINCIPAL -->
             <main class="flex-1 w-full">
-                {{ $slot }}
+                @isset($slot)
+                    {{ $slot }}
+                @else
+                    @yield('content')
+                @endisset
                 <!-- Pie de página automático para cualquier impresión del sistema -->
                 <div class="hidden print:flex justify-between items-center mt-4 px-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
                     <span>Documento generado el {{ now()->timezone('America/Managua')->format('d/m/Y h:i A') }}</span>

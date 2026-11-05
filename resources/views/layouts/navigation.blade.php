@@ -136,6 +136,12 @@
                 <span x-show="sidebarOpen" class="whitespace-nowrap">Agrupaciones</span>
             </a>
 
+            <!-- NUEVO ENLACE: Gestión de Años Escolares -->
+            <a href="{{ route('academico.anios-escolares.index') }}" title="Gestión de Años Escolares" class="flex items-center gap-3 px-4 mx-3 py-3 rounded-xl transition-all {{ request()->routeIs('academico.anios-escolares.*') ? 'bg-[#e6ac27]/15 text-[#e6ac27] font-black border border-[#e6ac27]/30 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-[#3d2c1d] font-bold' }}" :class="sidebarOpen ? 'justify-start' : 'justify-center lg:mx-2 lg:px-0'">
+                <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <span x-show="sidebarOpen" class="whitespace-nowrap">Años Escolares</span>
+            </a>
+
             <a href="{{ route('academico.bloques.index') }}" title="Bloques de Modalidades" class="flex items-center gap-3 px-4 mx-3 py-3 rounded-xl transition-all {{ request()->routeIs('academico.bloques.*') ? 'bg-[#e6ac27]/15 text-[#e6ac27] font-black border border-[#e6ac27]/30 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-[#3d2c1d] font-bold' }}" :class="sidebarOpen ? 'justify-start' : 'justify-center lg:mx-2 lg:px-0'">
                 <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 <span x-show="sidebarOpen" class="whitespace-nowrap">Bloques Horarios</span>

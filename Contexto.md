@@ -67,12 +67,13 @@ Ejemplos observados:
 - `Usuario` => `usuario`
 - `Alumno` => `alumno`
 - `Docente` => `docente`
-- `Aula` => `aula`
+- `Aula` => `aula` (relaciones: `docenteGuia`, `grado`, `modalidad`, `anioEscolar`, `matriculas`, `asignaciones`)
 - `Matricula` => `matricula`
 - `Asignatura` => `asignatura`
 - `CorteEvaluativo` => `corte_evaluativo`
-- `AulaAsignaturaDocente` => `aula_asignatura_docente`
+- `AulaAsignaturaDocente` => `aula_asignatura_docente` (relaciones: `aula`, `asignatura`, `docente`, `horarios`)
 - `BloqueHorario` => `bloque_horario`
+- `Horario` => `horario` (relaciones: `aulaAsignaturaDocente`, `bloque` / `bloqueHorario`)
 - `IndicadorLogro` => `indicador_logro`
 
 Esto implica que la aplicación no se apoya en convenciones plurales automáticas de Laravel; se ha diseñado para un esquema académico específico y no genérico. Es relevante para:
@@ -166,6 +167,17 @@ La regla general del proyecto es: el rol operativo define la capacidad, y la pol
 - supervisar matrículas
 - revisar boletines
 
+### 5.4 Rol de Secretaría
+
+La Secretaría es un rol operativo con alcance sobre procesos cotidianos de atención al estudiante y administración escolar:
+
+- **Gestión de Alumnos y Matrículas:** puede crear expedientes de nuevos ingresos (`alumnos.gestionar` vía `AlumnoPolicy@create`) y matricular estudiantes (reingresos y nuevos) gracias al permiso `alumnos.gestionar` validado por `MatriculaPolicy@create`. También consulta la información demográfica de los alumnos (`alumnos.ver`).
+- **Gestión de Usuarios:** puede crear y dar de alta cuentas de usuarios (alumnos, docentes o personal auxiliar) y gestionar el reseteo de contraseñas. Está autorizada en `UsuarioPolicy` para `viewAny`, `create` y `update`, con los mismos blindajes de seguridad que el resto del personal: no puede editar ni eliminar cuentas de Director (salvo la propia) ni de Subdirector (solo Dirección). En el formulario de creación/edición, el rol `Alumno` está disponible para la Secretaría.
+- **Consulta Operativa:** accede a la visualización de aulas (`aulas.ver`), horarios (`horarios.ver`) y catálogos académicos (`malla.ver`, `asignaturas_aula.ver`) necesarios para la atención de padres y la administración diaria.
+
+Permisos asignados (ver `database/seeders/PermisoSeeder.php`):
+`alumnos.gestionar`, `alumnos.ver`, `notas.ver`, `asistencia.ver`, `boletines.ver`, `reportes.ver`, `reportes.gestionar`, `aulas.ver`, `horarios.ver`, `malla.ver`, `asignaturas_aula.ver`.
+
 ## 6. Rutas y estructura de navegación HTTP
 
 El router principal se encuentra en `routes/web.php` y define dos grandes bloques:
@@ -204,6 +216,7 @@ Este paquete incluye módulos de:
 - reportes
 - gestión de usuarios
 - grupo-materias
+- **años escolares** (nuevo Nov 2026)
 
 El diseño del router es un reflejo del dominio escolar y define claramente los puntos de entrada de cada operación.
 
@@ -263,7 +276,43 @@ El modelo `Aula` también es central porque almacena la relación con:
 - año escolar
 - docente guía
 
-### 7.5 Matricula
+### 7.5 Detalles del Aula (módulo actualizado)
+
+El método `AulaController@show` expone la vista `academico.aulas.show` con tres pestañas (Alpine.js): Alumnos Matriculados, Horario del Aula y Asignaturas y Docentes.
+
+**Control de acceso:**
+- `Director` y `Subdirector`: pueden ver cualquier aula (policy `before` concede poder absoluto).
+- `Docente Guia`: solo puede ver la información completa (alumnos, horario y materias) del aula de la cual es titular (`docente_guia_id` coincide con su registro de `Docente`). Cualquier otra aula devuelve `abort(403)`.
+- Se mantiene `authorize('viewAny', Aula::class)` como permiso base (`aulas.ver` / `aulas.gestionar`).
+
+**Carga óptima (Eloquent eager loading):**
+- `$aula->load(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario', 'matriculas.alumno'])` filtrando matrículas por `estado = 'activo'`.
+- `AulaAsignaturaDocente::with(['asignatura', 'docente.usuario', 'horarios.bloque'])` para la carga académica y la matriz de bloques horarios del aula.
+
+**Relaciones del modelo `Aula`:** se agregó `asignaciones()` (`hasMany` a `AulaAsignaturaDocente` por `aula_id`) para consulta de carga académica.
+
+**Corrección de acceso para Subdirectora:** el método `show` ahora usa `authorize('viewAny', Aula::class)` (lectura) en lugar de `authorize('update', $aula)` (escritura), que era el método que bloqueaba el acceso de la Subdirectora al intentar ver detalles de un aula. Con `viewAny` y el `before()` de `AulaPolicy`, la Subdirectora puede ver cualquier aula.
+
+### 7.6 Detalles de Mi Aula (Docente Guía)
+
+Nuevo módulo exclusivo para el rol **Docente Guía**, accesible desde el dashboard (pestaña "Docente Guía", tarjeta "Detalles de Mi Aula") mediante la ruta `tutor.detalles-mi-aula` → `DocenteGuiaController@detallesMiAula()` → vista `academico.docente-guia.detalles-mi-aula`.
+
+**Contenido mostrado:**
+1. **Tarjeta de resumen:** ciclo escolar, modalidad, sección, turno, total de alumnos matriculados y nombre del Docente Guía titular.
+2. **Alumnos Matriculados:** tabla con nombre, código (CUP) y estado (activo) de todos los estudiantes con matrícula activa en el aula.
+3. **Horario del Aula:** matriz semanal (hora × día) con asignatura y profesor por celda, bloques de recreo resaltados, botón imprimir/PDF.
+4. **Asignaturas y Docentes Asignados:** tabla con asignatura, horas/semana, docente asignado (o "Sin docente") y estado (Activa/Inactiva).
+5. **Evaluaciones por Corte:** tarjetas por corte evaluativo con promedio, alumnos con nota, aprobados/reprobados y barra de avance de cobertura de notas.
+
+**Control de acceso:** solo el usuario con rol `Docente Guia` puede acceder, y únicamente al aula de la cual es titular (`docente_guia_id` coincide con su registro de `Docente`). Si no tiene aula asignada en el ciclo activo, se redirige al dashboard con mensaje de error.
+
+**Corrección (Nov 2026):** Se agregó la importación de `BloqueHorario` en `DocenteGuiaController` (faltaba el `use App\Models\BloqueHorario;`) que provocaba error 500 "Class 'BloqueHorario' not found" al intentar cargar la vista de detalles del aula.
+
+**Corrección (Nov 2026):** Se corrigió la carga de relaciones en `detallesMiAula()`: se estaba aplicando `where('estado', 'activo')` a la relación `alumno` en lugar de a `matriculas`. La columna `estado` existe en la tabla `matricula`, no en `alumno`. Se cambió a `$aula->load(['matriculas' => fn($q) => $q->where('estado', 'activo')->with('alumno')])`.
+
+**Corrección (Nov 2026):** Se agregó la importación de `AulaAsignaturaDocente` (faltaba `use App\Models\AulaAsignaturaDocente;`) que provocaba error 500 "Class 'AulaAsignaturaDocente' not found" en la línea 230 al consultar la carga académica del aula.
+
+### 7.7 Matricula
 
 `Matricula` conecta a un alumno con una aula y con un año escolar. El estado de la matrícula define si el alumno se encuentra activo, retirado o reactivado. El sistema usa ese estado para filtrar alumnos en planillas y para controlar el acceso a evaluaciones y reportes.
 
@@ -287,6 +336,149 @@ El servicio `NotaService` encapsula la lógica de conversión y promedios (escal
 Además, calcula promedios semestrales y anuales, y establece aprobado cuando la nota final es mayor o igual a 60.
 
 **Nota Final del Corte (0-100):** se calcula escalando la suma de puntos obtenidos contra el **total oficial del corte** (`peso_acumulado + peso_examen`, normalmente 100), no contra la suma de puntajes configurados: las actividades no configuradas aún valen 0. Esta escala se usa tanto al guardar (`NotaController@store`, `ActividadEvaluativaController::recalcularNotasParcial` — también recalcula al editar el puntaje máximo de una actividad) como en el cálculo en vivo de las vistas `notas/evaluar` y `notas/planilla` (columna "Nota Final del Corte N", donde N = número del corte).
+
+### 7.7 Gestión del Año Escolar (Nuevo - Nov 2026)
+
+El módulo de **Gestión del Año Escolar** es el eje central que controla el ciclo de vida académico de la institución. Implementa una máquina de estados estricta con tres estados y transiciones controladas.
+
+#### 7.7.1 Modelo de Datos (`AnioEscolar`)
+
+**Tabla:** `anio_escolar` (actualizada via migración `2026_11_04_000001_update_anio_escolar_add_estados_y_cierre`)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `id` | bigIncrements | PK |
+| `nombre` | string(9) | Formato AAAA-AAAA (ej: 2026-2027) |
+| `fecha_inicio` | date | Inicio del ciclo lectivo |
+| `fecha_fin` | date | Fin del ciclo lectivo |
+| `estado` | enum | `planificacion`, `activo`, `cerrado` |
+| `fecha_cierre` | timestamp | Auditoría: cuándo se cerró |
+| `cerrado_por` | foreignId | Usuario que ejecutó el cierre (nullable) |
+| `observaciones_cierre` | text | Observaciones del proceso de cierre |
+| `created_at` / `updated_at` | timestamps | Auditoría estándar |
+
+**Estados válidos:**
+- **Planificación** (`planificacion`): Año futuro en configuración. Permite crear aulas, asignar docentes, configurar malla curricular y realizar nuevas matrículas sin afectar el año en curso.
+- **Activo** (`activo`): Año actual en operaciones. **Solo puede haber UN (1) año escolar en este estado a la vez**. Aquí se registran asistencias, calificaciones y operaciones diarias.
+- **Cerrado** (`cerrado`): Año finalizado (Solo lectura). **Ninguna calificación, asistencia o registro vinculado a este año puede ser modificado**. Garantiza la inmutabilidad del historial académico.
+
+#### 7.7.2 Reglas de Negocio y Transiciones
+
+| Desde \ Hacia | Planificación | Activo | Cerrado |
+|---------------|---------------|--------|---------|
+| **Planificación** | — | ✅ Si no hay otro activo | ❌ |
+| **Activo** | ✅ Volver a planificación | — | ✅ Con validación estricta |
+| **Cerrado** | ❌ Inmutable | ❌ Inmutable | — |
+
+#### 7.7.3 Lógica de Cierre (Validación Estricta)
+
+El sistema **NO permite** pasar un año de "Activo" a "Cerrado" con un simple clic. El servicio `AnioEscolarService::cerrar()` ejecuta un validador que comprueba **obligatoriamente**:
+
+1. **Todos los docentes han subido y cerrado sus actas de calificaciones**
+   - Verifica que para cada `AulaAsignaturaDocente` activa exista un registro en `corte_cerrado` con `bloqueado=true` para **todos** los cortes evaluativos del año.
+
+2. **Los promedios finales definitivos están generados**
+   - Verifica que cada matrícula activa tenga `nota_cuantitativa` en el IV Corte (corte número 4) para **todas** sus asignaturas.
+
+3. **El estado final de los estudiantes está definido**
+   - Para cada estudiante en cada asignatura: si la nota final ≥ 60 → **Aprobado**; si < 60 → debe tener examen de reparación registrado en `examen_reparacion` con resultado `aprobado`/`reprobado` → **Reparación/Aprobado/Reprobado**.
+
+#### 7.7.4 Arquitectura del Módulo
+
+| Componente | Archivo | Responsabilidad |
+|------------|---------|-----------------|
+| **Migración** | `database/migrations/2026_11_04_000001_update_anio_escolar_add_estados_y_cierre.php` | Esquema BD con enum estado + auditoría |
+| **Modelo** | `app/Models/AnioEscolar.php` | Constantes, scopes, accesores, relaciones, validaciones de estado |
+| **Servicio** | `app/Services/AnioEscolarService.php` | Lógica de negocio: activar, cerrar, validar, auditoría |
+| **Controlador** | `app/Http/Controllers/Academico/AnioEscolarController.php` | HTTP, vistas, formularios, API |
+| **Policy** | `app/Policies/AnioEscolarPolicy.php` | Autorización por recurso (Director/Subdirector para cierre) |
+| **Requests** | `app/Http/Requests/AnioEscolar/*.php` | Validación de entrada y transiciones |
+| **Vistas** | `resources/views/academico/anios-escolares/*.blade.php` | UI: index, create, edit, show (con reporte de validaciones) |
+
+#### 7.7.5 Rutas (prefijo `academico.anios-escolares.*`)
+
+| Método | URI | Acción | Nombre | Permiso |
+|--------|-----|--------|--------|---------|
+| GET | `/anios-escolares` | index | `anios-escolares.index` | `configuracion.ver` |
+| GET | `/anios-escolares/create` | create | `anios-escolares.create` | `configuracion.gestionar` |
+| POST | `/anios-escolares` | store | `anios-escolares.store` | `configuracion.gestionar` |
+| GET | `/anios-escolares/{anioEscolar}` | show | `anios-escolares.show` | `configuracion.ver` |
+| GET | `/anios-escolares/{anioEscolar}/edit` | edit | `anios-escolares.edit` | `configuracion.gestionar` |
+| PUT | `/anios-escolares/{anioEscolar}` | update | `anios-escolares.update` | `configuracion.gestionar` |
+| PUT | `/anios-escolares/{anioEscolar}/cambiar-estado` | cambiarEstado | `anios-escolares.cambiar-estado` | `configuracion.gestionar` |
+| DELETE | `/anios-escolares/{anioEscolar}` | destroy | `anios-escolares.destroy` | `configuracion.gestionar` + Director |
+| GET | `/anios-escolares/activo` | activo (API) | `anios-escolares.activo` | `configuracion.ver` |
+| GET | `/anios-escolares/{anioEscolar}/validaciones-cierre` | validacionesCierre (API) | `anios-escolares.validaciones-cierre` | `configuracion.ver` |
+
+#### 7.7.6 Permisos y Roles
+
+| Acción | Permiso | Roles autorizados |
+|--------|---------|-------------------|
+| Ver listado/detalle | `configuracion.ver` | Director, Subdirector, Coordinador, Secretaría |
+| Crear/Editar/Activar/Planificación | `configuracion.gestionar` | Director, Subdirector |
+| Cerrar año escolar | `configuracion.gestionar` | **Solo Director, Subdirector** (policy `cerrar`) |
+| Eliminar (solo Planificación) | `configuracion.gestionar` | **Solo Director** (policy `delete`) |
+
+#### 7.7.7 API para Otros Módulos
+
+```php
+// Obtener año activo (singleton)
+$anioActivo = AnioEscolar::obtenerActivo(); // retorna null si no hay
+
+// Forzar obtención (lanza excepción si no existe)
+$anioActivo = AnioEscolar::obtenerActivoOFail();
+
+// Verificar si hay año activo
+if (AnioEscolar::existeActivo()) { ... }
+
+// En el servicio (inyectado)
+$anioEscolarService->obtenerOcrearActivo(); // Para desarrollo/testing
+```
+
+#### 7.7.8 Integración con Módulos Existentes
+
+- **Matrículas**: Filtradas por `anio_escolar_id` y `estado = 'activo'`
+- **Aulas**: Pertenecen a un `anio_escolar_id`
+- **Asignaciones** (`AulaAsignaturaDocente`): Vinculadas a `anio_escolar_id`
+- **Cortes Evaluativos**: Pertenecen a un `anio_escolar_id`
+- **Notas**: A través de matrícula → aula → año escolar
+- **Cierre de Cortes** (`CorteCerrado`): Valida cierre por asignación + corte del año activo
+
+### 7.7.9 Corrección Crítica: Migración de campo `activo` a `estado` (Nov 2026)
+
+**Problema:** La migración `2026_11_04_000001_update_anio_escolar_add_estados_y_cierre` eliminó la columna booleana `activo` y la reemplazó por el enum `estado` (`planificacion`, `activo`, `cerrado`). Esto rompió **15+ consultas** en controladores y servicios que aún usaban `AnioEscolar::where('activo', true)`.
+
+**Archivos corregidos (1ra ola - Nov 2026):**
+| Archivo | Método/Línea | Cambio |
+|---------|--------------|--------|
+| `ReporteService.php` | `anioActivo()` | `where('estado', 'activo')` |
+| `DashboardController.php` | 3 ubicaciones | `where('estado', 'activo')` |
+| `ReporteController.php` | 3 ubicaciones | `where('estado', 'activo')` |
+| `CorteEvaluativoController.php` | `index()` | `where('estado', 'activo')` |
+| `MatriculaController.php` | 3 ubicaciones | `where('estado', 'activo')` |
+| `GestorBoletinController.php` | `bandeja()` | `where('estado', 'activo')` |
+| `ExamenReparacionController.php` | `index()` | `where('estado', 'activo')` |
+| `AulaController.php` | 2 ubicaciones | `where('estado', 'activo')` |
+
+**Archivos corregidos (2da ola - Nov 2026):**
+| Archivo | Método/Línea | Cambio |
+|---------|--------------|--------|
+| `BoletinController.php` | `index()` | `where('estado', 'activo')` |
+| `ApoyoPadresController.php` | `index()` | `where('estado', 'activo')` |
+| `ApoyoFamiliarController.php` | `index()` | `where('estado', 'activo')` |
+| `ActividadEvaluativaController.php` | `index()` | `where('estado', 'activo')` |
+| `AsistenciaAulaController.php` | `create()`, `store()` | `where('estado', 'activo')` |
+| `AulaController.php` | `indexAsignaciones()` | `where('estado', 'activo')` |
+| `DocenteGuiaController.php` | `rendimiento()`, `miHorario()`, `detallesMiAula()` | `where('estado', 'activo')` |
+| `NotaController.php` | `create()`, `evaluar()` | `where('estado', 'activo')` |
+| `PrematriculaController.php` | `index()` | `where('estado', 'activo')` |
+| `NotaService.php` | `calcularResumenAsignatura()` | `where('estado', 'activo')` |
+
+**Total: 18 archivos / ~25 consultas corregidas**
+
+**Regla:** Tras cambiar el esquema de BD (migraciones), **siempre buscar y actualizar** todas las referencias al campo anterior en controladores, servicios, models, policies, seeders, factories, tests.
+
+---
 
 ## 8. Flujos de negocio principales
 
@@ -436,6 +628,61 @@ Merge commit `3df973e` (sobre `434f300 "Reportes finalizados ahora si"`). Mismo 
 2. Su mural leía la columna `calificacion`, que NO existe en `nota` (la real es `nota_cuantitativa`) → promedios e índices falsos (0% y 100%) → corregido con la columna real y `round((float) ...)`.
 3. **Restaurado el método `reporteMinedDetallado`**: el primer merge lo había perdido porque el controlador se regeneró con `merge-file` usando la versión b01bb03 de su archivo (el método llegó después con f13f0b1). La ruta `reportes/mined-detallado` existía y apuntaba a un método inexistente (500 latente). Se extrajo verbatim de su rama (con el bloqueo del punto anterior).
 4. Lección reforzada: tras cada merge, validar el par ruta→método del controlador (script de verificación) y el SQL crudo contra pgsql Y SQLite.
+
+---
+
+### 8.7.3 Corrección: Docente Guía sin aula asignada (Nov 2026)
+
+**Problema:** Al crear un usuario con rol "Docente Guía" sin asignarle ningún aula e iniciar sesión, se producía error 500: `ErrorException - Undefined array key 1` en `resources/views/components/dashboard/docente-guia.blade.php:210`. El componente intentaba acceder a `$muralAula[1]`...`$muralAula[12]` pero el array estaba vacío `[]` en el controlador.
+
+**Causa raíz:**
+1. `DashboardController` inicializaba `$muralAula = []` (vacío) cuando no había `$aulaGuia`
+2. La vista asumía que siempre existían 12 meses de datos y no manejaba el caso sin aula asignada
+
+**Solución implementada (2 archivos):**
+
+1. **`app/Http/Controllers/DashboardController.php`** (líneas 153-161): Inicialización defensiva del array con 12 meses vacíos (claves 1-12) para evitar "Undefined array key":
+```php
+$muralAula = [];
+for ($m = 1; $m <= 12; $m++) {
+    $muralAula[$m] = [
+        'asistencia_est' => null,
+        'asistencia_doc' => null,
+    ];
+}
+```
+
+2. **`resources/views/components/dashboard/docente-guia.blade.php`**: 
+   - Header condicional: muestra "Sin aula asignada" con mensaje explicativo
+   - Contenido principal envuelto en `@if($aulaGuia)` - solo se renderiza si hay aula
+   - Estado vacío elegante: card informativa con icono y botón "Ver Aulas Disponibles"
+   - Condiciones de estilo corregidas en tabla mural (verificación `&& !== null`)
+
+**Resultado:** El usuario ve un mensaje amigable en lugar de error 500, con CTA para contactar al administrador.
+
+---
+
+### 8.7.4 Preparación para usuarios sin rol asignado (Nov 2026)
+
+**Problema identificado:** Si el "Gestor de Usuarios" crea un usuario sin asignarle ningún rol (manualmente en BD o por error) y este intenta iniciar sesión, el sistema tiene un bug que le permite ver **todos los módulos** del dashboard (las pestañas de roles se muestran todas o comportamiento inesperado).
+
+**Causa:** En `dashboard.blade.php` línea 9-12, se filtran los roles permitidos pero si el usuario no tiene roles, `$rolesDashboard` queda vacío y `$rolPorDefecto` toma 'Usuario'. Al no tener roles válidos, la UI puede comportarse de forma inesperada.
+
+**Solución implementada (3 archivos):**
+
+1. **Middleware `app/Http/Middleware/EnsureUserHasRole.php`**: Verifica que el usuario autenticado tenga al menos uno de los roles válidos para el dashboard (`Director`, `Subdirector`, `Gestor de Usuarios`, `Coordinador`, `Secretaria`, `Docente Guia`, `Docente por Asignatura`). Si no tiene roles, redirige a la ruta `sin-rol` con mensaje de warning. Permite acceso a rutas de perfil y logout.
+
+2. **Registro en `bootstrap/app.php`**: Alias del middleware como `'role'`.
+
+3. **Ruta en `routes/web.php`**: 
+   - Dashboard ahora usa middleware `['auth', 'role']`
+   - Nueva ruta `/sin-rol` → vista `auth.sin-rol`
+
+4. **Vista `resources/views/auth/sin-rol.blade.php`**: Página amigable que explica al usuario que no tiene rol asignado, muestra los roles disponibles, y da instrucciones para contactar al administrador y cerrar sesión.
+
+5. **Validación en `UsuarioController` (ya existente)**: En `store` y `update` se valida `'roles' => 'required|array|min:1'`, impidiendo crear/editar usuarios sin rol desde la UI.
+
+**Resultado:** Usuarios sin rol ven mensaje claro en lugar de dashboard vacío/bug, con CTA para contactar admin y cerrar sesión.
 
 ### 8.8 Apoyo y disciplina
 

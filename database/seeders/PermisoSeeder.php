@@ -73,7 +73,7 @@ class PermisoSeeder extends Seeder
             'alumnos.supervisar','alumnos.ver', 'notas.ver', 'asistencia.ver', 'asistencia.gestionar','indicadores.ver', 
             'boletines.ver', 'malla.gestionar', 'aulas.gestionar', 'aulas.ver', 'asignaturas_aula.gestionar', 
             'horarios.ver', 'horarios.gestionar', 'avance.ver', 'apoyo_padres.ver', 'reparacion.ver', 
-            'reportes.supervisar', 'configuracion.ver'
+            'reportes.supervisar', 'configuracion.gestionar', 'configuracion.ver'
         ]);
 
         // 6. EL DOCENTE GUÍA
@@ -116,11 +116,16 @@ class PermisoSeeder extends Seeder
         ]);
 
         // 10. LA SECRETARÍA (Nuevo)
-        // Gestiona expedientes, matrículas y genera reportes oficiales.
+        // Gestiona expedientes, matrículas, usuarios operativos y genera reportes oficiales.
         $secretaria->syncPermissions([
             'alumnos.gestionar', 'alumnos.ver',
             'notas.ver', 'asistencia.ver', 'boletines.ver',
             'reportes.ver', 'reportes.gestionar',
+            // Consulta operativa para atención de padres y administración diaria
+            'aulas.ver',
+            'horarios.ver',
+            'malla.ver',
+            'asignaturas_aula.ver',
         ]);
     }
 }

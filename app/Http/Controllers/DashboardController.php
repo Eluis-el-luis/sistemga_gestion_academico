@@ -90,7 +90,7 @@ class DashboardController extends Controller
 
             // 4. CARGA DE DATOS PARA DIRECTIVA Y GESTIÓN
             if ($user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
-                $anioActivo = \App\Models\AnioEscolar::where('activo', true)->first();
+                $anioActivo = \App\Models\AnioEscolar::where('estado', 'activo')->first();
                 $totalMatriculados = \App\Models\Matricula::where('estado', 'activo')
                     ->when($anioActivo, fn($q) => $q->where('anio_escolar_id', $anioActivo->id))
                     ->count();
@@ -100,7 +100,7 @@ class DashboardController extends Controller
             }
 
             // 5. CARGA DE DATOS PARA DOCENTES (Guía y Asignatura)
-            $anioActivo = \App\Models\AnioEscolar::where('activo', true)->first();
+            $anioActivo = \App\Models\AnioEscolar::where('estado', 'activo')->first();
             
             if ($docente && $anioActivo) {
                 $aulaGuia = \App\Models\Aula::with('grado')
@@ -149,7 +149,17 @@ class DashboardController extends Controller
             $solicitudesPendientes = collect();
             $asistenciaSemanal = null;
             $rendimientoAula = null;
-            $muralAula = []; // NUEVA VARIABLE PARA EL MURAL DEL DOCENTE
+            
+            // Inicializar muralAula con 12 meses vacíos para evitar errores "Undefined array key"
+            // cuando el docente guía no tiene aula asignada
+            $muralAula = [];
+            for ($m = 1; $m <= 12; $m++) {
+                $muralAula[$m] = [
+                    'asistencia_est' => null,
+                    'asistencia_doc' => null,
+                ];
+            }
+            
             $rendimientoCortes = []; // NUEVA VARIABLE PARA CORTES DEL MURAL
 
             if ($user->hasRole('Coordinador')) {
@@ -374,7 +384,7 @@ class DashboardController extends Controller
     protected function calcularMetricas(): array
     {
         try {
-            $anioActivo = \App\Models\AnioEscolar::where('activo', true)->first();
+            $anioActivo = \App\Models\AnioEscolar::where('estado', 'activo')->first();
             
             // Si el colegio no ha aperturado un año escolar, devolvemos gráficas vacías seguras
             if (!$anioActivo) {

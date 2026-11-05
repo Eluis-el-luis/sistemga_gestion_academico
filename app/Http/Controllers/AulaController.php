@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Aula;
+use App\Models\BloqueHorario;
+use App\Models\Docente;
 use App\Http\Requests\StoreAulaRequest;
 use App\Services\AulaService; 
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Models\AulaAsignaturaDocente;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class AulaController extends Controller
 {
@@ -67,24 +70,125 @@ class AulaController extends Controller
     public function show(Aula $aula)
     {
         try {
-            $this->authorize('update', $aula);
-            $aula->load(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario']);
+            $usuario = auth()->user();
 
-            $asignaciones = \App\Models\AulaAsignaturaDocente::with(['asignatura', 'docente.usuario'])
-                                ->where('aula_id', $aula->id)
-                                ->get();
+            // 1. Permiso base para ver el aula (Director, Subdirector y Docente Guía tienen 'aulas.ver')
+            $this->authorize('view', $aula);
 
-            $asignaturasYaAsignadas = $asignaciones->pluck('asignatura_id')->toArray();
-            $todasAsignaturas = \App\Models\Asignatura::whereNotIn('id', $asignaturasYaAsignadas)->get();
+            // 2. Alcance del Docente Guía: solo puede ver la información completa
+            //    del aula de la cual es titular asignado. Cualquier otra aula -> 403.
+            if ($usuario->hasRole('Docente Guia') && !$usuario->hasRole(['Director', 'Subdirector'])) {
+                $docente = Docente::where('usuario_id', $usuario->id)->first();
 
-            $todosDocentes = \App\Models\Docente::with('usuario')->get();
+                // Si no tiene perfil de Docente vinculado, no puede verificar ownership del aula
+                if (!$docente) {
+                    abort(403, 'No tienes un perfil de docente vinculado. Contacta a administración.');
+                }
 
-            return view('academico.aulas.show', compact('aula', 'asignaciones', 'todasAsignaturas', 'todosDocentes'));
+                // Solo puede ver el aula de la cual es titular
+                if ($aula->docente_guia_id !== $docente->id) {
+                    abort(403, 'No tienes autorización para ver los detalles de esta aula.');
+                }
+            }
+
+            // 3. Carga óptima de relaciones del aula
+            $aula->load([
+                'grado',
+                'modalidad',
+                'anioEscolar',
+                'docenteGuia.usuario',
+                'matriculas.alumno',
+            ]);
+
+            // Matrículas activas ordenadas por nombre del alumno
+            $matriculas = $aula->matriculas->sortBy(fn ($m) => $m->alumno->nombre_completo ?? '');
+
+            // 4. Asignaturas y docentes asignados al aula, con sus bloques de horario
+            $asignaciones = AulaAsignaturaDocente::with(['asignatura', 'docente.usuario', 'horarios.bloque'])
+                ->where('aula_id', $aula->id)
+                ->orderBy('id')
+                ->get();
+
+            // 5. Matriz de horario del aula (solo lectura para la pestaña correspondiente)
+            $bloques = BloqueHorario::where('modalidad_id', $aula->modalidad_id)
+                ->where('turno', $aula->turno)
+                ->where('tipo_jornada', 'Regular')
+                ->orderBy('hora_inicio')
+                ->get();
+
+            $dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+            $diasBD = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
+
+            $horarios = $asignaciones->pluck('horarios')->flatten();
+            $horariosIndex = [];
+            foreach ($horarios as $h) {
+                $horariosIndex[$h->bloque_horario_id][$h->dia_semana] = $h;
+            }
+
+            $matriz = [];
+            foreach ($bloques as $bloque) {
+                $fila = ['bloque' => $bloque, 'dias' => []];
+                foreach ($dias as $i => $dia) {
+                    $diaBD = $diasBD[$i];
+                    $fila['dias'][$dia] = $bloque->es_recreo
+                        ? null
+                        : ($horariosIndex[$bloque->id][$diaBD] ?? null);
+                }
+                $matriz[] = $fila;
+            }
+
+            // 6. Resumen de evaluaciones por corte (notas del aula)
+            $matriculaIds = $matriculas->pluck('id');
+            $cortes = \App\Models\CorteEvaluativo::where('anio_escolar_id', $aula->anio_escolar_id)
+                ->orderBy('numero')
+                ->get();
+
+            $evaluacionesPorCorte = [];
+            foreach ($cortes as $corte) {
+                $notasCorte = \App\Models\Nota::whereIn('matricula_id', $matriculaIds)
+                    ->where('corte_evaluativo_id', $corte->id)
+                    ->get();
+
+                $evaluacionesPorCorte[] = [
+                    'corte' => $corte,
+                    'total_alumnos' => $matriculaIds->count(),
+                    'alumnos_con_nota' => $notasCorte->count(),
+                    'promedio' => $notasCorte->count() > 0 ? round((float) $notasCorte->avg('nota_cuantitativa'), 1) : null,
+                    'aprobados' => $notasCorte->where('nota_cuantitativa', '>=', 60)->count(),
+                    'reprobados' => $notasCorte->where('nota_cuantitativa', '<', 60)->count(),
+                ];
+            }
+
+            // Horas académicas totales asignadas (suma de horas_semanales de asignaciones activas)
+            $horasTotales = $asignaciones->where('activo', true)->sum('horas_semanales');
+
+            return view('academico.aulas.show', compact(
+                'aula',
+                'matriculas',
+                'asignaciones',
+                'matriz',
+                'dias',
+                'diasBD',
+                'bloques',
+                'cortes',
+                'evaluacionesPorCorte',
+                'horasTotales'
+            ));
         } catch (\Exception $e) {
+            // REGISTRO DEL ERROR REAL para diagnóstico
+            \Illuminate\Support\Facades\Log::error('Error crítico en AulaController@show: ' . $e->getMessage(), [
+                'user_id' => auth()->id(),
+                'aula_id' => $aula->id,
+                'exception' => $e
+            ]);
+
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
                 throw $e;
             }
-            return redirect()->route('academico.aulas.index')->with('error', 'No se pudo cargar la estructura de esta aula. Intenta de nuevo.');
+            if ($e instanceof HttpException) {
+                throw $e;
+            }
+            return redirect()->route('academico.aulas.index')->with('error', 'No se pudo cargar la información completa de esta aula. Intenta de nuevo.');
         }
     }
 
@@ -100,7 +204,7 @@ class AulaController extends Controller
             $anios = \App\Models\AnioEscolar::orderBy('nombre', 'desc')->get();
             
             // Si aún necesitas saber cuáles están activos para calcular los docentes ocupados vigentes:
-            $aniosActivosIds = \App\Models\AnioEscolar::where('activo', true)->pluck('id');
+            $aniosActivosIds = \App\Models\AnioEscolar::where('estado', 'activo')->pluck('id');
             
             $docentesOcupados = Aula::whereIn('anio_escolar_id', $aniosActivosIds)
                                         ->pluck('docente_guia_id')
@@ -157,7 +261,7 @@ class AulaController extends Controller
 
             $modalidades = \App\Models\Modalidad::all();
             $grados = \App\Models\Grado::all();
-            $anios = \App\Models\AnioEscolar::where('activo', true)->get();
+            $anios = \App\Models\AnioEscolar::where('estado', 'activo')->get();
             
             $docentesOcupados = Aula::where('anio_escolar_id', $aula->anio_escolar_id)
                                     ->where('id', '!=', $aula->id)
@@ -242,7 +346,7 @@ class AulaController extends Controller
 
             // Datos para el Asignador Masivo por Materia y Nivel
             $todasAulasActivas = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
-                ->whereHas('anioEscolar', fn($q) => $q->where('activo', true))
+                ->whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))
                 ->orderBy('modalidad_id')
                 ->orderBy('grado_id')
                 ->orderBy('nombre')
