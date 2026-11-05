@@ -69,7 +69,7 @@ class NotaController extends Controller
         try {
             $this->authorize('calificar', $asignacion);
 
-            $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('activo', true))->get();
+            $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))->get();
             $corteSeleccionado = $request->query('corte_evaluativo_id', $cortes->first()->id ?? null);
 
             // Traemos las actividades que el maestro configuró previamente para este parcial
@@ -239,7 +239,7 @@ class NotaController extends Controller
         try {
             $this->authorize('calificar', $asignacion);
 
-            $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('activo', true))->get();
+            $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))->get();
             $corteSeleccionado = $request->query('corte_evaluativo_id', $cortes->first()->id ?? null);
 
             // Actividades que el maestro configuró para este parcial

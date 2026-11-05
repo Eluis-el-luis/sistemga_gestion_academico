@@ -142,7 +142,7 @@ class NotaService
             ->keyBy('corte_evaluativo_id');
 
         // Cortes ordenados por número (1..4)
-        $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('activo', true))
+        $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))
             ->orderBy('numero')
             ->get();
 

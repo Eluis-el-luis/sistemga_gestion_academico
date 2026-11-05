@@ -31,7 +31,7 @@ class ExamenReparacionController extends Controller
             $this->authorize('viewAny', ExamenReparacion::class);
 
             $usuario = auth()->user();
-            $anioActivo = AnioEscolar::where('activo', true)->first();
+            $anioActivo = AnioEscolar::where('estado', 'activo')->first();
 
             // Grados con promoción automática (no requieren examen de reparación)
             $gradosAutoPromovidos = [1, 2, 3, 4, 5];

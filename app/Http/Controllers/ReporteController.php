@@ -546,7 +546,7 @@ class ReporteController extends Controller
         if ($user->hasRole('Docente Guia') && !$user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
             $esDocenteGuia = true;
             $docente = \App\Models\Docente::where('usuario_id', $user->id)->first();
-            $anioActivo = \App\Models\AnioEscolar::where('activo', true)->first();
+            $anioActivo = \App\Models\AnioEscolar::where('estado', 'activo')->first();
 
             if ($docente && $anioActivo) {
                 // Buscamos cuál es su aula guía asignada
@@ -839,7 +839,7 @@ class ReporteController extends Controller
         $anios = \App\Models\AnioEscolar::orderBy('id', 'desc')->get();
         
         // Si no hay año seleccionado, busca el activo, si no, el último
-        $anio = $anioId ? \App\Models\AnioEscolar::find($anioId) : (\App\Models\AnioEscolar::where('activo', true)->first() ?? $anios->first());
+        $anio = $anioId ? \App\Models\AnioEscolar::find($anioId) : (\App\Models\AnioEscolar::where('estado', 'activo')->first() ?? $anios->first());
         $anioId = $anio ? $anio->id : null;
         $anioActual = $anio ? $anio->nombre : date('Y');
 
@@ -919,7 +919,7 @@ class ReporteController extends Controller
         $anioId = $request->anio_escolar_id;
         $anios = \App\Models\AnioEscolar::orderBy('id', 'desc')->get();
         
-        $anio = $anioId ? \App\Models\AnioEscolar::find($anioId) : (\App\Models\AnioEscolar::where('activo', true)->first() ?? $anios->first());
+        $anio = $anioId ? \App\Models\AnioEscolar::find($anioId) : (\App\Models\AnioEscolar::where('estado', 'activo')->first() ?? $anios->first());
         $anioId = $anio ? $anio->id : null;
         $anioActual = $anio ? $anio->nombre : date('Y');
 

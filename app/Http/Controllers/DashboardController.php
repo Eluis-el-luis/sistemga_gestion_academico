@@ -149,7 +149,17 @@ class DashboardController extends Controller
             $solicitudesPendientes = collect();
             $asistenciaSemanal = null;
             $rendimientoAula = null;
-            $muralAula = []; // NUEVA VARIABLE PARA EL MURAL DEL DOCENTE
+            
+            // Inicializar muralAula con 12 meses vacíos para evitar errores "Undefined array key"
+            // cuando el docente guía no tiene aula asignada
+            $muralAula = [];
+            for ($m = 1; $m <= 12; $m++) {
+                $muralAula[$m] = [
+                    'asistencia_est' => null,
+                    'asistencia_doc' => null,
+                ];
+            }
+            
             $rendimientoCortes = []; // NUEVA VARIABLE PARA CORTES DEL MURAL
 
             if ($user->hasRole('Coordinador')) {

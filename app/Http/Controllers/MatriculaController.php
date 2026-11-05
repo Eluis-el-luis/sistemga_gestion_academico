@@ -19,7 +19,7 @@ class MatriculaController extends Controller
         try {
             $this->authorize('viewAny', Matricula::class);
 
-            $anioActivo = AnioEscolar::where('activo', true)->first();
+            $anioActivo = AnioEscolar::where('estado', 'activo')->first();
             $query = Matricula::with(['alumno', 'aula.grado', 'aula.modalidad', 'anioEscolar']);
 
             // --- FILTRO DE AÑO ---
@@ -66,7 +66,7 @@ class MatriculaController extends Controller
         try {
             $this->authorize('create', Matricula::class);
 
-            $anioActivo = AnioEscolar::where('activo', true)->first();
+            $anioActivo = AnioEscolar::where('estado', 'activo')->first();
             
             // 🔒 BLOQUEO DE DOBLE MATRÍCULA: 
             $alumnos = Alumno::whereDoesntHave('matriculas', function($q) use ($anioActivo) {
@@ -84,7 +84,7 @@ class MatriculaController extends Controller
                     }
                 }])->get();
 
-            $anios = AnioEscolar::where('activo', true)->get();
+            $anios = AnioEscolar::where('estado', 'activo')->get();
             
             $alumnoSeleccionado = $request->query('alumno_id');
 

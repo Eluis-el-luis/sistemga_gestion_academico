@@ -18,20 +18,25 @@ Route::get('/', function () {
 
 // --- RUTAS DEL PANEL PRINCIPAL Y TABLERO DE AVISOS ---
 Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'role'])
     ->name('dashboard');
+
+// Ruta para usuarios sin rol asignado
+Route::get('/sin-rol', function () {
+    return view('auth.sin-rol');
+})->middleware(['auth'])->name('sin-rol');
 
 // Gestión de Avisos
 Route::post('/dashboard/avisos', [\App\Http\Controllers\DashboardController::class, 'storeAviso'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'role'])
     ->name('dashboard.avisos.store');
 
 Route::put('/dashboard/avisos/{id}', [\App\Http\Controllers\DashboardController::class, 'updateAviso'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'role'])
     ->name('dashboard.avisos.update');
 
 Route::delete('/dashboard/avisos/{id}', [\App\Http\Controllers\DashboardController::class, 'destroyAviso'])
-    ->middleware(['auth'])
+    ->middleware(['auth', 'role'])
     ->name('dashboard.avisos.destroy');
 // -----------------------------------------------------
 

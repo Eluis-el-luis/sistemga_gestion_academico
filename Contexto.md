@@ -444,6 +444,40 @@ $anioEscolarService->obtenerOcrearActivo(); // Para desarrollo/testing
 - **Notas**: A través de matrícula → aula → año escolar
 - **Cierre de Cortes** (`CorteCerrado`): Valida cierre por asignación + corte del año activo
 
+### 7.7.9 Corrección Crítica: Migración de campo `activo` a `estado` (Nov 2026)
+
+**Problema:** La migración `2026_11_04_000001_update_anio_escolar_add_estados_y_cierre` eliminó la columna booleana `activo` y la reemplazó por el enum `estado` (`planificacion`, `activo`, `cerrado`). Esto rompió **15+ consultas** en controladores y servicios que aún usaban `AnioEscolar::where('activo', true)`.
+
+**Archivos corregidos (1ra ola - Nov 2026):**
+| Archivo | Método/Línea | Cambio |
+|---------|--------------|--------|
+| `ReporteService.php` | `anioActivo()` | `where('estado', 'activo')` |
+| `DashboardController.php` | 3 ubicaciones | `where('estado', 'activo')` |
+| `ReporteController.php` | 3 ubicaciones | `where('estado', 'activo')` |
+| `CorteEvaluativoController.php` | `index()` | `where('estado', 'activo')` |
+| `MatriculaController.php` | 3 ubicaciones | `where('estado', 'activo')` |
+| `GestorBoletinController.php` | `bandeja()` | `where('estado', 'activo')` |
+| `ExamenReparacionController.php` | `index()` | `where('estado', 'activo')` |
+| `AulaController.php` | 2 ubicaciones | `where('estado', 'activo')` |
+
+**Archivos corregidos (2da ola - Nov 2026):**
+| Archivo | Método/Línea | Cambio |
+|---------|--------------|--------|
+| `BoletinController.php` | `index()` | `where('estado', 'activo')` |
+| `ApoyoPadresController.php` | `index()` | `where('estado', 'activo')` |
+| `ApoyoFamiliarController.php` | `index()` | `where('estado', 'activo')` |
+| `ActividadEvaluativaController.php` | `index()` | `where('estado', 'activo')` |
+| `AsistenciaAulaController.php` | `create()`, `store()` | `where('estado', 'activo')` |
+| `AulaController.php` | `indexAsignaciones()` | `where('estado', 'activo')` |
+| `DocenteGuiaController.php` | `rendimiento()`, `miHorario()`, `detallesMiAula()` | `where('estado', 'activo')` |
+| `NotaController.php` | `create()`, `evaluar()` | `where('estado', 'activo')` |
+| `PrematriculaController.php` | `index()` | `where('estado', 'activo')` |
+| `NotaService.php` | `calcularResumenAsignatura()` | `where('estado', 'activo')` |
+
+**Total: 18 archivos / ~25 consultas corregidas**
+
+**Regla:** Tras cambiar el esquema de BD (migraciones), **siempre buscar y actualizar** todas las referencias al campo anterior en controladores, servicios, models, policies, seeders, factories, tests.
+
 ---
 
 ## 8. Flujos de negocio principales
@@ -594,6 +628,61 @@ Merge commit `3df973e` (sobre `434f300 "Reportes finalizados ahora si"`). Mismo 
 2. Su mural leía la columna `calificacion`, que NO existe en `nota` (la real es `nota_cuantitativa`) → promedios e índices falsos (0% y 100%) → corregido con la columna real y `round((float) ...)`.
 3. **Restaurado el método `reporteMinedDetallado`**: el primer merge lo había perdido porque el controlador se regeneró con `merge-file` usando la versión b01bb03 de su archivo (el método llegó después con f13f0b1). La ruta `reportes/mined-detallado` existía y apuntaba a un método inexistente (500 latente). Se extrajo verbatim de su rama (con el bloqueo del punto anterior).
 4. Lección reforzada: tras cada merge, validar el par ruta→método del controlador (script de verificación) y el SQL crudo contra pgsql Y SQLite.
+
+---
+
+### 8.7.3 Corrección: Docente Guía sin aula asignada (Nov 2026)
+
+**Problema:** Al crear un usuario con rol "Docente Guía" sin asignarle ningún aula e iniciar sesión, se producía error 500: `ErrorException - Undefined array key 1` en `resources/views/components/dashboard/docente-guia.blade.php:210`. El componente intentaba acceder a `$muralAula[1]`...`$muralAula[12]` pero el array estaba vacío `[]` en el controlador.
+
+**Causa raíz:**
+1. `DashboardController` inicializaba `$muralAula = []` (vacío) cuando no había `$aulaGuia`
+2. La vista asumía que siempre existían 12 meses de datos y no manejaba el caso sin aula asignada
+
+**Solución implementada (2 archivos):**
+
+1. **`app/Http/Controllers/DashboardController.php`** (líneas 153-161): Inicialización defensiva del array con 12 meses vacíos (claves 1-12) para evitar "Undefined array key":
+```php
+$muralAula = [];
+for ($m = 1; $m <= 12; $m++) {
+    $muralAula[$m] = [
+        'asistencia_est' => null,
+        'asistencia_doc' => null,
+    ];
+}
+```
+
+2. **`resources/views/components/dashboard/docente-guia.blade.php`**: 
+   - Header condicional: muestra "Sin aula asignada" con mensaje explicativo
+   - Contenido principal envuelto en `@if($aulaGuia)` - solo se renderiza si hay aula
+   - Estado vacío elegante: card informativa con icono y botón "Ver Aulas Disponibles"
+   - Condiciones de estilo corregidas en tabla mural (verificación `&& !== null`)
+
+**Resultado:** El usuario ve un mensaje amigable en lugar de error 500, con CTA para contactar al administrador.
+
+---
+
+### 8.7.4 Preparación para usuarios sin rol asignado (Nov 2026)
+
+**Problema identificado:** Si el "Gestor de Usuarios" crea un usuario sin asignarle ningún rol (manualmente en BD o por error) y este intenta iniciar sesión, el sistema tiene un bug que le permite ver **todos los módulos** del dashboard (las pestañas de roles se muestran todas o comportamiento inesperado).
+
+**Causa:** En `dashboard.blade.php` línea 9-12, se filtran los roles permitidos pero si el usuario no tiene roles, `$rolesDashboard` queda vacío y `$rolPorDefecto` toma 'Usuario'. Al no tener roles válidos, la UI puede comportarse de forma inesperada.
+
+**Solución implementada (3 archivos):**
+
+1. **Middleware `app/Http/Middleware/EnsureUserHasRole.php`**: Verifica que el usuario autenticado tenga al menos uno de los roles válidos para el dashboard (`Director`, `Subdirector`, `Gestor de Usuarios`, `Coordinador`, `Secretaria`, `Docente Guia`, `Docente por Asignatura`). Si no tiene roles, redirige a la ruta `sin-rol` con mensaje de warning. Permite acceso a rutas de perfil y logout.
+
+2. **Registro en `bootstrap/app.php`**: Alias del middleware como `'role'`.
+
+3. **Ruta en `routes/web.php`**: 
+   - Dashboard ahora usa middleware `['auth', 'role']`
+   - Nueva ruta `/sin-rol` → vista `auth.sin-rol`
+
+4. **Vista `resources/views/auth/sin-rol.blade.php`**: Página amigable que explica al usuario que no tiene rol asignado, muestra los roles disponibles, y da instrucciones para contactar al administrador y cerrar sesión.
+
+5. **Validación en `UsuarioController` (ya existente)**: En `store` y `update` se valida `'roles' => 'required|array|min:1'`, impidiendo crear/editar usuarios sin rol desde la UI.
+
+**Resultado:** Usuarios sin rol ven mensaje claro en lugar de dashboard vacío/bug, con CTA para contactar admin y cerrar sesión.
 
 ### 8.8 Apoyo y disciplina
 

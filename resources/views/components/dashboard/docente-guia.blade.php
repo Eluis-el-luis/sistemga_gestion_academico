@@ -4,10 +4,15 @@
     <!-- Encabezado de Contexto -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
         <div>
-            <h3 class="text-xl sm:text-2xl font-black text-[#3d2c1d]">
-                Tutoría Activa: <span class="text-[#e6ac27]">{{ $aulaGuia?->grado?->nombre ?? 'Sin Grado' }} Sección "{{ $aulaGuia?->nombre ?? 'N/A' }}"</span>
-            </h3>
-            <p class="text-sm text-slate-500 font-medium mt-1">Panel de control y seguimiento integral del grupo asignado.</p>
+            @if($aulaGuia)
+                <h3 class="text-xl font-black text-[#3d2c1d]">
+                    Tutoría Activa: <span class="text-[#e6ac27]">{{ $aulaGuia->grado->nombre ?? 'Sin Grado' }} Sección "{{ $aulaGuia->nombre ?? 'N/A' }}"</span>
+                </h3>
+                <p class="text-sm text-slate-500 font-medium mt-1">Panel de control y seguimiento integral del grupo asignado.</p>
+            @else
+                <h3 class="text-xl font-black text-[#3d2c1d]">Tutoría Activa: <span class="text-slate-400">Sin aula asignada</span></h3>
+                <p class="text-sm text-slate-500 font-medium mt-1">No tienes un aula asignada como docente guía. Contacta al administrador para que te asigne un grupo.</p>
+            @endif
         </div>
 
         @if($aulaGuia)
@@ -23,8 +28,10 @@
         @endif
     </div>
 
-    <!-- Accesos Rápidos Operativos (Grid Limpio) -->
-    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+    @if($aulaGuia)
+
+    <!-- 5 Accesos Rápidos Operativos -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         
         <!-- 1. Mis Alumnos -->
         <a href="{{ route('academico.tutor.mis-alumnos') }}" class="group bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-[#e6ac27] hover:shadow-md transition-all flex flex-col justify-between min-h-[120px]">
@@ -176,16 +183,25 @@
                     <tr class="hover:bg-slate-50 transition-colors">
                         <td class="py-3 px-4 text-xs font-bold text-[#3d2c1d]">1. Asistencia Estudiantil</td>
                         @for($i = 1; $i <= 12; $i++)
-                            @php $valAsist = $muralAula[$i]['asistencia_est'] ?? null; @endphp
-                            <td class="py-3 px-2 text-center text-xs font-black {{ $valAsist >= 80 ? 'text-emerald-600' : ($valAsist !== null ? 'text-rose-600' : 'text-slate-300') }}">
-                                {{ $valAsist !== null ? $valAsist.'%' : '---' }}
+                            <td class="py-4 px-2 text-center text-xs border-l border-slate-100 {{ isset($muralAula[$i]['asistencia_est']) && $muralAula[$i]['asistencia_est'] >= 80 ? 'font-black text-emerald-600' : (isset($muralAula[$i]['asistencia_est']) && $muralAula[$i]['asistencia_est'] !== null ? 'font-black text-rose-600' : 'text-slate-300') }}">
+                                {{ $muralAula[$i]['asistencia_est'] !== null ? $muralAula[$i]['asistencia_est'].'%' : '---' }}
                             </td>
                         @endfor
                     </tr>
 
                     <!-- 2. Índices de Aprobados (SOLUCIONADO EL UNDEFINED KEY 1) -->
                     <tr class="hover:bg-slate-50 transition-colors">
-                        <td class="py-3 px-4 text-xs font-bold text-[#3d2c1d]">2. Aprobados Limpios</td>
+                        <td class="py-4 px-4 text-sm font-bold text-[#3d2c1d]">2. Asistencia Docente</td>
+                        @for($i = 1; $i <= 12; $i++)
+                            <td class="py-4 px-2 text-center text-xs border-l border-slate-100 {{ isset($muralAula[$i]['asistencia_doc']) && $muralAula[$i]['asistencia_doc'] == 100 ? 'font-black text-emerald-600' : (isset($muralAula[$i]['asistencia_doc']) && $muralAula[$i]['asistencia_doc'] !== null ? 'font-black text-amber-600' : 'text-slate-300') }}">
+                                {{ $muralAula[$i]['asistencia_doc'] !== null ? $muralAula[$i]['asistencia_doc'].'%' : '---' }}
+                            </td>
+                        @endfor
+                    </tr>
+
+                    <!-- 3. Índices de Aprobados -->
+                    <tr class="hover:bg-slate-50 transition-colors bg-slate-50/50">
+                        <td class="py-4 px-4 text-sm font-bold text-[#3d2c1d]">3. Índices de Aprobados Limpios</td>
                         @foreach([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as $mesNum)
                             <td class="py-3 px-2 text-center text-xs">
                                 @if(in_array($mesNum, [6, 9, 11, 12]))
@@ -233,5 +249,68 @@
             </table>
         </div>
     </div>
+
+    <!-- FORMATOS MINED EXCLUSIVOS DEL AULA -->
+    <div class="mt-4 mb-6">
+        <div class="flex justify-between items-end mb-4">
+            <div>
+                <h3 class="text-sm font-black text-[#3d2c1d] uppercase tracking-widest">Formatos MINED (Mi Aula)</h3>
+                <p class="text-xs font-medium text-slate-500 mt-1">Listados oficiales filtrados exclusivamente para {{ $aulaGuia->grado->nombre ?? '' }} {{ $aulaGuia->nombre ?? '' }}</p>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Aprobados (Mi Aula) -->
+            <a href="{{ url('/academico/reportes/mined-detallado?tipo=aprobados&grado_id=' . ($aulaGuia->grado_id ?? '')) }}" class="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 hover:border-emerald-400 hover:shadow-sm transition-all flex items-center gap-4 group">
+                <div class="w-12 h-12 rounded-xl bg-white text-emerald-600 flex items-center justify-center font-black group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                    ✓
+                </div>
+                <div>
+                    <h4 class="font-black text-emerald-900">Listado Aprobados</h4>
+                    <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Formato Oficial</span>
+                </div>
+            </a>
+
+            <!-- Aplazados 1 a 2 (Mi Aula) -->
+            <a href="{{ url('/academico/reportes/mined-detallado?tipo=1_2&grado_id=' . ($aulaGuia->grado_id ?? '')) }}" class="bg-amber-50 p-5 rounded-2xl border border-amber-100 hover:border-amber-400 hover:shadow-sm transition-all flex items-center gap-4 group">
+                <div class="w-12 h-12 rounded-xl bg-white text-amber-600 flex items-center justify-center font-black group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                    1-2
+                </div>
+                <div>
+                    <h4 class="font-black text-amber-900">Aplazados (1 a 2)</h4>
+                    <span class="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Desglose de Materias</span>
+                </div>
+            </a>
+
+            <!-- Aplazados 3 a más (Mi Aula) -->
+            <a href="{{ url('/academico/reportes/mined-detallado?tipo=3_mas&grado_id=' . ($aulaGuia->grado_id ?? '')) }}" class="bg-rose-50 p-5 rounded-2xl border border-rose-100 hover:border-rose-400 hover:shadow-sm transition-all flex items-center gap-4 group">
+                <div class="w-12 h-12 rounded-xl bg-white text-rose-600 flex items-center justify-center font-black group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                    3+
+                </div>
+                <div>
+                    <h4 class="font-black text-rose-900">Aplazados (3 a más)</h4>
+                    <span class="text-[10px] font-bold text-rose-600 uppercase tracking-widest">Riesgo Académico</span>
+                </div>
+            </a>
+        </div>
+    </div>
+
+@else
+    <!-- Estado vacío cuando no hay aula asignada -->
+    <div class="bg-white p-12 rounded-3xl border border-slate-200 shadow-sm text-center">
+        <div class="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-6">
+            <svg class="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+        </div>
+        <h3 class="text-xl font-black text-[#3d2c1d] mb-2">Sin Aula Asignada</h3>
+        <p class="text-slate-500 mb-6 max-w-md mx-auto">No tienes ningún aula asignada como docente guía para el año escolar actual. Contacta al administrador o coordinador para que te asignen un grupo.</p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="{{ route('academico.aulas.index') }}" class="inline-flex items-center gap-2 px-6 py-3 bg-[#3d2c1d] hover:bg-stone-800 text-white rounded-2xl text-sm font-black shadow-sm transition-all">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                Ver Aulas Disponibles
+            </a>
+        </div>
+    </div>
+@endif
+
 </div>
 @endhasanyrole

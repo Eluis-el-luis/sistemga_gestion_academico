@@ -28,7 +28,7 @@ class ReporteService
 
     public function anioActivo(): ?AnioEscolar
     {
-        return AnioEscolar::where('activo', true)->first();
+        return AnioEscolar::where('estado', 'activo')->first();
     }
 
     public function resolverAnio(?int $anioId): ?AnioEscolar

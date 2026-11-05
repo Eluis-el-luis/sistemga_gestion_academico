@@ -105,7 +105,7 @@ class DocenteGuiaController extends Controller
 
             $aula = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
                 ->where('docente_guia_id', $docente->id)
-                ->whereHas('anioEscolar', fn ($q) => $q->where('activo', true))
+                ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'))
                 ->first();
 
             if (!$aula) {
@@ -144,7 +144,7 @@ class DocenteGuiaController extends Controller
             // Busca estrictamente el aula activa asignada a este Docente Guía
             $aula = Aula::with(['grado', 'modalidad', 'docenteGuia.usuario'])
                 ->where('docente_guia_id', $docente->id)
-                ->whereHas('anioEscolar', fn ($q) => $q->where('activo', true))
+                ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'))
                 ->first();
 
             if (!$aula) {
@@ -213,7 +213,7 @@ class DocenteGuiaController extends Controller
             // Busca estrictamente el aula activa asignada a este Docente Guía
             $aula = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
                 ->where('docente_guia_id', $docente->id)
-                ->whereHas('anioEscolar', fn ($q) => $q->where('activo', true))
+                ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'))
                 ->first();
 
             if (!$aula) {
