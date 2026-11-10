@@ -377,6 +377,16 @@ class AulaController extends Controller
     {
         try {
             $this->authorize('viewAny', Aula::class);
+
+            // FIX CVE-2026-006: Validar ownership para Docente Guía (similar a show())
+            $usuario = auth()->user();
+            if ($usuario->hasRole('Docente Guia') && !$usuario->hasRole(['Director', 'Subdirector'])) {
+                $docente = \App\Models\Docente::where('usuario_id', $usuario->id)->first();
+                if (!$docente || $aula->docente_guia_id !== $docente->id) {
+                    abort(403, 'No tiene autorización para ver las asignaciones de esta aula.');
+                }
+            }
+
             $aula->load(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario']);
 
             $asignaciones = \App\Models\AulaAsignaturaDocente::with(['asignatura', 'docente.usuario'])

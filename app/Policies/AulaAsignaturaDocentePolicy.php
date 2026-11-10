@@ -73,7 +73,8 @@ class AulaAsignaturaDocentePolicy
             }
 
             // Regla B: ¿Es el docente guía dueño de toda el aula?
-            if ($asignatura->aula->docente_guia_id === $docente->id) {
+            // FIX CVE-2026-005: Null-safe access a relación aula
+            if ($asignatura->aula?->docente_guia_id === $docente->id) {
                 return true;
             }
         }
@@ -100,7 +101,8 @@ class AulaAsignaturaDocentePolicy
             }
 
             // Regla B: ¿Es el docente guía dueño de toda el aula?
-            if ($asignatura->aula->docente_guia_id === $docente->id) {
+            // FIX CVE-2026-005: Null-safe access a relación aula
+            if ($asignatura->aula?->docente_guia_id === $docente->id) {
                 return true;
             }
         }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AvanceContenido;
 use App\Models\AulaAsignaturaDocente;
+use App\Models\Aula;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
@@ -14,6 +15,9 @@ class AvanceContenidoController extends Controller
     /**
      * Pantalla principal de seguimiento de contenidos: muestra las asignaturas
      * del docente y su avance por mes.
+     * 
+     * FIX CVE-2026-003: Validar ownership del asignacion_id solicitado
+     * FIX CVE-2026-004: Incluir Docente Guía en modo supervisión y corregir query
      */
     public function index(Request $request)
     {
@@ -22,10 +26,38 @@ class AvanceContenidoController extends Controller
 
             $usuario = auth()->user();
 
-            if ($usuario->hasRole(['Subdirector', 'Director', 'Coordinador'])) {
+            // FIX CVE-2026-004: Incluir 'Docente Guia' en roles de supervisión
+            // pero con alcance limitado a su aula (no todas las asignaciones del sistema)
+            $esSupervisorGlobal = $usuario->hasRole(['Subdirector', 'Director', 'Coordinador']);
+            $esDocenteGuia = $usuario->hasRole('Docente Guia');
+
+            if ($esSupervisorGlobal) {
+                // Supervisores globales (Dirección/Coordinación) ven TODO
                 $asignaciones = AulaAsignaturaDocente::with(['aula.grado', 'asignatura', 'docente'])->get();
                 $modoSupervision = true;
+            } elseif ($esDocenteGuia) {
+                // FIX CVE-2026-004: Docente Guía ve sus materias (docente_id) + materias de su aula (docente_guia_id)
+                $docente = $usuario->docente;
+                $aulaGuia = $docente 
+                    ? Aula::where('docente_guia_id', $docente->id)
+                          ->whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))
+                          ->first()
+                    : null;
+
+                $query = AulaAsignaturaDocente::with(['aula.grado', 'asignatura']);
+                
+                if ($docente) {
+                    $query->where('docente_id', $docente->id);
+                }
+                
+                if ($aulaGuia) {
+                    $query->orWhere('aula_id', $aulaGuia->id);
+                }
+                
+                $asignaciones = $query->get();
+                $modoSupervision = false; // No es supervisor global, pero ve su alcance
             } else {
+                // Docente por Asignatura u otros: solo sus materias directas
                 $docente = $usuario->docente;
                 $asignaciones = $docente
                     ? AulaAsignaturaDocente::with(['aula.grado', 'asignatura'])->where('docente_id', $docente->id)->get()
@@ -39,7 +71,16 @@ class AvanceContenidoController extends Controller
             $asignacionId = $request->query('asignacion_id', $asignaciones->first()->id ?? null);
 
             if ($asignacionId) {
-                $asignacionSeleccionada = AulaAsignaturaDocente::with(['aula.grado', 'asignatura'])->find($asignacionId);
+                // FIX CVE-2026-003: Validar que el asignacion_id solicitado esté en la colección permitida
+                // Usar firstWhere sobre $asignaciones (ya filtrada) en lugar de find() global
+                $asignacionSeleccionada = $asignaciones->firstWhere('id', $asignacionId);
+                
+                // Si el ID solicitado no está en sus asignaciones permitidas, usar la primera por defecto
+                if (!$asignacionSeleccionada) {
+                    $asignacionSeleccionada = $asignaciones->first();
+                    $asignacionId = $asignacionSeleccionada?->id;
+                }
+
                 if ($asignacionSeleccionada) {
                     $avances = AvanceContenido::where('aula_asignatura_docente_id', $asignacionId)
                         ->orderBy('mes')

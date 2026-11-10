@@ -16,6 +16,10 @@ class ActividadEvaluativaController extends Controller
     public function index(Request $request, \App\Models\AulaAsignaturaDocente $asignacion)
     {
         try {
+            // FIX CVE-2026-002: Verificación de autorización obligatoria
+            // La policy 'calificar' valida: docente_id (profesor de la materia) O docente_guia_id (guía del aula)
+            $this->authorize('calificar', $asignacion);
+
             // 1. Determinar si el usuario en sesión es supervisor (Directiva)
             /** @var \App\Models\Usuario $user */
             $user = auth()->user();
