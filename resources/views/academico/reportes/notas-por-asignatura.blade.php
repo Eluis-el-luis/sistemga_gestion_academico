@@ -40,7 +40,7 @@
                     <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Año Escolar</label>
                     <select name="anio_escolar_id" class="w-full border-slate-200 rounded-xl text-sm font-medium focus:ring-blue-500">
                         @foreach($anios ?? [] as $an)
-                            <option value="{{ $an->id }}" @selected($an->id == request('anio_escolar_id', optional(\App\Models\AnioEscolar::where('activo', true)->first())->id))>                                {{ $an->nombre }} {{ $an->activo ? '(Activo)' : '' }}
+                            <option value="{{ $an->id }}" @selected($an->id == request('anio_escolar_id', optional(\App\Models\AnioEscolar::where('estado', 'activo')->first())->id))>                                {{ $an->nombre }} {{ $an->es_activo ? '(Activo)' : '' }}
                             </option>
                         @endforeach
                     </select>

@@ -77,7 +77,7 @@
                                 <select name="anio_escolar_id" class="w-full border-slate-200 bg-slate-50/70 hover:bg-slate-100/80 rounded-xl shadow-sm text-sm font-bold text-[#3d2c1d] focus:ring-[#e6ac27] focus:border-[#e6ac27] cursor-pointer transition-colors" required>
                                     @foreach($anios as $anio)
                                         <option value="{{ $anio->id }}" {{ old('anio_escolar_id', $aula->anio_escolar_id) == $anio->id ? 'selected' : '' }}>
-                                            {{ $anio->nombre }} {{ $anio->activo ? '(Vigente)' : '' }}
+                                            {{ $anio->nombre }} {{ $anio->es_activo ? '(Vigente)' : '' }}
                                         </option>
                                     @endforeach
                                 </select>

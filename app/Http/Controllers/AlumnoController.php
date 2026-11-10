@@ -22,17 +22,8 @@ class AlumnoController extends Controller
                 $q->latest('fecha_matricula');
             }, 'matriculas.aula.grado', 'matriculas.aula.modalidad']);
 
-            // --- 1. ALCANCE POR ROL (Scope para Docentes Guías) ---
-            $usuario = auth()->user();
-            if ($usuario->hasRole('Docente Guia')) {
-                $docente = \App\Models\Docente::where('usuario_id', $usuario->id)->first();
-                if ($docente) {
-                    $aulas_id = \App\Models\Aula::where('docente_guia_id', $docente->id)->pluck('id');
-                    $query->whereHas('matriculas', function($q) use ($aulas_id) {
-                        $q->whereIn('aula_id', $aulas_id)->where('estado', 'activo');
-                    });
-                }
-            }
+            // --- 1. ALCANCE POR ROL (Scope centralizado) ---
+            $query = $this->applyAlumnoScope($query, auth()->user());
 
             // --- 2. MOTOR DE BÚSQUEDA (Nombre o CUP) ---
             if ($request->filled('buscar')) {
@@ -231,5 +222,53 @@ class AlumnoController extends Controller
             // CONTINGENCIA: Si el usuario no tiene perfil de docente u ocurre otro error
             return redirect()->route('dashboard')->with('error', 'Hubo un problema al intentar cargar tu lista de alumnos.');
         }
+    }
+
+    /**
+     * Scope centralizado para filtrar alumnos según ownership del usuario
+     */
+    protected function applyAlumnoScope($query, \App\Models\Usuario $usuario)
+    {
+        // Super-admin (Director/Subdirector/Gestor/Secretaria) ven todo - sin filtro adicional
+        if ($usuario->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Secretaria'])) {
+            return $query;
+        }
+
+        // Coordinador: solo alumnos de su modalidad
+        if ($usuario->hasRole('Coordinador')) {
+            $docente = $usuario->docente;
+            if ($docente && $docente->es_coordinador && $docente->modalidad_coordina_id) {
+                return $query->whereHas('matriculas.aula', function($q) use ($docente) {
+                    $q->where('modalidad_id', $docente->modalidad_coordina_id);
+                });
+            }
+            return $query;
+        }
+
+        // Docente Guía: solo alumnos de su aula
+        if ($usuario->hasRole('Docente Guia')) {
+            $docente = $usuario->docente;
+            if ($docente) {
+                return $query->whereHas('matriculas', function($q) use ($docente) {
+                    $q->where('aula_id', function($subQ) use ($docente) {
+                        $subQ->select('id')->from('aula')->where('docente_guia_id', $docente->id);
+                    })->where('estado', 'activo');
+                });
+            }
+            return $query;
+        }
+
+        // Docente por Asignatura: alumnos de aulas donde imparte
+        if ($usuario->hasRole('Docente por Asignatura')) {
+            $docente = $usuario->docente;
+            if ($docente) {
+                return $query->whereHas('matriculas.aula.asignaciones', function($q) use ($docente) {
+                    $q->where('docente_id', $docente->id)->where('activo', true);
+                });
+            }
+            return $query;
+        }
+
+        return $query;
     }
 }

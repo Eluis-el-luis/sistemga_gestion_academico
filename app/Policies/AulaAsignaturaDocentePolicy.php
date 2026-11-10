@@ -4,79 +4,112 @@ namespace App\Policies;
 
 use App\Models\AulaAsignaturaDocente;
 use App\Models\Usuario;
-use Illuminate\Auth\Access\Response;
+use App\Policies\Concerns\HasResourceOwnership;
 
 class AulaAsignaturaDocentePolicy
 {
-    /**
-     * El "Poder Absoluto" para Dirección y Subdirección.
-     * Al poner esto aquí, te ahorras validarlos en los demás métodos.
-     */
+    use HasResourceOwnership;
+
     public function before(Usuario $usuario, $ability): ?bool
     {
-        if ($usuario->hasRole(['Director', 'Subdirector'])) {
+        if (in_array($ability, ['viewAny', 'view']) && $this->isSuperAdmin($usuario)) {
             return true;
         }
         return null;
     }
 
-    /**
-     * Equivalente a (V)er en la Matriz.
-     */
     public function viewAny(Usuario $usuario): bool
     {
         return $usuario->hasPermissionTo('asignaturas_aula.ver') || $usuario->hasPermissionTo('asignaturas_aula.gestionar');
     }
 
-    /**
-     * Equivalente a (G)estionar en la Matriz.
-     */
+    public function view(Usuario $usuario, AulaAsignaturaDocente $asignacion): bool
+    {
+        if (!$usuario->hasPermissionTo('asignaturas_aula.ver') && !$usuario->hasPermissionTo('asignaturas_aula.gestionar')) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($usuario)) {
+            return true;
+        }
+
+        if ($usuario->hasRole('Gestor de Usuarios')) {
+            return true;
+        }
+
+        if ($usuario->hasRole('Coordinador')) {
+            return $this->coordinatesModality($usuario, $asignacion, 'aula.modalidad_id');
+        }
+
+        // Docente guía del aula
+        if ($this->ownsAula($usuario, $asignacion, 'aula')) {
+            return true;
+        }
+
+        // Docente que imparte esta asignatura
+        return $this->ownsAsDocenteAsignaturaDirect($usuario, $asignacion);
+    }
+
     public function create(Usuario $usuario): bool
     {
         return $usuario->hasPermissionTo('asignaturas_aula.gestionar');
     }
 
-    /**
-     * Alcance de los datos (G)estionar.
-     */
-    public function update(Usuario $usuario, AulaAsignaturaDocente $aulaAsignaturaDocente): bool
+    public function update(Usuario $usuario, AulaAsignaturaDocente $asignacion): bool
     {
         if (!$usuario->hasPermissionTo('asignaturas_aula.gestionar')) {
             return false;
         }
 
-        // Validación de alcance: El docente solo puede editar si él imparte esa clase
-        $docente = $usuario->docente;
-        if ($docente) {
-            return $aulaAsignaturaDocente->docente_id === $docente->id;
+        if ($this->isSuperAdmin($usuario) || $usuario->hasRole('Gestor de Usuarios')) {
+            return true;
         }
 
-        return false;
+        // Coordinador: solo su modalidad
+        if ($this->coordinatesModality($usuario, $asignacion, 'aula.modalidad_id')) {
+            return true;
+        }
+
+        // Docente puede actualizar su propia asignación
+        return $this->ownsAsDocenteAsignaturaDirect($usuario, $asignacion);
+    }
+
+    public function delete(Usuario $usuario, AulaAsignaturaDocente $asignacion): bool
+    {
+        if (!$usuario->hasPermissionTo('asignaturas_aula.gestionar')) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($usuario) || $usuario->hasRole('Gestor de Usuarios')) {
+            return true;
+        }
+
+        return $this->coordinatesModality($usuario, $asignacion, 'aula.modalidad_id');
     }
 
     /**
      * Determina si el usuario puede ingresar calificaciones para esta asignatura.
+     * Requiere permiso notas.gestionar Y ownership de la asignación.
      */
-    public function calificar(Usuario $usuario, AulaAsignaturaDocente $asignatura): bool
+    public function calificar(Usuario $usuario, AulaAsignaturaDocente $asignacion): bool
     {
-        // 1. Debe tener el permiso base de Spatie para gestionar notas
         if (!$usuario->hasPermissionTo('notas.gestionar')) {
             return false;
         }
 
-        // 2. Verificamos la relación del docente con esta materia específica
-        $docente = $usuario->docente;
-        if ($docente) {
-            // Regla A: ¿Es el maestro que imparte esta asignatura exacta?
-            if ($asignatura->docente_id === $docente->id) {
-                return true;
-            }
+        // Super-admin puede calificar todo
+        if ($this->isSuperAdmin($usuario)) {
+            return true;
+        }
 
-            // Regla B: ¿Es el docente guía dueño de toda el aula?
-            // FIX CVE-2026-005: Null-safe access a relación aula
-            if ($asignatura->aula?->docente_guia_id === $docente->id) {
-                return true;
-            }
+        // Docente que imparte la asignatura exacta
+        if ($this->ownsAsDocenteAsignaturaDirect($usuario, $asignacion)) {
+            return true;
+        }
+
+        // Docente guía del aula (tiene acceso a todas las materias de su aula)
+        if ($this->ownsAula($usuario, $asignacion, 'aula')) {
+            return true;
         }
 
         return false;
@@ -85,26 +118,22 @@ class AulaAsignaturaDocentePolicy
     /**
      * Determina si el usuario puede gestionar asistencia para esta asignatura.
      */
-    public function gestionarAsistencia(Usuario $usuario, AulaAsignaturaDocente $asignatura): bool
+    public function gestionarAsistencia(Usuario $usuario, AulaAsignaturaDocente $asignacion): bool
     {
-        // 1. Debe tener el permiso base de Spatie para gestionar asistencia
         if (!$usuario->hasPermissionTo('asistencia.gestionar')) {
             return false;
         }
 
-        // 2. Verificamos la relación del docente con esta materia específica
-        $docente = $usuario->docente;
-        if ($docente) {
-            // Regla A: ¿Es el maestro que imparte esta asignatura exacta?
-            if ($asignatura->docente_id === $docente->id) {
-                return true;
-            }
+        if ($this->isSuperAdmin($usuario)) {
+            return true;
+        }
 
-            // Regla B: ¿Es el docente guía dueño de toda el aula?
-            // FIX CVE-2026-005: Null-safe access a relación aula
-            if ($asignatura->aula?->docente_guia_id === $docente->id) {
-                return true;
-            }
+        if ($this->ownsAsDocenteAsignaturaDirect($usuario, $asignacion)) {
+            return true;
+        }
+
+        if ($this->ownsAula($usuario, $asignacion, 'aula')) {
+            return true;
         }
 
         return false;

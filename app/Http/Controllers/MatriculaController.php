@@ -20,6 +20,7 @@ class MatriculaController extends Controller
             $this->authorize('viewAny', Matricula::class);
 
             $anioActivo = AnioEscolar::where('estado', 'activo')->first();
+            $aniosEscolares = AnioEscolar::orderByDesc('fecha_inicio')->get(); // Para el filtro de años
             $query = Matricula::with(['alumno', 'aula.grado', 'aula.modalidad', 'anioEscolar']);
 
             // --- FILTRO DE AÑO ---
@@ -46,10 +47,13 @@ class MatriculaController extends Controller
                 $query->where('estado', $request->estado);
             }
 
+            // Aplicar scope de ownership a la consulta principal
+            $query = $this->applyMatriculaScope($query, auth()->user());
+
             $matriculas = $query->latest('fecha_matricula')->paginate(15);
 
-            $aniosEscolares = AnioEscolar::orderBy('nombre', 'desc')->get();
-            $aulas = Aula::with(['grado', 'modalidad'])->get();
+            // Aulas para el filtro - también con scope
+            $aulas = $this->getAulasScope(auth()->user());
 
             return view('academico.matriculas.index', compact('matriculas', 'aniosEscolares', 'aulas', 'anioActivo'));
 
@@ -179,5 +183,91 @@ class MatriculaController extends Controller
             }
             return back()->with('error', 'No se pudo eliminar la matrícula. Es posible que el sistema la proteja por tener calificaciones asociadas.');
         }
+    }
+
+    /**
+     * Scope centralizado para filtrar matrículas según ownership del usuario
+     */
+    protected function applyMatriculaScope($query, \App\Models\Usuario $usuario)
+    {
+        // Super-admin (Director/Subdirector/Gestor/Secretaria) ven todo
+        if ($usuario->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Secretaria'])) {
+            return $query;
+        }
+
+        // Coordinador: solo matrículas de su modalidad
+        if ($usuario->hasRole('Coordinador')) {
+            $docente = $usuario->docente;
+            if ($docente && $docente->es_coordinador && $docente->modalidad_coordina_id) {
+                return $query->whereHas('aula', function($q) use ($docente) {
+                    $q->where('modalidad_id', $docente->modalidad_coordina_id);
+                });
+            }
+            return $query;
+        }
+
+        // Docente Guía: solo matrículas de su aula
+        if ($usuario->hasRole('Docente Guia')) {
+            $docente = $usuario->docente;
+            if ($docente) {
+                return $query->where('aula_id', function($subQ) use ($docente) {
+                    $subQ->select('id')->from('aula')->where('docente_guia_id', $docente->id);
+                });
+            }
+            return $query;
+        }
+
+        // Docente por Asignatura: matrículas de aulas donde imparte
+        if ($usuario->hasRole('Docente por Asignatura')) {
+            $docente = $usuario->docente;
+            if ($docente) {
+                return $query->whereHas('aula.asignaciones', function($q) use ($docente) {
+                    $q->where('docente_id', $docente->id)->where('activo', true);
+                });
+            }
+            return $query;
+        }
+
+        return $query;
+    }
+
+    /**
+     * Obtener aulas para el filtro dropdown según ownership
+     */
+    protected function getAulasScope(\App\Models\Usuario $usuario)
+    {
+        $query = \App\Models\Aula::with(['grado', 'modalidad']);
+
+        if ($usuario->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Secretaria'])) {
+            return $query->get();
+        }
+
+        if ($usuario->hasRole('Coordinador')) {
+            $docente = $usuario->docente;
+            if ($docente && $docente->es_coordinador && $docente->modalidad_coordina_id) {
+                return $query->where('modalidad_id', $docente->modalidad_coordina_id)->get();
+            }
+            return $query->get();
+        }
+
+        if ($usuario->hasRole('Docente Guia')) {
+            $docente = $usuario->docente;
+            if ($docente) {
+                return $query->where('docente_guia_id', $docente->id)->get();
+            }
+            return $query->get();
+        }
+
+        if ($usuario->hasRole('Docente por Asignatura')) {
+            $docente = $usuario->docente;
+            if ($docente) {
+                return $query->whereHas('asignaciones', function($q) use ($docente) {
+                    $q->where('docente_id', $docente->id)->where('activo', true);
+                })->get();
+            }
+            return $query->get();
+        }
+
+        return $query->get();
     }
 }

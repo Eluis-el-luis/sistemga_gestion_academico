@@ -4,46 +4,82 @@ namespace App\Policies;
 
 use App\Models\MallaCurricular;
 use App\Models\Usuario;
-use Illuminate\Auth\Access\Response;
+use App\Policies\Concerns\HasResourceOwnership;
 
 class MallaCurricularPolicy
 {
-    /**
-     * El "Poder Absoluto" para Dirección y Subdirección.
-     * Al poner esto aquí, te ahorras validarlos en los demás métodos.
-     */
+    use HasResourceOwnership;
+
     public function before(Usuario $usuario, $ability): ?bool
     {
-        if ($usuario->hasRole(['Director', 'Subdirector'])) {
+        if (in_array($ability, ['viewAny', 'view']) && $this->isSuperAdmin($usuario)) {
             return true;
         }
         return null;
     }
 
-    /**
-     * Equivalente a (V)er en la Matriz.
-     */
     public function viewAny(Usuario $usuario): bool
     {
         return $usuario->hasPermissionTo('malla.ver') || $usuario->hasPermissionTo('malla.gestionar');
     }
 
-    /**
-     * Equivalente a (G)estionar en la Matriz.
-     */
+    public function view(Usuario $usuario, MallaCurricular $malla): bool
+    {
+        if (!$usuario->hasPermissionTo('malla.ver') && !$usuario->hasPermissionTo('malla.gestionar')) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($usuario)) {
+            return true;
+        }
+
+        // Gestor de Usuarios, Coordinador, Secretaria ven todo
+        if ($usuario->hasAnyRole(['Gestor de Usuarios', 'Coordinador', 'Secretaria'])) {
+            return true;
+        }
+
+        return false;
+    }
+
     public function create(Usuario $usuario): bool
     {
         return $usuario->hasPermissionTo('malla.gestionar');
     }
 
-    /**
-     * Alcance de los datos (G)estionar.
-     */
-    public function update(Usuario $usuario, MallaCurricular $mallaCurricular): bool
+    public function update(Usuario $usuario, MallaCurricular $malla): bool
     {
-        // Como el 'before()' ya le dio acceso libre al Director y Subdirector,
-        // y ningún otro rol tiene permiso de gestionar la malla en el Seeder,
-        // basta con verificar el permiso de Spatie.
-        return $usuario->hasPermissionTo('malla.gestionar');
+        if (!$usuario->hasPermissionTo('malla.gestionar')) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($usuario) || $usuario->hasRole('Gestor de Usuarios')) {
+            return true;
+        }
+
+        // Coordinador puede actualizar malla de su modalidad
+        // Nota: MallaCurricular no tiene modalidad_id directamente, 
+        // se vincula via grado->modalidad_id
+        if ($usuario->hasRole('Coordinador') && $this->coordinatesModality($usuario, $malla, 'grado.modalidad_id')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function delete(Usuario $usuario, MallaCurricular $malla): bool
+    {
+        if (!$usuario->hasPermissionTo('malla.gestionar')) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($usuario) || $usuario->hasRole('Gestor de Usuarios')) {
+            return true;
+        }
+
+        if ($usuario->hasRole('Coordinador') && $this->coordinatesModality($usuario, $malla, 'grado.modalidad_id')) {
+            return true;
+        }
+
+        return false;
     }
 }

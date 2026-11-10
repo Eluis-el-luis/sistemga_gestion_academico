@@ -4,61 +4,59 @@ namespace App\Policies;
 
 use App\Models\AvanceContenido;
 use App\Models\Usuario;
-use Illuminate\Auth\Access\Response;
+use App\Policies\Concerns\HasResourceOwnership;
 
 class AvanceContenidoPolicy
 {
-    /**
-     * El "Poder Absoluto" para Dirección y Subdirección.
-     * Al poner esto aquí, te ahorras validarlos en los demás métodos.
-     */
+    use HasResourceOwnership;
+
     public function before(Usuario $usuario, $ability): ?bool
     {
-        if ($usuario->hasRole(['Director', 'Subdirector'])) {
+        if (in_array($ability, ['viewAny', 'view']) && $this->isSuperAdmin($usuario)) {
             return true;
         }
         return null;
     }
 
-    /**
-     * Equivalente a (V)er en la Matriz.
-     */
     public function viewAny(Usuario $usuario): bool
     {
         return $usuario->hasPermissionTo('avance.ver') || $usuario->hasPermissionTo('avance.gestionar');
     }
 
-    /**
-     * Equivalente a (G)estionar en la Matriz.
-     */
+    public function view(Usuario $usuario, AvanceContenido $avance): bool
+    {
+        if (!$usuario->hasPermissionTo('avance.ver') && !$usuario->hasPermissionTo('avance.gestionar')) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($usuario)) {
+            return true;
+        }
+
+        // Docente que imparte la asignatura O docente guía del aula
+        return $this->ownsViaAsignacion($usuario, $avance, 'aulaAsignaturaDocente');
+    }
+
     public function create(Usuario $usuario): bool
     {
         return $usuario->hasPermissionTo('avance.gestionar');
     }
 
-    /**
-     * Alcance de los datos (G)estionar.
-     */
-    public function update(Usuario $usuario, AvanceContenido $avanceContenido): bool
+    public function update(Usuario $usuario, AvanceContenido $avance): bool
     {
         if (!$usuario->hasPermissionTo('avance.gestionar')) {
             return false;
         }
 
-        // Validación de alcance: El docente solo puede editar si él imparte esa clase
-        $docente = $usuario->docente;
-        if ($docente) {
-            return $avanceContenido->aulaAsignaturaDocente->docente_id === $docente->id;
+        if ($this->isSuperAdmin($usuario)) {
+            return true;
         }
 
-        return false;
+        return $this->ownsViaAsignacion($usuario, $avance, 'aulaAsignaturaDocente');
     }
 
-    /**
-     * Eliminar un registro de avance.
-     */
-    public function delete(Usuario $usuario, AvanceContenido $avanceContenido): bool
+    public function delete(Usuario $usuario, AvanceContenido $avance): bool
     {
-        return $this->update($usuario, $avanceContenido);
+        return $this->update($usuario, $avance);
     }
 }

@@ -34,10 +34,10 @@ class AnioEscolarPolicy
 
     /**
      * Determina si el usuario puede actualizar un año escolar.
+     * Solo si tiene permiso de gestionar Y el año no está cerrado
      */
     public function update(Usuario $usuario, AnioEscolar $anioEscolar): bool
     {
-        // Solo si tiene permiso de gestionar Y el año no está cerrado
         if (!$usuario->can('configuracion.gestionar')) {
             return false;
         }
@@ -48,10 +48,10 @@ class AnioEscolarPolicy
 
     /**
      * Determina si el usuario puede eliminar un año escolar.
+     * Solo Director puede eliminar, y solo años en planificación
      */
     public function delete(Usuario $usuario, AnioEscolar $anioEscolar): bool
     {
-        // Solo Director puede eliminar, y solo años en planificación
         if (!$usuario->can('configuracion.gestionar') || !$usuario->hasRole('Director')) {
             return false;
         }

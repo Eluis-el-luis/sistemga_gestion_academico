@@ -65,10 +65,21 @@ class AvanceContenidoController extends Controller
                 $modoSupervision = false;
             }
 
+            // Manejar caso sin asignaciones
+            if ($asignaciones->isEmpty()) {
+                return view('academico.avance-contenido.index', [
+                    'asignaciones' => collect(),
+                    'asignacionSeleccionada' => null,
+                    'avances' => collect(),
+                    'modoSupervision' => $modoSupervision,
+                    'cortes' => collect(),
+                ]);
+            }
+
             $asignacionSeleccionada = null;
             $avances = collect();
 
-            $asignacionId = $request->query('asignacion_id', $asignaciones->first()->id ?? null);
+            $asignacionId = $request->query('asignacion_id', $asignaciones->first()->id);
 
             if ($asignacionId) {
                 // FIX CVE-2026-003: Validar que el asignacion_id solicitado esté en la colección permitida

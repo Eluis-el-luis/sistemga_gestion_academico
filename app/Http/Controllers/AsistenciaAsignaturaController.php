@@ -23,6 +23,9 @@ class AsistenciaAsignaturaController extends Controller
         try {
             $this->authorize('gestionarAsistencia', $asignacion);
 
+            // Cargar relaciones necesarias para evitar lazy loading
+            $asignacion->load('aula', 'asignatura');
+
             $fecha = $request->query('fecha', Carbon::today()->toDateString());
 
             // 1. Alumnos matriculados en esta aula
@@ -46,6 +49,11 @@ class AsistenciaAsignaturaController extends Controller
                 ->groupBy('matricula_id');
 
             // 4. Bloques horarios de esta modalidad/turno/jornada (excluyendo recreos) para que el maestro elija la hora
+            // Verificar que el aula existe y tiene modalidad/turno
+            if (!$asignacion->aula) {
+                return redirect()->route('dashboard')->with('error', 'Esta asignación no tiene aula asociada. Contacte al administrador.');
+            }
+
             $bloques = BloqueHorario::where('modalidad_id', $asignacion->aula->modalidad_id)
                 ->where('turno', $asignacion->aula->turno)
                 ->where('tipo_jornada', 'Regular')

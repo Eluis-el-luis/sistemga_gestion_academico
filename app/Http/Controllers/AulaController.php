@@ -70,28 +70,10 @@ class AulaController extends Controller
     public function show(Aula $aula)
     {
         try {
-            $usuario = auth()->user();
-
-            // 1. Permiso base para ver el aula (Director, Subdirector y Docente Guía tienen 'aulas.ver')
+            // Authorization explícita - Policy maneja ownership (Docente Guía, Coordinador, etc.)
             $this->authorize('view', $aula);
 
-            // 2. Alcance del Docente Guía: solo puede ver la información completa
-            //    del aula de la cual es titular asignado. Cualquier otra aula -> 403.
-            if ($usuario->hasRole('Docente Guia') && !$usuario->hasRole(['Director', 'Subdirector'])) {
-                $docente = Docente::where('usuario_id', $usuario->id)->first();
-
-                // Si no tiene perfil de Docente vinculado, no puede verificar ownership del aula
-                if (!$docente) {
-                    abort(403, 'No tienes un perfil de docente vinculado. Contacta a administración.');
-                }
-
-                // Solo puede ver el aula de la cual es titular
-                if ($aula->docente_guia_id !== $docente->id) {
-                    abort(403, 'No tienes autorización para ver los detalles de esta aula.');
-                }
-            }
-
-            // 3. Carga óptima de relaciones del aula
+            // Carga óptima de relaciones del aula
             $aula->load([
                 'grado',
                 'modalidad',
@@ -376,16 +358,8 @@ class AulaController extends Controller
     public function showAsignaciones(Aula $aula)
     {
         try {
-            $this->authorize('viewAny', Aula::class);
-
-            // FIX CVE-2026-006: Validar ownership para Docente Guía (similar a show())
-            $usuario = auth()->user();
-            if ($usuario->hasRole('Docente Guia') && !$usuario->hasRole(['Director', 'Subdirector'])) {
-                $docente = \App\Models\Docente::where('usuario_id', $usuario->id)->first();
-                if (!$docente || $aula->docente_guia_id !== $docente->id) {
-                    abort(403, 'No tiene autorización para ver las asignaciones de esta aula.');
-                }
-            }
+            // Authorization explícita - Policy Aula maneja ownership (Docente Guía, Coordinador, etc.)
+            $this->authorize('view', $aula);
 
             $aula->load(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario']);
 

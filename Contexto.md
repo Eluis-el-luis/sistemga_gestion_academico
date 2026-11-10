@@ -480,6 +480,75 @@ $anioEscolarService->obtenerOcrearActivo(); // Para desarrollo/testing
 
 ---
 
+### 7.7.10 Corrección: Error "Verificación del Sistema - Ocurrió un problema al cargar el módulo de evaluación" (Nov 2026)
+
+**Problema:** Al acceder como **Docente por Asignatura** al "Centro de Calificaciones" y hacer clic en "Evaluar / Configurar" para su materia asignada (ej. Lengua Extranjera), o al intentar acceder a la vista de asistencia de esa asignatura, saltaba el error: *"Verificación del Sistema - Ocurrió un problema al cargar el módulo de evaluación."*
+
+**Causas raíz identificadas (3 problemas combinados):**
+
+1. **Bug en Policy `AulaAsignaturaDocentePolicy`:** Los métodos `view`, `update`, `calificar` y `gestionarAsistencia` usaban `$this->ownsAsDocenteAsignatura($usuario, $asignacion, 'aulaAsignaturaDocente')` pasando `'aulaAsignaturaDocente'` como nombre de relación. Pero el recurso **ES** el `AulaAsignaturaDocente` mismo, no un modelo que tenga esa relación. Esto provocaba `BadMethodCallException` al intentar acceder a `$asignacion->aulaAsignaturaDocente()` (método inexistente), que era atrapado por el try-catch genérico y mostraba el error genérico.
+
+2. **Falta de eager loading y manejo de estado vacío en controladores:** Varios controladores consultaban `CorteEvaluativo` sin eager loading de `anioEscolar` (causando N+1 en vistas) y usaban `$cortes->first()->id` sin verificar si la colección estaba vacía. Si no hay año activo, `$cortes->first()` retorna `null` y `null->id` lanza "Attempt to read property 'id' on null".
+
+3. **Acceso a relaciones sin cargar:** `AsistenciaAsignaturaController::create` accedía a `$asignacion->aula->modalidad_id` y `$asignacion->aula->turno` sin eager loading previo.
+
+**Archivos corregidos:**
+
+| Archivo | Cambio |
+|---------|--------|
+| `app/Policies/Concerns/HasResourceOwnership.php` | Agregado método `ownsAsDocenteAsignaturaDirect(Usuario $usuario, AulaAsignaturaDocente $asignacion)` para ownership directo |
+| `app/Policies/AulaAsignaturaDocentePolicy.php` | Métodos `view`, `update`, `calificar`, `gestionarAsistencia` usan ahora `ownsAsDocenteAsignaturaDirect` |
+| `app/Http/Controllers/NotaController.php` | Métodos `create` (planilla) y `evaluar`: eager loading `anioEscolar`, validación `$cortes->isEmpty()`, uso de `?->` para acceso seguro |
+| `app/Http/Controllers/ActividadEvaluativaController.php` | Método `index`: eager loading `anioEscolar`, validación `$cortes->isEmpty()` |
+| `app/Http/Controllers/GestorBoletinController.php` | Método `bandeja`: validación `$cortes->isEmpty()` antes de acceder a `first()->id` |
+| `app/Http/Controllers/AsistenciaAsignaturaController.php` | Método `create`: eager loading `aula` y `asignatura`, validación de existencia de aula |
+
+**Patrón de corrección aplicado (reutilizable para futuras vistas):**
+```php
+// 1. Eager loading de relaciones necesarias
+$cortes = CorteEvaluativo::with('anioEscolar')
+    ->whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))
+    ->get();
+
+// 2. Manejo explícito de estado vacío (sin año activo / sin cortes)
+if ($cortes->isEmpty()) {
+    return view('...', [
+        'cortes' => collect(),
+        'corteSeleccionado' => null,
+        'corteActivo' => null,
+        // ... variables con valores por defecto
+    ]);
+}
+
+// 3. Acceso seguro con operador null-safe
+$corteSeleccionado = $request->query('corte_evaluativo_id', $cortes->first()->id);
+$pesoAcumulado = $corteActivo?->peso_acumulado ?? 0;
+```
+
+**Lección:** El error genérico "Verificación del Sistema" oculta la causa real. Siempre revisar logs (`storage/logs/laravel.log`) para ver la excepción original (`BadMethodCallException`, `ErrorException`, etc.) antes de asumir que es un problema de permisos.
+
+---
+
+### 7.7.11 Corrección: Error en Asistencia Semanal del Docente Guía (Nov 2026)
+
+**Problema:** Al acceder como **Docente Guía** a la vista de "Pasar Asistencia" (asistencia semanal del aula), saltaba el error: *"Verificación del Sistema - Ocurrió un error al cargar la planilla de asistencia. Por favor, intenta de nuevo."*
+
+**Causa raíz:** En `AsistenciaAulaController::create` y `store`, la consulta para buscar el aula del docente guía usaba:
+```php
+->whereHas('anioEscolar', function($q) {
+    $q->where('activo', true);  // ❌ Campo eliminado en migración Nov 2026
+})
+```
+
+La migración `2026_11_04_000001_update_anio_escolar_add_estados_y_cierre` eliminó la columna booleana `activo` y la reemplazó por el enum `estado` (`planificacion`, `activo`, `cerrado`).
+
+**Archivo corregido:**
+- `app/Http/Controllers/AsistenciaAulaController.php` (líneas 35-36 y 94-95): Cambiado `where('activo', true)` por `where('estado', 'activo')`.
+
+**Nota:** Este es el mismo tipo de error corregido en 18 archivos previos (sección 7.7.9). La regla sigue siendo: **tras cambiar el esquema de BD, buscar y actualizar TODAS las referencias al campo anterior**.
+
+---
+
 ## 8. Flujos de negocio principales
 
 ### 8.1 Gestión de usuarios y acceso
