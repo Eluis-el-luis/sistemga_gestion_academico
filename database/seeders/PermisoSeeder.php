@@ -113,6 +113,11 @@ class PermisoSeeder extends Seeder
             'reparacion.gestionar', 'reparacion.ver',
             // Reportes propios (filtrados por aula en middleware)
             'reportes.mis_clases.ver', 'reportes.mi_aula.ver',
+            // Reportes MINED oficiales - Solo SU aula (scope automático via autorizarReportes)
+            'reportes.rendimiento_corte.ver',
+            'reportes.mined_detallado.ver',
+            'reportes.escalas.ver',
+            'reportes.asignaturas_aprobadas.ver',
         ]);
 
         // 7. EL DOCENTE POR ASIGNATURA - Reportes solo de SUS asignaturas
@@ -151,6 +156,8 @@ class PermisoSeeder extends Seeder
             'reportes.historial_estudiante.ver', 'reportes.mined_detallado.ver',
             'reportes.avance_programatico.ver', 'reportes.estudiantes.ver',
             'reportes.padres.ver', 'reportes.escalas.ver', 'reportes.asignaturas_aprobadas.ver',
+            // Ver actividades evaluativas (solo lectura) en su modalidad
+            'asignaturas_aula.ver',
         ]);
 
         // 10. LA SECRETARÍA - Reportes oficiales y operativos

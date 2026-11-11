@@ -25,7 +25,7 @@ class ReporteController extends Controller
         $user = auth()->user();
         
         // 1. Permiso base
-        if (!$user->hasAnyPermission(['reportes.ver', 'reportes.gestionar', 'reportes.supervisar'])) {
+        if (!$user->hasAnyPermission(['reportes.ver', 'reportes.gestionar', 'reportes.supervisar', 'reportes.mi_aula.ver', 'reportes.mis_clases.ver'])) {
             throw new \Illuminate\Auth\Access\AuthorizationException('No tiene permisos para acceder a los reportes.');
         }
 
@@ -49,6 +49,24 @@ class ReporteController extends Controller
                 if ($aula) {
                     request()->merge(['aula_id' => $aula->id, 'grado_id' => $aula->grado_id]);
                 }
+            }
+        }
+        
+        // 4. Permisos granulares para reportes MINED específicos (Docente Guía)
+        // El middleware/autorización ya inyectó los filtros de aula/grado arriba
+        $rutaActual = request()->route()->getName();
+        $reportesMinidDocenteGuia = [
+            'reportes.rendimiento-corte',
+            'reportes.mined-detallado', 
+            'reportes.escalas',
+            'reportes.asignaturas-aprobadas',
+        ];
+        
+        if ($user->hasRole('Docente Guia') && in_array($rutaActual, $reportesMinidDocenteGuia)) {
+            // Verificar que tiene al menos el permiso base de mi_aula o mis_clases
+            // Los filtros de aula ya se inyectaron en el paso 3
+            if (!$user->hasAnyPermission(['reportes.mi_aula.ver', 'reportes.mis_clases.ver'])) {
+                throw new \Illuminate\Auth\Access\AuthorizationException('No tiene permisos para acceder a este reporte MINED.');
             }
         }
     }

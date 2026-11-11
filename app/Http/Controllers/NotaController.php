@@ -31,14 +31,61 @@ class NotaController extends Controller
             $usuario = auth()->user();
             $asignaciones = $this->getAsignacionesScope($usuario, $request);
             
-            // Para vista de supervisión (Director/Subdirector)
-            $modoSupervision = $usuario->hasRole(['Director', 'Subdirector']);
-            $grados = $modoSupervision ? \App\Models\Grado::with('modalidad')->orderBy('modalidad_id', 'asc')->orderBy('id', 'asc')->get() : collect();
-            $aulas = $modoSupervision ? \App\Models\Aula::with('grado')->get() : collect();
-            $gradoSeleccionadoId = $modoSupervision && $request->filled('grado_id') ? $request->grado_id : ($grados->first()->id ?? null);
-            $aulaSeleccionadaId = $modoSupervision && $request->filled('aula_id') ? $request->aula_id : ($aulas->where('grado_id', $gradoSeleccionadoId)->first()->id ?? null);
+            // Determinar tipo de vista según rol
+            $esDirectivo = $usuario->hasRole(['Director', 'Subdirector']);
+            $esCoordinador = $usuario->hasRole('Coordinador');
+            $esDocenteGuia = $usuario->hasRole('Docente Guia');
+            
+            $modoSupervision = $esDirectivo || $esCoordinador;
+            
+            // Preparar datos según rol
+            if ($esDirectivo) {
+                // Director/Subdirector: vista completa con filtros
+                $grados = \App\Models\Grado::with('modalidad')->orderBy('modalidad_id', 'asc')->orderBy('id', 'asc')->get();
+                $aulas = \App\Models\Aula::with('grado')->get();
+                $gradoSeleccionadoId = $request->filled('grado_id') ? $request->grado_id : ($grados->first()->id ?? null);
+                $aulaSeleccionadaId = $request->filled('aula_id') ? $request->aula_id : ($aulas->where('grado_id', $gradoSeleccionadoId)->first()->id ?? null);
+                
+            } elseif ($esCoordinador) {
+                // Coordinador: vista segmentada por aulas de su modalidad
+                $docente = $usuario->docente;
+                $aulas = \App\Models\Aula::with(['grado', 'asignaciones.asignatura', 'asignaciones.docente.usuario'])
+                    ->where('modalidad_id', $docente->modalidad_coordina_id)
+                    ->whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))
+                    ->orderBy('grado_id')
+                    ->get();
+                
+                // Agrupar asignaciones por aula para la vista
+                $asignacionesPorAula = [];
+                foreach ($aulas as $aula) {
+                    $asignacionesPorAula[$aula->id] = $aula->asignaciones
+                        ->where('activo', true)
+                        ->sortBy('asignatura.nombre')
+                        ->values();
+                }
+                
+                $grados = collect();
+                $gradoSeleccionadoId = null;
+                $aulaSeleccionadaId = $aulas->first()->id ?? null;
+                
+            } else {
+                // Docente Guía / Docente por Asignatura
+                $grados = collect();
+                $aulas = collect();
+                $gradoSeleccionadoId = null;
+                $aulaSeleccionadaId = null;
+            }
 
-            return view('academico.notas.index', compact('asignaciones', 'modoSupervision', 'grados', 'aulas', 'gradoSeleccionadoId', 'aulaSeleccionadaId'));
+            return view('academico.notas.index', compact(
+                'asignaciones', 
+                'modoSupervision', 
+                'grados', 
+                'aulas', 
+                'gradoSeleccionadoId', 
+                'aulaSeleccionadaId',
+                'esCoordinador',
+                'asignacionesPorAula' ?? null
+            ));
 
         } catch (\Exception $e) {
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
@@ -78,7 +125,18 @@ class NotaController extends Controller
             })->get();
         }
 
-        // Docente por Asignatura / Coordinador: solo sus asignaciones
+        if ($usuario->hasRole('Coordinador')) {
+            // Coordinador: TODAS las asignaturas de su modalidad, agrupadas por aula
+            // No solo las que imparte, sino todas las de su sector para supervisión
+            if ($docente->modalidad_coordina_id) {
+                return $query->whereHas('aula', function ($q) use ($docente) {
+                    $q->where('modalidad_id', $docente->modalidad_coordina_id);
+                })->get();
+            }
+            return collect();
+        }
+
+        // Docente por Asignatura: solo sus asignaciones
         return $query->where('docente_id', $docente->id)->get();
     }
 

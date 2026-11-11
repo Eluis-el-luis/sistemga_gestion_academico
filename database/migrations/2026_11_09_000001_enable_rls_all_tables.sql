@@ -763,6 +763,8 @@ CREATE POLICY asistencia_aula_update_policy ON asistencia_aula
 -- -----------------------------------------------------------------------------
 -- TABLA: corte_evaluativo
 -- -----------------------------------------------------------------------------
+-- Nota: corte_evaluativo NO tiene columna es_cerrado. El cierre se maneja en tabla corte_cerrado
+-- es_planificacion: verificar si el anio_escolar asociado está en estado 'planificacion'
 ALTER TABLE corte_evaluativo ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY corte_select_policy ON corte_evaluativo
@@ -779,18 +781,32 @@ CREATE POLICY corte_insert_policy ON corte_evaluativo
 CREATE POLICY corte_update_policy ON corte_evaluativo
   FOR UPDATE USING (
     has_permission('configuracion.gestionar')
-    AND NOT es_cerrado
+    AND NOT EXISTS (
+      SELECT 1 FROM corte_cerrado cc
+      WHERE cc.corte_evaluativo_id = corte_evaluativo.id
+        AND cc.bloqueado = true
+    )
   ) WITH CHECK (
     has_permission('configuracion.gestionar')
-    AND NOT es_cerrado
+    AND NOT EXISTS (
+      SELECT 1 FROM corte_cerrado cc
+      WHERE cc.corte_evaluativo_id = corte_evaluativo.id
+        AND cc.bloqueado = true
+    )
   );
 
 CREATE POLICY corte_delete_policy ON corte_evaluativo
-  FOR DELETE USING ( has_role('Director') AND es_planificacion );
+  FOR DELETE USING (
+    has_role('Director')
+    AND anio_escolar_id IN (
+      SELECT id FROM anio_escolar WHERE estado = 'planificacion'
+    )
+  );
 
 -- -----------------------------------------------------------------------------
 -- TABLA: anio_escolar
 -- -----------------------------------------------------------------------------
+-- Nota: anio_escolar usa columna 'estado' (enum: planificacion, activo, cerrado)
 ALTER TABLE anio_escolar ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY anio_select_policy ON anio_escolar
@@ -802,14 +818,303 @@ CREATE POLICY anio_insert_policy ON anio_escolar
 CREATE POLICY anio_update_policy ON anio_escolar
   FOR UPDATE USING (
     has_permission('configuracion.gestionar')
-    AND NOT es_cerrado
+    AND estado != 'cerrado'
   ) WITH CHECK (
     has_permission('configuracion.gestionar')
-    AND NOT es_cerrado
+    AND estado != 'cerrado'
   );
 
 CREATE POLICY anio_delete_policy ON anio_escolar
-  FOR DELETE USING ( has_role('Director') AND es_planificacion );
+  FOR DELETE USING ( has_role('Director') AND estado = 'planificacion' );
+
+-- -----------------------------------------------------------------------------
+-- TABLA: actividad_evaluativa
+-- -----------------------------------------------------------------------------
+ALTER TABLE actividad_evaluativa ENABLE ROW LEVEL SECURITY;
+
+-- SELECT: Coordinador ve todo en su modalidad (solo lectura), Docentes ven sus asignaciones, Directiva ve todo
+CREATE POLICY actividad_evaluativa_select_policy ON actividad_evaluativa
+  FOR SELECT USING (
+    is_super_admin()
+    OR has_permission('notas.ver')
+    OR has_permission('notas.gestionar')
+    OR aula_asignatura_docente_id IN (
+      SELECT id FROM aula_asignatura_docente WHERE docente_id = current_docente_id()
+    )
+    OR aula_asignatura_docente_id IN (
+      SELECT aad.id FROM aula_asignatura_docente aad
+      JOIN aula a ON a.id = aad.aula_id
+      WHERE a.docente_guia_id = current_docente_id()
+    )
+    OR (
+      has_role('Coordinador')
+      AND aula_asignatura_docente_id IN (
+        SELECT aad.id FROM aula_asignatura_docente aad
+        JOIN aula a ON a.id = aad.aula_id
+        WHERE a.modalidad_id = current_coordinador_modalidad_id()
+      )
+    )
+  );
+
+-- INSERT: Solo quien puede calificar (requiere notas.gestionar + ownership)
+CREATE POLICY actividad_evaluativa_insert_policy ON actividad_evaluativa
+  FOR INSERT WITH CHECK (
+    has_permission('notas.gestionar')
+    AND (
+      is_super_admin()
+      OR (
+        has_role('Docente Guia')
+        AND aula_asignatura_docente_id IN (
+          SELECT aad.id FROM aula_asignatura_docente aad
+          WHERE aad.docente_id = current_docente_id()
+            OR aad.aula_id IN (SELECT id FROM aula WHERE docente_guia_id = current_docente_id())
+        )
+      )
+      OR (
+        has_role('Docente por Asignatura')
+        AND aula_asignatura_docente_id IN (
+          SELECT id FROM aula_asignatura_docente WHERE docente_id = current_docente_id()
+        )
+      )
+    )
+  );
+
+-- UPDATE: Solo quien puede calificar (requiere notas.gestionar + ownership + corte no bloqueado)
+CREATE POLICY actividad_evaluativa_update_policy ON actividad_evaluativa
+  FOR UPDATE USING (
+    has_permission('notas.gestionar')
+    AND (
+      is_super_admin()
+      OR (
+        has_role('Docente Guia')
+        AND aula_asignatura_docente_id IN (
+          SELECT aad.id FROM aula_asignatura_docente aad
+          WHERE aad.docente_id = current_docente_id()
+            OR aad.aula_id IN (SELECT id FROM aula WHERE docente_guia_id = current_docente_id())
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM corte_cerrado cc
+          WHERE cc.aula_asignatura_docente_id = actividad_evaluativa.aula_asignatura_docente_id
+            AND cc.corte_evaluativo_id = actividad_evaluativa.corte_evaluativo_id
+            AND cc.bloqueado = true
+        )
+      )
+      OR (
+        has_role('Docente por Asignatura')
+        AND aula_asignatura_docente_id IN (
+          SELECT id FROM aula_asignatura_docente WHERE docente_id = current_docente_id()
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM corte_cerrado cc
+          WHERE cc.aula_asignatura_docente_id = actividad_evaluativa.aula_asignatura_docente_id
+            AND cc.corte_evaluativo_id = actividad_evaluativa.corte_evaluativo_id
+            AND cc.bloqueado = true
+        )
+      )
+    )
+  ) WITH CHECK (
+    has_permission('notas.gestionar')
+    AND (
+      is_super_admin()
+      OR (
+        has_role('Docente Guia')
+        AND aula_asignatura_docente_id IN (
+          SELECT aad.id FROM aula_asignatura_docente aad
+          WHERE aad.docente_id = current_docente_id()
+            OR aad.aula_id IN (SELECT id FROM aula WHERE docente_guia_id = current_docente_id())
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM corte_cerrado cc
+          WHERE cc.aula_asignatura_docente_id = actividad_evaluativa.aula_asignatura_docente_id
+            AND cc.corte_evaluativo_id = actividad_evaluativa.corte_evaluativo_id
+            AND cc.bloqueado = true
+        )
+      )
+      OR (
+        has_role('Docente por Asignatura')
+        AND aula_asignatura_docente_id IN (
+          SELECT id FROM aula_asignatura_docente WHERE docente_id = current_docente_id()
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM corte_cerrado cc
+          WHERE cc.aula_asignatura_docente_id = actividad_evaluativa.aula_asignatura_docente_id
+            AND cc.corte_evaluativo_id = actividad_evaluativa.corte_evaluativo_id
+            AND cc.bloqueado = true
+        )
+      )
+    )
+  );
+
+-- DELETE: Solo quien puede calificar
+CREATE POLICY actividad_evaluativa_delete_policy ON actividad_evaluativa
+  FOR DELETE USING (
+    has_permission('notas.gestionar')
+    AND (
+      is_super_admin()
+      OR (
+        has_role('Docente Guia')
+        AND aula_asignatura_docente_id IN (
+          SELECT aad.id FROM aula_asignatura_docente aad
+          WHERE aad.docente_id = current_docente_id()
+            OR aad.aula_id IN (SELECT id FROM aula WHERE docente_guia_id = current_docente_id())
+        )
+      )
+      OR (
+        has_role('Docente por Asignatura')
+        AND aula_asignatura_docente_id IN (
+          SELECT id FROM aula_asignatura_docente WHERE docente_id = current_docente_id()
+        )
+      )
+    )
+  );
+
+-- -----------------------------------------------------------------------------
+-- TABLA: nota_actividad
+-- -----------------------------------------------------------------------------
+ALTER TABLE nota_actividad ENABLE ROW LEVEL SECURITY;
+
+-- SELECT: Coordinador ve todo en su modalidad, Docentes ven sus notas, Directiva ve todo
+CREATE POLICY nota_actividad_select_policy ON nota_actividad
+  FOR SELECT USING (
+    is_super_admin()
+    OR has_permission('notas.ver')
+    OR has_permission('notas.gestionar')
+    OR matricula_id IN (
+      SELECT id FROM matricula 
+      WHERE alumno_id IN (SELECT id FROM alumno WHERE usuario_id = current_user_id())
+    )
+    OR (
+      has_role('Docente Guia')
+      AND matricula_id IN (
+        SELECT m.id FROM matricula m
+        JOIN aula a ON a.id = m.aula_id
+        WHERE a.docente_guia_id = current_docente_id()
+          AND m.estado = 'activo'
+      )
+    )
+    OR (
+      has_role('Docente por Asignatura')
+      AND actividad_evaluativa_id IN (
+        SELECT aea.id FROM actividad_evaluativa aea
+        JOIN aula_asignatura_docente aad ON aad.id = aea.aula_asignatura_docente_id
+        WHERE aad.docente_id = current_docente_id()
+      )
+    )
+    OR (
+      has_role('Coordinador')
+      AND matricula_id IN (
+        SELECT m.id FROM matricula m
+        JOIN aula a ON a.id = m.aula_id
+        WHERE a.modalidad_id = current_coordinador_modalidad_id()
+      )
+    )
+  );
+
+-- INSERT: Solo quien puede calificar (requiere notas.gestionar + ownership)
+CREATE POLICY nota_actividad_insert_policy ON nota_actividad
+  FOR INSERT WITH CHECK (
+    has_permission('notas.gestionar')
+    AND (
+      is_super_admin()
+      OR (
+        has_role('Docente Guia')
+        AND actividad_evaluativa_id IN (
+          SELECT aea.id FROM actividad_evaluativa aea
+          JOIN aula_asignatura_docente aad ON aad.id = aea.aula_asignatura_docente_id
+          WHERE aad.docente_id = current_docente_id()
+            OR aad.aula_id IN (SELECT id FROM aula WHERE docente_guia_id = current_docente_id())
+        )
+      )
+      OR (
+        has_role('Docente por Asignatura')
+        AND actividad_evaluativa_id IN (
+          SELECT aea.id FROM actividad_evaluativa aea
+          JOIN aula_asignatura_docente aad ON aad.id = aea.aula_asignatura_docente_id
+          WHERE aad.docente_id = current_docente_id()
+        )
+      )
+    )
+  );
+
+-- UPDATE: Solo quien puede calificar (requiere notas.gestionar + ownership + corte no bloqueado)
+CREATE POLICY nota_actividad_update_policy ON nota_actividad
+  FOR UPDATE USING (
+    has_permission('notas.gestionar')
+    AND (
+      is_super_admin()
+      OR (
+        has_role('Docente Guia')
+        AND actividad_evaluativa_id IN (
+          SELECT aea.id FROM actividad_evaluativa aea
+          JOIN aula_asignatura_docente aad ON aad.id = aea.aula_asignatura_docente_id
+          WHERE aad.docente_id = current_docente_id()
+            OR aad.aula_id IN (SELECT id FROM aula WHERE docente_guia_id = current_docente_id())
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM corte_cerrado cc
+          JOIN actividad_evaluativa aea ON aea.corte_evaluativo_id = cc.corte_evaluativo_id
+          WHERE aea.id = nota_actividad.actividad_evaluativa_id
+            AND aea.aula_asignatura_docente_id = cc.aula_asignatura_docente_id
+            AND cc.bloqueado = true
+        )
+      )
+      OR (
+        has_role('Docente por Asignatura')
+        AND actividad_evaluativa_id IN (
+          SELECT aea.id FROM actividad_evaluativa aea
+          JOIN aula_asignatura_docente aad ON aad.id = aea.aula_asignatura_docente_id
+          WHERE aad.docente_id = current_docente_id()
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM corte_cerrado cc
+          JOIN actividad_evaluativa aea ON aea.corte_evaluativo_id = cc.corte_evaluativo_id
+          WHERE aea.id = nota_actividad.actividad_evaluativa_id
+            AND aea.aula_asignatura_docente_id = cc.aula_asignatura_docente_id
+            AND cc.bloqueado = true
+        )
+      )
+    )
+  ) WITH CHECK (
+    has_permission('notas.gestionar')
+    AND (
+      is_super_admin()
+      OR (
+        has_role('Docente Guia')
+        AND actividad_evaluativa_id IN (
+          SELECT aea.id FROM actividad_evaluativa aea
+          JOIN aula_asignatura_docente aad ON aad.id = aea.aula_asignatura_docente_id
+          WHERE aad.docente_id = current_docente_id()
+            OR aad.aula_id IN (SELECT id FROM aula WHERE docente_guia_id = current_docente_id())
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM corte_cerrado cc
+          JOIN actividad_evaluativa aea ON aea.corte_evaluativo_id = cc.corte_evaluativo_id
+          WHERE aea.id = nota_actividad.actividad_evaluativa_id
+            AND aea.aula_asignatura_docente_id = cc.aula_asignatura_docente_id
+            AND cc.bloqueado = true
+        )
+      )
+      OR (
+        has_role('Docente por Asignatura')
+        AND actividad_evaluativa_id IN (
+          SELECT aea.id FROM actividad_evaluativa aea
+          JOIN aula_asignatura_docente aad ON aad.id = aea.aula_asignatura_docente_id
+          WHERE aad.docente_id = current_docente_id()
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM corte_cerrado cc
+          JOIN actividad_evaluativa aea ON aea.corte_evaluativo_id = cc.corte_evaluativo_id
+          WHERE aea.id = nota_actividad.actividad_evaluativa_id
+            AND aea.aula_asignatura_docente_id = cc.aula_asignatura_docente_id
+            AND cc.bloqueado = true
+        )
+      )
+    )
+  );
+
+-- DELETE: Solo super-admin
+CREATE POLICY nota_actividad_delete_policy ON nota_actividad
+  FOR DELETE USING ( is_super_admin() );
 
 -- -----------------------------------------------------------------------------
 -- TABLAS DE CATÁLOGO (solo lectura para roles operativos, escritura para admin)
@@ -817,7 +1122,7 @@ CREATE POLICY anio_delete_policy ON anio_escolar
 -- grado, modalidad, asignatura, grupo_materia, bloque_horario, indicador_logro,
 -- malla_curricular, corte_cerrado, solicitud_edicion_nota, examen_reparacion,
 -- avance_contenido, apoyo_padres, evaluacion_familiar, incidencia_disciplinaria,
--- asistencia_personal, envio_boletines, aviso, respaldo
+-- asistencia_personal, envio_boletines, aviso
 
 DO $$
 DECLARE
@@ -827,7 +1132,7 @@ BEGIN
         'grado','modalidad','asignatura','grupo_materia','bloque_horario',
         'indicador_logro','malla_curricular','corte_cerrado','solicitud_edicion_nota',
         'examen_reparacion','avance_contenido','apoyo_padres','evaluacion_familiar',
-        'incidencia_disciplinaria','asistencia_personal','envio_boletines','aviso','respaldo'
+        'incidencia_disciplinaria','asistencia_personal','envio_boletines','aviso'
     ])
     LOOP
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
@@ -842,16 +1147,6 @@ BEGIN
             FOR ALL USING ( has_permission(''configuracion.gestionar'') )', t, t);
     END LOOP;
 END $$;
-
--- Excepción: respaldo solo Director/Subdirector
-DROP POLICY IF EXISTS respaldo_select_policy ON respaldo;
-DROP POLICY IF EXISTS respaldo_modify_policy ON respaldo;
-CREATE POLICY respaldo_select_policy ON respaldo
-  FOR SELECT USING ( has_any_role(ARRAY['Director','Subdirector']) );
-CREATE POLICY respaldo_insert_policy ON respaldo
-  FOR INSERT WITH CHECK ( has_any_role(ARRAY['Director','Subdirector']) );
-CREATE POLICY respaldo_delete_policy ON respaldo
-  FOR DELETE USING ( has_role('Director') );
 
 -- -----------------------------------------------------------------------------
 -- VERIFICACIÓN POST-MIGRACIÓN

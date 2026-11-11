@@ -4,7 +4,8 @@
             <!-- Flecha de Regreso Inteligente según Rol -->
             @php
                 $esDirectiva = auth()->user()->hasAnyRole(['Director', 'Subdirector']);
-                $rutaRetorno = $esDirectiva
+                $esCoordinador = auth()->user()->hasRole('Coordinador');
+                $rutaRetorno = ($esDirectiva || $esCoordinador)
                     ? route('academico.notas.index', ['grado_id' => $asignacion->aula->grado_id, 'aula_id' => $asignacion->aula_id])
                     : route('academico.notas.evaluar', ['asignacion' => $asignacion->id, 'corte_evaluativo_id' => $corteSeleccionado]);
             @endphp
@@ -13,9 +14,15 @@
             </a>
             
             <div>
-                <h2 class="font-black text-2xl text-[#3d2c1d] dark:text-white leading-tight">
-                    {{ $esDirectiva ? 'Auditoría de Actividades:' : 'Configurar Actividades:' }} 
+                <h2 class="font-black text-2xl text-[#3d2c1d] dark:text-white leading-tight flex items-center gap-2">
+                    {{ ($esDirectiva || $esCoordinador) ? 'Auditoría de Actividades:' : 'Configurar Actividades:' }} 
                     <span class="text-[#e6ac27]">{{ $asignacion->asignatura->nombre }}</span>
+                    @if($esCoordinador)
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200">
+                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                            Solo Lectura
+                        </span>
+                    @endif
                 </h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mt-1 font-bold flex flex-wrap items-center gap-2">
                     <span>{{ $asignacion->aula->grado->nombre }} - Sección "{{ $asignacion->aula->nombre }}"</span>
@@ -44,8 +51,8 @@
                     </select>
                 </form>
                 
-                <!-- Botón para ir a Calificar Planilla (apunta a evaluar) -->
-                @if($corteActivo && $actividades->isNotEmpty())
+                <!-- Botón para ir a Calificar Planilla (apunta a evaluar) - Solo para quienes pueden calificar -->
+                @if($corteActivo && $actividades->isNotEmpty() && auth()->user()->hasPermissionTo('notas.gestionar'))
                     <a href="{{ route('academico.notas.evaluar', ['asignacion' => $asignacion->id, 'corte_evaluativo_id' => $corteSeleccionado]) }}" class="w-full md:w-auto bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black py-3 px-6 rounded-xl shadow-sm transition-transform transform hover:-translate-y-0.5 flex justify-center items-center gap-2">
                         Ir a Calificar Planilla 
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
@@ -86,7 +93,7 @@
 
             <div class="grid grid-cols-1 {{ $modoSupervision ? '' : 'lg:grid-cols-12' }} gap-6">
                 
-                @if(!$modoSupervision)
+                @can('calificar', $asignacion)
                 <div class="lg:col-span-4 bg-white dark:bg-slate-800 p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 self-start">
                     <h3 class="text-lg font-black text-[#3d2c1d] dark:text-white border-b border-slate-100 dark:border-slate-700 pb-4 mb-5">Nueva Actividad</h3>
                     <form action="{{ route('academico.notas.actividades.store', $asignacion->id) }}" method="POST" class="space-y-5">
@@ -113,7 +120,7 @@
                         </button>
                     </form>
                 </div>
-                @endif
+                @endcan
 
                 <div class="{{ $modoSupervision ? '' : 'lg:col-span-8' }} bg-white dark:bg-slate-800 overflow-hidden shadow-sm rounded-3xl border border-slate-200 dark:border-slate-700">
                     <div class="px-6 py-5 border-b border-slate-100 dark:border-slate-700 bg-[#FFFDF5] dark:bg-slate-800/50">
@@ -144,7 +151,7 @@
                                         <td class="px-6 py-4 font-black text-[#3d2c1d] dark:text-white text-base">{{ $actividad->nombre }}</td>
                                         <td class="px-6 py-4 text-center font-black text-lg text-slate-600 dark:text-slate-300">{{ $actividad->puntaje_maximo }}</td>
                                         
-                                        @if(!$modoSupervision)
+                                        @can('calificar', $asignacion)
                                             <td class="px-6 py-4 text-center">
                                                 <form action="{{ route('academico.notas.actividades.destroy', [$asignacion->id, $actividad->id]) }}" method="POST" class="form-eliminar-actividad inline-block">
                                                     @csrf @method('DELETE')
@@ -153,7 +160,11 @@
                                                     </button>
                                                 </form>
                                             </td>
-                                        @endif
+                                        @else
+                                            <td class="px-6 py-4 text-center text-slate-400 dark:text-slate-500">
+                                                <span class="text-xs">Solo lectura</span>
+                                            </td>
+                                        @endcan
                                     </tr>
                                 @empty
                                     <tr>

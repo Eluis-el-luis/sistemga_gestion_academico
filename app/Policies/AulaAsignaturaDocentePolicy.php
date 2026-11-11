@@ -138,4 +138,40 @@ class AulaAsignaturaDocentePolicy
 
         return false;
     }
+
+    /**
+     * Determina si el usuario puede VER (solo lectura) las actividades evaluativas.
+     * Para Coordinador: acceso de supervisión a su modalidad sin permiso notas.gestionar
+     * Para Directiva: acceso total
+     * Para Docentes: ownership normal
+     */
+    public function ver(Usuario $usuario, AulaAsignaturaDocente $asignacion): bool
+    {
+        // Directiva: acceso total
+        if ($this->isSuperAdmin($usuario)) {
+            return true;
+        }
+
+        // Coordinador: supervisión de su modalidad (solo lectura)
+        if ($usuario->hasRole('Coordinador')) {
+            return $this->coordinatesModality($usuario, $asignacion, 'aula.modalidad_id');
+        }
+
+        // Gestor de Usuarios: acceso total
+        if ($usuario->hasRole('Gestor de Usuarios')) {
+            return true;
+        }
+
+        // Docente que imparte la asignatura exacta
+        if ($this->ownsAsDocenteAsignaturaDirect($usuario, $asignacion)) {
+            return true;
+        }
+
+        // Docente guía del aula
+        if ($this->ownsAula($usuario, $asignacion, 'aula')) {
+            return true;
+        }
+
+        return false;
+    }
 }

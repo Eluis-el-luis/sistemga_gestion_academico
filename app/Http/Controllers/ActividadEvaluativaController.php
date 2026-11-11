@@ -17,13 +17,15 @@ class ActividadEvaluativaController extends Controller
     {
         try {
             // FIX CVE-2026-002: Verificación de autorización obligatoria
-            // La policy 'calificar' valida: docente_id (profesor de la materia) O docente_guia_id (guía del aula)
-            $this->authorize('calificar', $asignacion);
+            // La policy 'ver' permite: Directiva (total), Coordinador (supervisión modalidad), Docentes (ownership)
+            $this->authorize('ver', $asignacion);
 
-            // 1. Determinar si el usuario en sesión es supervisor (Directiva)
+            // 1. Determinar si el usuario en sesión es supervisor (Directiva O Coordinador)
             /** @var \App\Models\Usuario $user */
             $user = auth()->user();
-            $modoSupervision = $user->hasAnyRole(['Director', 'Subdirector']);
+            $esDirectiva = $user->hasAnyRole(['Director', 'Subdirector']);
+            $esCoordinador = $user->hasRole('Coordinador');
+            $modoSupervision = $esDirectiva || $esCoordinador;
 
             // 2. Obtener los cortes evaluativos del año activo con eager loading
             $cortes = \App\Models\CorteEvaluativo::with('anioEscolar')
@@ -65,7 +67,8 @@ class ActividadEvaluativaController extends Controller
                 'corteActivo', 
                 'actividades',
                 'sumaAcumulados', 
-                'sumaExamen'
+                'sumaExamen',
+                'esCoordinador'
             ));
 
         } catch (\Exception $e) {

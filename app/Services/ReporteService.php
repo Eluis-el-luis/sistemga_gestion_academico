@@ -1357,7 +1357,7 @@ class ReporteService
             ->get();
 
         // Precargar todas las notas del corte con sus asignaciones y asignaturas en una sola consulta
-        $notasAgrupadas = \App\Models\Nota::with('asignacionDocente.asignatura')
+        $notasAgrupadas = \App\Models\Nota::with('aulaAsignaturaDocente.asignatura')
             ->where('corte_evaluativo_id', $corteId)
             ->whereIn('matricula_id', $matriculas->pluck('id'))
             ->get()
@@ -1374,7 +1374,7 @@ class ReporteService
             $reprobadas = collect();
 
             foreach ($notasAlumno as $nota) {
-                $nombreAsignatura = $nota->asignacionDocente->asignatura->nombre ?? '';
+                $nombreAsignatura = $nota->aulaAsignaturaDocente->asignatura->nombre ?? '';
                 
                 // Excluimos estrictamente materias institucionales (TIC, Biblia, Informática, Computación)
                 if (in_array($nombreAsignatura, ['TIC', 'Biblia', 'Informática', 'Computación'])) {

@@ -25,10 +25,20 @@ class AulaController extends Controller
 
     private function getAulasPaginadas()
     {
-        return Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
+        $user = auth()->user();
+        $query = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
                      ->orderBy('anio_escolar_id', 'desc')
-                     ->orderBy('grado_id')
-                     ->paginate(15);
+                     ->orderBy('grado_id');
+
+        // Coordinador: solo aulas de su modalidad
+        if ($user->hasRole('Coordinador') && !$user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
+            $docente = $user->docente;
+            if ($docente && $docente->modalidad_coordina_id) {
+                $query->where('modalidad_id', $docente->modalidad_coordina_id);
+            }
+        }
+
+        return $query->paginate(15);
     }
 
     public function destroyAsignatura($aulaId, $asignacionId)
