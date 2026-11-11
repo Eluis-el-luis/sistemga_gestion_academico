@@ -33,4 +33,9 @@ class Nota extends Model
     {
         return $this->belongsTo(Usuario::class, 'updated_by');
     }
+
+    public function asignacionDocente()
+    {
+        return $this->belongsTo(AulaAsignaturaDocente::class, 'aula_asignatura_docente_id');
+    }
 }
