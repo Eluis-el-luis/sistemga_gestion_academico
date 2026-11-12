@@ -39,7 +39,7 @@
                            {{ $anioSeleccionadoId == $anio->id ? 'bg-[#FFFDF5] border-[#e6ac27] text-[#e6ac27]' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300' }}">
                             <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
                             <span class="font-black text-sm {{ $anioSeleccionadoId == $anio->id ? 'text-[#3d2c1d]' : 'text-slate-700' }}">{{ $anio->nombre }}</span>
-                            @if($anio->activo)
+                            @if($anio->es_activo)
                                 <span class="text-[9px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-md mt-1 border border-emerald-100">Activo</span>
                             @endif
                         </a>

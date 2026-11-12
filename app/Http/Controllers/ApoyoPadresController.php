@@ -28,7 +28,16 @@ class ApoyoPadresController extends Controller
                 })
                 ->get();
 
-            $aulaSeleccionada = $request->query('aula_id', $aulas->first()->id ?? null);
+            // Manejar caso sin aulas asignadas
+            if ($aulas->isEmpty()) {
+                return view('academico.apoyo-padres.index', [
+                    'aulas' => collect(),
+                    'aulaSeleccionada' => null,
+                    'registros' => collect(),
+                ]);
+            }
+
+            $aulaSeleccionada = $request->query('aula_id', $aulas->first()->id);
 
             $registros = collect();
             if ($aulaSeleccionada) {

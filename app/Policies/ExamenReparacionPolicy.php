@@ -4,61 +4,77 @@ namespace App\Policies;
 
 use App\Models\ExamenReparacion;
 use App\Models\Usuario;
-use Illuminate\Auth\Access\Response;
+use App\Policies\Concerns\HasResourceOwnership;
 
 class ExamenReparacionPolicy
 {
-    /**
-     * El "Poder Absoluto" para Dirección y Subdirección.
-     * Al poner esto aquí, te ahorras validarlos en los demás métodos.
-     */
+    use HasResourceOwnership;
+
     public function before(Usuario $usuario, $ability): ?bool
     {
-        if ($usuario->hasRole(['Director', 'Subdirector'])) {
+        if (in_array($ability, ['viewAny', 'view']) && $this->isSuperAdmin($usuario)) {
             return true;
         }
         return null;
     }
 
-    /**
-     * Equivalente a (V)er en la Matriz.
-     */
     public function viewAny(Usuario $usuario): bool
     {
         return $usuario->hasPermissionTo('reparacion.ver') || $usuario->hasPermissionTo('reparacion.gestionar');
     }
 
-    /**
-     * Equivalente a (G)estionar en la Matriz.
-     */
+    public function view(Usuario $usuario, ExamenReparacion $examen): bool
+    {
+        if (!$usuario->hasPermissionTo('reparacion.ver') && !$usuario->hasPermissionTo('reparacion.gestionar')) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($usuario)) {
+            return true;
+        }
+
+        // Docente guía del aula de la matrícula
+        if ($this->ownsViaMatriculaAula($usuario, $examen, 'matricula')) {
+            return true;
+        }
+
+        // Docente por asignatura que imparte la materia del examen
+        // (asumiendo que examen tiene relación con aula_asignatura_docente)
+        // Por ahora solo docente guía
+        return false;
+    }
+
     public function create(Usuario $usuario): bool
     {
         return $usuario->hasPermissionTo('reparacion.gestionar');
     }
 
-    /**
-     * Alcance de los datos (G)estionar.
-     */
-    public function update(Usuario $usuario, ExamenReparacion $examenReparacion): bool
+    public function update(Usuario $usuario, ExamenReparacion $examen): bool
     {
         if (!$usuario->hasPermissionTo('reparacion.gestionar')) {
             return false;
         }
 
-        // Validación de alcance: El docente solo puede editar si es guía del aula de la matrícula
-        $docente = $usuario->docente;
-        if ($docente) {
-            return $examenReparacion->matricula->aula->docente_guia_id === $docente->id;
+        if ($this->isSuperAdmin($usuario)) {
+            return true;
+        }
+
+        // Docente guía del aula
+        if ($this->ownsViaMatriculaAula($usuario, $examen, 'matricula')) {
+            return true;
+        }
+
+        // Docente por asignatura que imparte la materia
+        // Si ExamenReparacion tiene aula_asignatura_docente_id:
+        if (isset($examen->aula_asignatura_docente_id)) {
+            return $this->ownsAsDocenteAsignatura($usuario, $examen, 'aulaAsignaturaDocente');
         }
 
         return false;
     }
 
-    /**
-     * Eliminar un examen de reparación.
-     */
-    public function delete(Usuario $usuario, ExamenReparacion $examenReparacion): bool
+    public function delete(Usuario $usuario, ExamenReparacion $examen): bool
     {
-        return $this->update($usuario, $examenReparacion);
+        return $this->update($usuario, $examen);
     }
 }

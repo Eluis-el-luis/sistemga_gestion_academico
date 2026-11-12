@@ -16,16 +16,38 @@ class ActividadEvaluativaController extends Controller
     public function index(Request $request, \App\Models\AulaAsignaturaDocente $asignacion)
     {
         try {
-            // 1. Determinar si el usuario en sesión es supervisor (Directiva)
+            // FIX CVE-2026-002: Verificación de autorización obligatoria
+            // La policy 'ver' permite: Directiva (total), Coordinador (supervisión modalidad), Docentes (ownership)
+            $this->authorize('ver', $asignacion);
+
+            // 1. Determinar si el usuario en sesión es supervisor (Directiva O Coordinador)
             /** @var \App\Models\Usuario $user */
             $user = auth()->user();
-            $modoSupervision = $user->hasAnyRole(['Director', 'Subdirector']);
+            $esDirectiva = $user->hasAnyRole(['Director', 'Subdirector']);
+            $esCoordinador = $user->hasRole('Coordinador');
+            $modoSupervision = $esDirectiva || $esCoordinador;
 
-            // 2. Obtener los cortes evaluativos del año activo
-            $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))->get();
-            
+            // 2. Obtener los cortes evaluativos del año activo con eager loading
+            $cortes = \App\Models\CorteEvaluativo::with('anioEscolar')
+                ->whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))
+                ->get();
+
+            // Si no hay cortes (no hay año activo), mostrar vista con estado vacío
+            if ($cortes->isEmpty()) {
+                return view('academico.notas.actividades', [
+                    'asignacion' => $asignacion,
+                    'modoSupervision' => $modoSupervision,
+                    'cortes' => collect(),
+                    'corteSeleccionado' => null,
+                    'corteActivo' => null,
+                    'actividades' => collect(),
+                    'sumaAcumulados' => 0,
+                    'sumaExamen' => 0,
+                ]);
+            }
+
             // IMPORTANTE: La vista manda el filtro como 'corte_id' en el select
-            $corteSeleccionado = $request->query('corte_id', $cortes->first()->id ?? null);
+            $corteSeleccionado = $request->query('corte_id', $cortes->first()->id);
             $corteActivo = $cortes->firstWhere('id', $corteSeleccionado);
 
             // 3. Traer las actividades correspondientes
@@ -45,7 +67,8 @@ class ActividadEvaluativaController extends Controller
                 'corteActivo', 
                 'actividades',
                 'sumaAcumulados', 
-                'sumaExamen'
+                'sumaExamen',
+                'esCoordinador'
             ));
 
         } catch (\Exception $e) {

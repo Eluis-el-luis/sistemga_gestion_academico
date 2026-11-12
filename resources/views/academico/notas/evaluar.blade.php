@@ -16,7 +16,7 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-3">
-                @if(!$estaBloqueado)
+                @if(!$estaBloqueado && auth()->user()->hasPermissionTo('notas.gestionar'))
                     @php
                         $puntosFaltantes = ($pesoAcumulado - $sumaAcumulado) + ($pesoExamen - $sumaExamen);
                     @endphp

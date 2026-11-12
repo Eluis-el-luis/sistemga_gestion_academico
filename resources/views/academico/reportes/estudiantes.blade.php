@@ -39,7 +39,7 @@
                     <select name="anio_escolar_id" onchange="this.form.submit()" class="w-full border-slate-200 rounded-xl text-sm font-medium focus:ring-emerald-500">
                         @foreach(\App\Models\AnioEscolar::orderBy('id', 'desc')->get() as $an)
                             <option value="{{ $an->id }}" @selected($an->id == request('anio_escolar_id', $anio['id'] ?? null))>
-                                {{ $an->nombre }} {{ $an->activo ? '(Activo)' : '' }}
+                                {{ $an->nombre }} {{ $an->es_activo ? '(Activo)' : '' }}
                             </option>
                         @endforeach
                     </select>

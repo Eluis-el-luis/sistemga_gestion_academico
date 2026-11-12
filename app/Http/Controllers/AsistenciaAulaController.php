@@ -33,7 +33,7 @@ class AsistenciaAulaController extends Controller
             // Buscamos el aula activa donde este maestro es el guía
             $aula = Aula::where('docente_guia_id', $docente->id)
                         ->whereHas('anioEscolar', function($q) {
-                            $q->where('activo', true);
+                            $q->where('estado', 'activo');
                         })->first();
 
             if (!$aula) {

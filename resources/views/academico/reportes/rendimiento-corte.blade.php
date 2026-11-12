@@ -19,7 +19,11 @@
     <x-slot name="header">
         <div class="flex justify-between items-center no-print">
             <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight flex items-center gap-2">
-                <a href="{{ route('academico.reportes.index') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors text-sm font-bold mr-2">← Volver</a>
+                @php
+                    $esDocenteGuia = auth()->user()->hasRole('Docente Guia') && !auth()->user()->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Coordinador']);
+                    $rutaVolver = $esDocenteGuia ? route('academico.reportes.mi-aula') : route('academico.reportes.index');
+                @endphp
+                <a href="{{ $rutaVolver }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors text-sm font-bold mr-2">← Volver</a>
                 Rendimiento Académico General 
             </h2>
             <button onclick="window.print()" class="bg-[#e6ac27] hover:bg-amber-500 text-white px-6 py-2 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2">

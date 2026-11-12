@@ -33,14 +33,21 @@ class BoletinController extends Controller
             $this->authorize('viewAny', Boletin::class);
             $usuario = auth()->user();
 
-            $aulas = Aula::with(['grado', 'anioEscolar'])
-                ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'))
-                ->when($usuario->docente && !$usuario->hasRole(['Director', 'Subdirector']), function ($q) use ($usuario) {
-                    $q->where('docente_guia_id', $usuario->docente->id);
-                })
-                ->get();
+            $aulas = $this->getAulasScope($usuario);
 
-            $aulaSeleccionada = $request->query('aula_id', $aulas->first()->id ?? null);
+            // Manejar caso sin aulas
+            if ($aulas->isEmpty()) {
+                return view('academico.boletines.index', [
+                    'aulas' => collect(),
+                    'aulaSeleccionada' => null,
+                    'aulaActual' => null,
+                    'matriculas' => collect(),
+                    'todosAprobados' => false,
+                    'corteActivo' => null,
+                ]);
+            }
+
+            $aulaSeleccionada = $request->query('aula_id', $aulas->first()->id);
 
             $aulaActual = $aulas->firstWhere('id', $aulaSeleccionada);
 
@@ -344,5 +351,39 @@ class BoletinController extends Controller
             // CONTINGENCIA: Si el servicio de notas falla o el alumno no tiene el historial completo
             return back()->with('error', 'No se pudo generar la constancia de notas. Verifica que el estudiante tenga un historial académico válido.');
         }
+    }
+
+    /**
+     * Scope centralizado para aulas según ownership del usuario
+     */
+    protected function getAulasScope(\App\Models\Usuario $usuario)
+    {
+        $query = \App\Models\Aula::with(['grado', 'anioEscolar'])
+            ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'));
+
+        // Super-admin (Director/Subdirector/Gestor/Secretaria/Coordinador) ven todas las aulas del año activo
+        if ($usuario->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Secretaria', 'Coordinador'])) {
+            return $query->get();
+        }
+
+        // Docente Guía: solo su aula
+        if ($usuario->hasRole('Docente Guia')) {
+            $docente = $usuario->docente;
+            if ($docente) {
+                return $query->where('docente_guia_id', $docente->id)->get();
+            }
+            return collect();
+        }
+
+        // Docente por Asignatura: aulas donde imparte
+        if ($usuario->hasRole('Docente por Asignatura')) {
+            $docente = $usuario->docente;
+            if ($docente) {
+                return $query->whereHas('asignaciones', fn($q) => $q->where('docente_id', $docente->id)->where('activo', true))->get();
+            }
+            return collect();
+        }
+
+        return collect();
     }
 }

@@ -25,10 +25,20 @@ class AulaController extends Controller
 
     private function getAulasPaginadas()
     {
-        return Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
+        $user = auth()->user();
+        $query = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
                      ->orderBy('anio_escolar_id', 'desc')
-                     ->orderBy('grado_id')
-                     ->paginate(15);
+                     ->orderBy('grado_id');
+
+        // Coordinador: solo aulas de su modalidad
+        if ($user->hasRole('Coordinador') && !$user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
+            $docente = $user->docente;
+            if ($docente && $docente->modalidad_coordina_id) {
+                $query->where('modalidad_id', $docente->modalidad_coordina_id);
+            }
+        }
+
+        return $query->paginate(15);
     }
 
     public function destroyAsignatura($aulaId, $asignacionId)
@@ -70,28 +80,10 @@ class AulaController extends Controller
     public function show(Aula $aula)
     {
         try {
-            $usuario = auth()->user();
-
-            // 1. Permiso base para ver el aula (Director, Subdirector y Docente Guía tienen 'aulas.ver')
+            // Authorization explícita - Policy maneja ownership (Docente Guía, Coordinador, etc.)
             $this->authorize('view', $aula);
 
-            // 2. Alcance del Docente Guía: solo puede ver la información completa
-            //    del aula de la cual es titular asignado. Cualquier otra aula -> 403.
-            if ($usuario->hasRole('Docente Guia') && !$usuario->hasRole(['Director', 'Subdirector'])) {
-                $docente = Docente::where('usuario_id', $usuario->id)->first();
-
-                // Si no tiene perfil de Docente vinculado, no puede verificar ownership del aula
-                if (!$docente) {
-                    abort(403, 'No tienes un perfil de docente vinculado. Contacta a administración.');
-                }
-
-                // Solo puede ver el aula de la cual es titular
-                if ($aula->docente_guia_id !== $docente->id) {
-                    abort(403, 'No tienes autorización para ver los detalles de esta aula.');
-                }
-            }
-
-            // 3. Carga óptima de relaciones del aula
+            // Carga óptima de relaciones del aula
             $aula->load([
                 'grado',
                 'modalidad',
@@ -376,7 +368,9 @@ class AulaController extends Controller
     public function showAsignaciones(Aula $aula)
     {
         try {
-            $this->authorize('viewAny', Aula::class);
+            // Authorization explícita - Policy Aula maneja ownership (Docente Guía, Coordinador, etc.)
+            $this->authorize('view', $aula);
+
             $aula->load(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario']);
 
             $asignaciones = \App\Models\AulaAsignaturaDocente::with(['asignatura', 'docente.usuario'])

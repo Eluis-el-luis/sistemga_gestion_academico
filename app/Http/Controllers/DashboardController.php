@@ -38,40 +38,13 @@ class DashboardController extends Controller
             // 1. CARGA DE MODALIDADES
             $modalidades = \App\Models\Modalidad::orderBy('id')->get();
 
-            // 2. FILTRADO INTELIGENTE DE AVISOS
+            // 2. FILTRADO INTELIGENTE DE AVISOS (ya implementado correctamente con scopes)
             $queryAvisos = DB::table('aviso')
                 ->join('usuario', 'aviso.autor_id', '=', 'usuario.id')
                 ->select('aviso.*', 'usuario.nombre_completo as autor_nombre')
                 ->where('aviso.activo', true);
 
-            if (!$user->hasAnyRole(['Director', 'Subdirector'])) {
-                $modalidadesPermitidas = [];
-
-                if ($user->hasRole('Coordinador') && $docente) {
-                    $modalidadesPermitidas[] = $docente->modalidad_coordina_id;
-                }
-
-                if ($user->hasAnyRole(['Docente Guia', 'Docente por Asignatura']) && $docente) {
-                    $modalidadesClase = \App\Models\AulaAsignaturaDocente::where('docente_id', $docente->id)
-                        ->where('activo', true)
-                        ->join('aula', 'aula_asignatura_docente.aula_id', '=', 'aula.id')
-                        ->pluck('aula.modalidad_id')
-                        ->toArray();
-                    
-                    $modalidadesPermitidas = array_merge($modalidadesPermitidas, $modalidadesClase);
-                }
-
-                $modalidadesPermitidas = array_filter(array_unique($modalidadesPermitidas));
-
-                $queryAvisos->where(function($q) use ($modalidadesPermitidas) {
-                    $q->whereNull('aviso.modalidad_id'); 
-                    if (!empty($modalidadesPermitidas)) {
-                        $q->orWhereIn('aviso.modalidad_id', $modalidadesPermitidas); 
-                    }
-                });
-            }
-
-            $avisos = $queryAvisos->orderBy('aviso.created_at', 'desc')->take(5)->get();
+            $avisos = $this->filtrarAvisosPorScope($queryAvisos, $user, $docente)->orderBy('aviso.created_at', 'desc')->take(5)->get();
 
             // 3. INICIALIZAR VARIABLES
             $totalMatriculados = 0;
@@ -88,20 +61,50 @@ class DashboardController extends Controller
             $matrizHorario = [];
             $esquemaActivo = 'Regular';
 
-            // 4. CARGA DE DATOS PARA DIRECTIVA Y GESTIÓN
-            if ($user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
-                $anioActivo = \App\Models\AnioEscolar::where('estado', 'activo')->first();
+            // 4. CARGA DE DATOS POR ROL - Zero Trust: cada rol ve solo su ámbito
+            $anioActivo = \App\Models\AnioEscolar::where('estado', 'activo')->first();
+            
+            if ($user->hasAnyRole(['Director', 'Subdirector'])) {
+                // Director/Subdirector: vista global completa
                 $totalMatriculados = \App\Models\Matricula::where('estado', 'activo')
                     ->when($anioActivo, fn($q) => $q->where('anio_escolar_id', $anioActivo->id))
                     ->count();
                 $totalPersonal = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count();
                 $dbMetricas = $this->calcularMetricas();
                 $muralData = $this->generarMuralDigital($anioActivo, $request->query('modalidad_mural'));
+            } elseif ($user->hasRole('Gestor de Usuarios')) {
+                // Gestor de Usuarios: solo métricas operativas (NO métricas académicas de Director)
+                $totalMatriculados = \App\Models\Matricula::where('estado', 'activo')
+                    ->when($anioActivo, fn($q) => $q->where('anio_escolar_id', $anioActivo->id))
+                    ->count();
+                $totalPersonal = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count();
+                // NO calcular métricas académicas ni mural digital
+                $dbMetricas = [];
+                $muralData = [];
+            } elseif ($user->hasRole('Coordinador')) {
+                // Coordinador: solo su modalidad
+                if ($docente && $docente->modalidad_coordina_id && $anioActivo) {
+                    $totalMatriculados = \App\Models\Matricula::where('estado', 'activo')
+                        ->whereHas('aula', fn($q) => $q->where('modalidad_id', $docente->modalidad_coordina_id))
+                        ->when($anioActivo, fn($q) => $q->where('anio_escolar_id', $anioActivo->id))
+                        ->count();
+                    $totalPersonal = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])
+                        ->whereHas('docente', fn($q) => $q->where('modalidad_id', $docente->modalidad_coordina_id))
+                        ->count();
+                    $dbMetricas = $this->calcularMetricasPorModalidad($docente->modalidad_coordina_id, $anioActivo);
+                    $muralData = $this->generarMuralDigital($anioActivo, $docente->modalidad_coordina_id);
+                }
+            } elseif ($user->hasRole('Secretaria')) {
+                // Secretaria: vista operativa global (similar a Gestor pero sin métricas académicas)
+                $totalMatriculados = \App\Models\Matricula::where('estado', 'activo')
+                    ->when($anioActivo, fn($q) => $q->where('anio_escolar_id', $anioActivo->id))
+                    ->count();
+                $totalPersonal = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->count();
+                $dbMetricas = [];
+                $muralData = [];
             }
 
             // 5. CARGA DE DATOS PARA DOCENTES (Guía y Asignatura)
-            $anioActivo = \App\Models\AnioEscolar::where('estado', 'activo')->first();
-            
             if ($docente && $anioActivo) {
                 $aulaGuia = \App\Models\Aula::with('grado')
                     ->where('docente_guia_id', $docente->id)
@@ -163,6 +166,25 @@ class DashboardController extends Controller
             $rendimientoCortes = []; // NUEVA VARIABLE PARA CORTES DEL MURAL
 
             if ($user->hasRole('Coordinador')) {
+                $hoy = now()->timezone('America/Managua')->toDateString();
+                $docentesIds = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])
+                    ->whereHas('docente', fn($q) => $q->where('modalidad_id', $docente?->modalidad_coordina_id))
+                    ->pluck('id');
+                $docentesQueMarcaron = \App\Models\AsistenciaPersonal::where('fecha', $hoy)
+                    ->whereIn('usuario_id', $docentesIds)
+                    ->pluck('usuario_id');
+
+                $docentesSinMarcar = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])
+                    ->whereNotIn('id', $docentesQueMarcaron)
+                    ->whereHas('docente', fn($q) => $q->where('modalidad_id', $docente?->modalidad_coordina_id))
+                    ->get();
+
+                $solicitudesPendientes = \App\Models\SolicitudEdicionNota::with(['docente.usuario', 'nota.aulaAsignaturaDocente.asignatura'])
+                    ->where('estado', 'Pendiente')
+                    ->whereHas('nota.aulaAsignaturaDocente.aula', fn($q) => $q->where('modalidad_id', $docente?->modalidad_coordina_id))
+                    ->orderByDesc('created_at')
+                    ->get();
+            } elseif ($user->hasAnyRole(['Director', 'Subdirector'])) {
                 $hoy = now()->timezone('America/Managua')->toDateString();
                 $docentesIds = \App\Models\Usuario::role(['Docente Guia', 'Docente por Asignatura'])->pluck('id');
                 $docentesQueMarcaron = \App\Models\AsistenciaPersonal::where('fecha', $hoy)
@@ -263,6 +285,41 @@ class DashboardController extends Controller
                 'asistenciaSemanal' => null, 'rendimientoAula' => null, 'muralAula' => [], 'rendimientoCortes' => []
             ])->with('error', $this->formatearError($e, 'Ocurrió un problema técnico al cargar algunos datos del panel.'));
         }
+    }
+
+    /**
+     * Filtrar avisos según scope del usuario (Zero Trust)
+     */
+    protected function filtrarAvisosPorScope($query, \App\Models\Usuario $user, ?\App\Models\Docente $docente)
+    {
+        if (!$user->hasAnyRole(['Director', 'Subdirector'])) {
+            $modalidadesPermitidas = [];
+
+            if ($user->hasRole('Coordinador') && $docente) {
+                $modalidadesPermitidas[] = $docente->modalidad_coordina_id;
+            }
+
+            if ($user->hasAnyRole(['Docente Guia', 'Docente por Asignatura']) && $docente) {
+                $modalidadesClase = \App\Models\AulaAsignaturaDocente::where('docente_id', $docente->id)
+                    ->where('activo', true)
+                    ->join('aula', 'aula_asignatura_docente.aula_id', '=', 'aula.id')
+                    ->pluck('aula.modalidad_id')
+                    ->toArray();
+                
+                $modalidadesPermitidas = array_merge($modalidadesPermitidas, $modalidadesClase);
+            }
+
+            $modalidadesPermitidas = array_filter(array_unique($modalidadesPermitidas));
+
+            $query->where(function($q) use ($modalidadesPermitidas) {
+                $q->whereNull('aviso.modalidad_id'); 
+                if (!empty($modalidadesPermitidas)) {
+                    $q->orWhereIn('aviso.modalidad_id', $modalidadesPermitidas); 
+                }
+            });
+        }
+        
+        return $query;
     }
 
     /**
@@ -495,6 +552,112 @@ class DashboardController extends Controller
                 'promedio_notas'        => ['titulo' => 'Promedio de Calificaciones (Escala 0-100)', 'datos' => $promedioNotas],
                 'avances_silabo'        => ['titulo' => 'Avance Curricular del Maestro (%)', 'datos' => $avances],
                 'retencion'             => ['titulo' => 'Retención Estudiantil (%)', 'datos' => $retencion],
+                'puntualidad'           => ['titulo' => 'Puntualidad en Horario de Entrada (%)', 'datos' => $puntualidad],
+            ];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Calcular métricas para una modalidad específica (para Coordinadores)
+     */
+    protected function calcularMetricasPorModalidad(int $modalidadId, ?\App\Models\AnioEscolar $anioActivo): array
+    {
+        if (!$anioActivo) {
+            return [];
+        }
+
+        try {
+            $modalidad = \App\Models\Modalidad::find($modalidadId);
+            if (!$modalidad) {
+                return [];
+            }
+
+            // 1. AULAS ESTRICTAMENTE DEL AÑO ESCOLAR ACTUAL Y MODALIDAD
+            $aulaIds = \App\Models\Aula::where('modalidad_id', $modalidadId)
+                ->where('anio_escolar_id', $anioActivo->id)
+                ->pluck('id');
+
+            // 2. MATRÍCULAS (Activas y Retiradas) DE ESTE AÑO Y MODALIDAD
+            $matriculaQuery = \App\Models\Matricula::whereIn('aula_id', $aulaIds);
+            $activos = (clone $matriculaQuery)->where('estado', 'activo')->count();
+            $retirados = (clone $matriculaQuery)->where('estado', 'retirado')->count();
+            
+            $matriculados = [$activos];
+            $retencion = ($activos + $retirados) > 0 ? round(($activos / ($activos + $retirados)) * 100, 1) : 0;
+
+            $matriculaIds = (clone $matriculaQuery)->where('estado', 'activo')->pluck('id');
+
+            // 3. ASISTENCIA ALUMNOS (De este año y modalidad)
+            $asistAula = \App\Models\AsistenciaAula::whereIn('matricula_id', $matriculaIds)->get();
+            $totalRegAula = $asistAula->count();
+            $presentesAula = $asistAula->whereIn('estado_asistencia', ['Presente', 'Actividad Institucional'])->count();
+            $asistenciaAlumnos = [$totalRegAula > 0 ? round(($presentesAula / $totalRegAula) * 100, 1) : 0];
+
+            // 4. RENDIMIENTO ACADÉMICO Y NOTAS (De este año y modalidad)
+            $notasModalidad = \App\Models\Nota::whereIn('matricula_id', $matriculaIds)->get();
+            $totalNotas = $notasModalidad->count();
+            $aprob = $notasModalidad->where('nota_cuantitativa', '>=', 60)->count();
+            
+            $rendimiento = [$totalNotas > 0 ? round(($aprob / $totalNotas) * 100, 1) : 0];
+            $promedioNotas = [$totalNotas > 0 ? round((float) $notasModalidad->avg('nota_cuantitativa'), 2) : 0];
+
+            // Clasificación de Riesgo Estudiantil
+            $alumnosNotas = $notasModalidad->groupBy('matricula_id');
+            $limpios = 0; $leves = 0; $graves = 0; $totalAlumnosEval = $alumnosNotas->count();
+            
+            foreach ($alumnosNotas as $notasAlumno) {
+                $reprobadas = $notasAlumno->where('nota_cuantitativa', '<', 60)->count();
+                if ($reprobadas === 0) $limpios++;
+                elseif ($reprobadas <= 2) $leves++;
+                else $graves++;
+            }
+            
+            $aprobados = [$totalAlumnosEval > 0 ? round(($limpios / $totalAlumnosEval) * 100, 1) : 0];
+            $reprobadosLeves = [$totalAlumnosEval > 0 ? round(($leves / $totalAlumnosEval) * 100, 1) : 0];
+            $reprobadosGraves = [$totalAlumnosEval > 0 ? round(($graves / $totalAlumnosEval) * 100, 1) : 0];
+
+            // 5. PARTICIPACIÓN FAMILIAR (De este año y modalidad)
+            $apoyo = \App\Models\ApoyoPadres::whereIn('aula_id', $aulaIds)->get();
+            $totApoyo = $apoyo->sum('total_padres');
+            $cantApoyo = $apoyo->sum('cantidad_apoyan');
+            $apoyoPadres = [$totApoyo > 0 ? round(($cantApoyo / $totApoyo) * 100, 1) : 0];
+
+            // 6. AVANCE CURRICULAR DE DOCENTES
+            $asignacionIds = \App\Models\AulaAsignaturaDocente::whereIn('aula_id', $aulaIds)->pluck('id');
+            $avancesMod = \App\Models\AvanceContenido::whereIn('aula_asignatura_docente_id', $asignacionIds)->get();
+            $avances = [$avancesMod->count() > 0 ? round((float) $avancesMod->avg('porcentaje_avance'), 1) : 0];
+
+            // 7. PUNTUALIDAD Y ASISTENCIA DE DOCENTES (Filtrado por modalidad)
+            $docentesIds = \App\Models\Docente::where('modalidad_id', $modalidadId)->pluck('usuario_id');
+            
+            $fechaInicio = $anioActivo->fecha_inicio ?? now()->startOfYear()->toDateString();
+            $fechaFin = $anioActivo->fecha_fin ?? now()->endOfYear()->toDateString();
+            
+            $asisPersonal = \App\Models\AsistenciaPersonal::whereIn('usuario_id', $docentesIds)
+                ->whereBetween('fecha', [$fechaInicio, $fechaFin])
+                ->get();
+                
+            $totPersonal = $asisPersonal->count();
+            $asistenciasDoc = $asisPersonal->whereIn('estado', ['Presente', 'Retardo'])->count();
+            $puntuales = $asisPersonal->where('estado', 'Presente')->count(); 
+
+            $asistenciaDocentes = [$totPersonal > 0 ? round(($asistenciasDoc / $totPersonal) * 100, 1) : 0];
+            $puntualidad = [$totPersonal > 0 ? round(($puntuales / $totPersonal) * 100, 1) : 0];
+
+            return [
+                'matriculados'          => ['titulo' => 'Alumnos Matriculados Activos', 'datos' => $matriculados],
+                'asistencia_alumnos'    => ['titulo' => 'Asistencia de Alumnos (%)', 'datos' => $asistenciaAlumnos],
+                'asistencia_docentes'   => ['titulo' => 'Asistencia de Docentes (%)', 'datos' => $asistenciaDocentes],
+                'rendimiento_modalidad' => ['titulo' => 'Rendimiento Académico General (%)', 'datos' => $rendimiento],
+                'apoyo_padres'          => ['titulo' => 'Participación de Padres (%)', 'datos' => $apoyoPadres],
+                'aprobados'             => ['titulo' => 'Alumnos Aprobados Limpios (%)', 'datos' => $aprobados],
+                'reprobados_leves'      => ['titulo' => 'Reprobados (1 a 2 Clases) (%)', 'datos' => $reprobadosLeves],
+                'reprobados_graves'     => ['titulo' => 'Reprobados Críticos (3+ Clases) (%)', 'datos' => $reprobadosGraves],
+                'promedio_notas'        => ['titulo' => 'Promedio de Calificaciones (Escala 0-100)', 'datos' => $promedioNotas],
+                'avances_silabo'        => ['titulo' => 'Avance Curricular del Maestro (%)', 'datos' => $avances],
+                'retencion'             => ['titulo' => 'Retención Estudiantil (%)', 'datos' => [$retencion]],
                 'puntualidad'           => ['titulo' => 'Puntualidad en Horario de Entrada (%)', 'datos' => $puntualidad],
             ];
         } catch (\Exception $e) {

@@ -16,7 +16,14 @@
                 <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Reportes de Rendimiento y Aplazados</p>
             </div>
             <div class="flex items-center gap-3 self-end sm:self-auto">
-                <a href="{{ url('/academico/reportes') }}" class="inline-flex items-center gap-1.5 text-stone-500 hover:text-[#3d2c1d] font-bold text-sm px-3 py-2 rounded-xl hover:bg-stone-100 transition-colors cursor-pointer">
+                @php
+                    // Docente Guía puro (sin roles de dirección/coordinación) -> su módulo mi-aula
+                    // Si tiene roles de dirección/coordinación -> centro de reportes general
+                    $esDocenteGuiaPuro = auth()->user()->hasRole('Docente Guia') 
+                        && !auth()->user()->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Coordinador']);
+                    $rutaVolver = $esDocenteGuiaPuro ? route('academico.reportes.mi-aula') : url('/academico/reportes');
+                @endphp
+                <a href="{{ $rutaVolver }}" class="inline-flex items-center gap-1.5 text-stone-500 hover:text-[#3d2c1d] font-bold text-sm px-3 py-2 rounded-xl hover:bg-stone-100 transition-colors cursor-pointer">
                     Volver
                 </a>
                 <button type="button" onclick="window.print()" class="inline-flex items-center gap-2 bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black px-5 py-2.5 rounded-xl shadow-sm text-xs uppercase tracking-widest transition-all cursor-pointer">

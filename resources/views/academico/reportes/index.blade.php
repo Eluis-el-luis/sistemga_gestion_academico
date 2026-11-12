@@ -22,7 +22,7 @@
                     <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Año Escolar</label>
                     <select name="anio_escolar_id" onchange="this.form.submit()" class="border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm font-medium">
                         @foreach($anios as $an)
-                            <option value="{{ $an->id }}" @selected($an->id == ($anio->id ?? null))>{{ $an->nombre }} {{ $an->activo ? '(Activo)' : '' }}</option>
+                            <option value="{{ $an->id }}" @selected($an->id == ($anio->id ?? null))>{{ $an->nombre }} {{ $an->es_activo ? '(Activo)' : '' }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -54,24 +54,32 @@
         <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
             
             <div class="flex space-x-2 border-b border-slate-200 overflow-x-auto bg-slate-50/50">
+                @can('reportes.control_notas.ver')
                 <button @click="tabActiva = 'auditoria'" 
                         :class="tabActiva === 'auditoria' ? 'border-[#e6ac27] text-[#3d2c1d] font-black bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.02)]' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-bold'"
                         class="px-6 py-4 border-b-4 text-sm transition-all whitespace-nowrap rounded-t-xl flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
                     Auditoría Interna
                 </button>
+                @endcan
+                
+                @can('reportes.rendimiento_corte.ver')
                 <button @click="tabActiva = 'mined'" 
                         :class="tabActiva === 'mined' ? 'border-blue-500 text-blue-900 font-black bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.02)]' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-bold'"
                         class="px-6 py-4 border-b-4 text-sm transition-all whitespace-nowrap rounded-t-xl flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                     Formatos Oficiales (MINED)
                 </button>
+                @endcan
+                
+                @can('reportes.estudiantes.ver')
                 <button @click="tabActiva = 'gestion'" 
                         :class="tabActiva === 'gestion' ? 'border-[#e6ac27] text-[#3d2c1d] font-black bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.02)]' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-bold'"
                         class="px-6 py-4 border-b-4 text-sm transition-all whitespace-nowrap rounded-t-xl flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                     Administración Estudiantil
                 </button>
+                @endcan
             </div>
 
             <div class="p-6 md:p-8">
@@ -79,6 +87,7 @@
                 <!-- ========================================== -->
                 <!-- PESTAÑA 1: AUDITORÍA INTERNA -->
                 <!-- ========================================== -->
+                @can('reportes.control_notas.ver')
                 <div x-show="tabActiva === 'auditoria'" x-transition.opacity>
                     <p class="text-sm text-slate-500 mb-6 font-medium">Herramientas de monitoreo interno para evaluar el desempeño docente, calificar aulas y revisar métricas de asistencia no oficiales.</p>
                     
@@ -204,10 +213,12 @@
                         
                     </div>
                 </div>
+                @endcan
 
                 <!-- ========================================== -->
                 <!-- PESTAÑA 2: FORMATOS MINED -->
                 <!-- ========================================== -->
+                @can('reportes.rendimiento_corte.ver')
                 <div x-show="tabActiva === 'mined'" style="display: none;" x-transition.opacity>
                     <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-4 mb-6 flex items-start gap-3">
                         <svg class="w-5 h-5 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -326,11 +337,13 @@
 
                     </div>
                 </div>
+                @endcan
                 
 
                 <!-- ========================================== -->
                 <!-- PESTAÑA 3: ADMINISTRACIÓN ESTUDIANTIL -->
                 <!-- ========================================== -->
+                @can('reportes.estudiantes.ver')
                 <div x-show="tabActiva === 'gestion'" style="display: none;" x-transition.opacity>
                     <p class="text-sm text-slate-500 mb-6 font-medium">Auditoría de expedientes de secretaría, contactos familiares y trazabilidad histórica del estudiante.</p>
                     
@@ -376,6 +389,7 @@
                         </a>
                     </div>
                 </div>
+                @endcan
 
             </div>
         </div>

@@ -26,9 +26,19 @@ class GestorBoletinController extends Controller
 
             // Obtener los cortes evaluativos (I Parcial, II Parcial, etc.)
             $cortes = CorteEvaluativo::where('anio_escolar_id', $anioActivo->id)->orderBy('id')->get();
+
+            // Si no hay cortes para el año activo, mostrar vista con estado vacío
+            if ($cortes->isEmpty()) {
+                return view('academico.boletin.bandeja', [
+                    'aulas' => collect(),
+                    'cortes' => collect(),
+                    'corteActivo' => null,
+                    'anioActivo' => $anioActivo,
+                ]);
+            }
             
             // Si el usuario no selecciona un corte en el filtro, tomamos el primero por defecto
-            $corteActivo = $request->input('corte_id', $cortes->first()->id ?? null);
+            $corteActivo = $request->input('corte_id', $cortes->first()->id);
 
             // Consultar todas las aulas y verificar su estado de envío
             $aulas = Aula::with(['grado', 'docenteGuia.usuario'])

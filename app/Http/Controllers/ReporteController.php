@@ -22,9 +22,52 @@ class ReporteController extends Controller
 
     protected function autorizarReportes(): void
     {
-        if (!auth()->user()->hasAnyPermission(['reportes.ver', 'reportes.gestionar', 'reportes.supervisar'])) {
-            // Lanzamos AuthorizationException para que Laravel la resuelva como 403 (y no la atrape el catch genérico)
+        $user = auth()->user();
+        
+        // 1. Permiso base
+        if (!$user->hasAnyPermission(['reportes.ver', 'reportes.gestionar', 'reportes.supervisar', 'reportes.mi_aula.ver', 'reportes.mis_clases.ver'])) {
             throw new \Illuminate\Auth\Access\AuthorizationException('No tiene permisos para acceder a los reportes.');
+        }
+
+        // 2. Para Coordinador: inyectar scope de modalidad en request para que servicios lo usen
+        if ($user->hasRole('Coordinador') && !$user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
+            $docente = $user->docente;
+            if ($docente && $docente->modalidad_coordina_id) {
+                // Forzar filtro de modalidad en todos los reportes
+                request()->merge(['modalidad_id' => $docente->modalidad_coordina_id]);
+            }
+        }
+
+        // 3. Para Docente Guía: inyectar scope de aula
+        if ($user->hasRole('Docente Guia') && !$user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Coordinador'])) {
+            $docente = $user->docente;
+            $anioActivo = \App\Models\AnioEscolar::where('estado', 'activo')->first();
+            if ($docente && $anioActivo) {
+                $aula = \App\Models\Aula::where('docente_guia_id', $docente->id)
+                    ->where('anio_escolar_id', $anioActivo->id)
+                    ->first();
+                if ($aula) {
+                    request()->merge(['aula_id' => $aula->id, 'grado_id' => $aula->grado_id]);
+                }
+            }
+        }
+        
+        // 4. Permisos granulares para reportes MINED específicos (Docente Guía)
+        // El middleware/autorización ya inyectó los filtros de aula/grado arriba
+        $rutaActual = request()->route()->getName();
+        $reportesMinidDocenteGuia = [
+            'reportes.rendimiento-corte',
+            'reportes.mined-detallado', 
+            'reportes.escalas',
+            'reportes.asignaturas-aprobadas',
+        ];
+        
+        if ($user->hasRole('Docente Guia') && in_array($rutaActual, $reportesMinidDocenteGuia)) {
+            // Verificar que tiene al menos el permiso base de mi_aula o mis_clases
+            // Los filtros de aula ya se inyectaron en el paso 3
+            if (!$user->hasAnyPermission(['reportes.mi_aula.ver', 'reportes.mis_clases.ver'])) {
+                throw new \Illuminate\Auth\Access\AuthorizationException('No tiene permisos para acceder a este reporte MINED.');
+            }
         }
     }
 

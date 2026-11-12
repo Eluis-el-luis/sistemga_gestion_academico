@@ -29,30 +29,63 @@ class NotaController extends Controller
             $this->authorize('viewAny', \App\Models\Nota::class);
             
             $usuario = auth()->user();
+            $asignaciones = $this->getAsignacionesScope($usuario, $request);
             
-            if ($usuario->hasRole(['Subdirector', 'Director'])) {
-                $modoSupervision = true;
+            // Determinar tipo de vista según rol
+            $esDirectivo = $usuario->hasRole(['Director', 'Subdirector']);
+            $esCoordinador = $usuario->hasRole('Coordinador');
+            $esDocenteGuia = $usuario->hasRole('Docente Guia');
+            
+            $modoSupervision = $esDirectivo || $esCoordinador;
+            
+            // Preparar datos según rol
+            if ($esDirectivo) {
+                // Director/Subdirector: vista completa con filtros
                 $grados = \App\Models\Grado::with('modalidad')->orderBy('modalidad_id', 'asc')->orderBy('id', 'asc')->get();
                 $aulas = \App\Models\Aula::with('grado')->get();
-                
                 $gradoSeleccionadoId = $request->filled('grado_id') ? $request->grado_id : ($grados->first()->id ?? null);
                 $aulaSeleccionadaId = $request->filled('aula_id') ? $request->aula_id : ($aulas->where('grado_id', $gradoSeleccionadoId)->first()->id ?? null);
                 
-                $asignaciones = $aulaSeleccionadaId 
-                    ? AulaAsignaturaDocente::with(['aula.grado', 'asignatura', 'docente.usuario'])->where('aula_id', $aulaSeleccionadaId)->get() 
-                    : collect();
-            } else {
-                $modoSupervision = false;
-                $grados = collect(); $aulas = collect();
-                $gradoSeleccionadoId = null; $aulaSeleccionadaId = null;
+            } elseif ($esCoordinador) {
+                // Coordinador: vista segmentada por aulas de su modalidad
+                $docente = $usuario->docente;
+                $aulas = \App\Models\Aula::with(['grado', 'asignaciones.asignatura', 'asignaciones.docente.usuario'])
+                    ->where('modalidad_id', $docente->modalidad_coordina_id)
+                    ->whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))
+                    ->orderBy('grado_id')
+                    ->get();
                 
-                $docente = \App\Models\Docente::where('usuario_id', $usuario->id)->first();
-                $asignaciones = $docente 
-                    ? AulaAsignaturaDocente::with(['aula.grado', 'asignatura'])->where('docente_id', $docente->id)->get() 
-                    : collect();
+                // Agrupar asignaciones por aula para la vista
+                $asignacionesPorAula = [];
+                foreach ($aulas as $aula) {
+                    $asignacionesPorAula[$aula->id] = $aula->asignaciones
+                        ->where('activo', true)
+                        ->sortBy('asignatura.nombre')
+                        ->values();
+                }
+                
+                $grados = collect();
+                $gradoSeleccionadoId = null;
+                $aulaSeleccionadaId = $aulas->first()->id ?? null;
+                
+            } else {
+                // Docente Guía / Docente por Asignatura
+                $grados = collect();
+                $aulas = collect();
+                $gradoSeleccionadoId = null;
+                $aulaSeleccionadaId = null;
             }
 
-            return view('academico.notas.index', compact('asignaciones', 'modoSupervision', 'grados', 'aulas', 'gradoSeleccionadoId', 'aulaSeleccionadaId'));
+            return view('academico.notas.index', compact(
+                'asignaciones', 
+                'modoSupervision', 
+                'grados', 
+                'aulas', 
+                'gradoSeleccionadoId', 
+                'aulaSeleccionadaId',
+                'esCoordinador',
+                'asignacionesPorAula' ?? null
+            ));
 
         } catch (\Exception $e) {
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
@@ -63,14 +96,91 @@ class NotaController extends Controller
         }
     }
 
+    /**
+     * Scope centralizado de asignaciones según ownership del usuario
+     * Reemplaza lógica hardcodeada dispersa en controladores
+     */
+    protected function getAsignacionesScope(\App\Models\Usuario $usuario, Request $request)
+    {
+        $query = \App\Models\AulaAsignaturaDocente::with(['aula.grado', 'asignatura', 'docente.usuario']);
+
+        // Super-admin (Director/Subdirector) ve todo, filtrado por request params
+        if ($usuario->hasRole(['Director', 'Subdirector'])) {
+            if ($request->filled('aula_id')) {
+                $query->where('aula_id', $request->aula_id);
+            }
+            return $query->get();
+        }
+
+        $docente = $usuario->docente;
+        if (!$docente) {
+            return collect();
+        }
+
+        if ($usuario->hasRole('Docente Guia')) {
+            // Docente guía: sus asignaciones + asignaciones de su aula
+            return $query->where(function ($q) use ($docente) {
+                $q->where('docente_id', $docente->id)
+                  ->orWhereHas('aula', fn($aq) => $aq->where('docente_guia_id', $docente->id));
+            })->get();
+        }
+
+        if ($usuario->hasRole('Coordinador')) {
+            // Coordinador: TODAS las asignaturas de su modalidad, agrupadas por aula
+            // No solo las que imparte, sino todas las de su sector para supervisión
+            if ($docente->modalidad_coordina_id) {
+                return $query->whereHas('aula', function ($q) use ($docente) {
+                    $q->where('modalidad_id', $docente->modalidad_coordina_id);
+                })->get();
+            }
+            return collect();
+        }
+
+        // Docente por Asignatura: solo sus asignaciones
+        return $query->where('docente_id', $docente->id)->get();
+    }
+
+    protected function isCorteBloqueado(int $corteId, int $asignacionId): bool
+    {
+        return \App\Models\CorteCerrado::where('aula_asignatura_docente_id', $asignacionId)
+            ->where('corte_evaluativo_id', $corteId)
+            ->where('bloqueado', true)
+            ->exists();
+    }
+
     // 2. LA PLANILLA (Ahora carga las Actividades y verifica si está bloqueada)
     public function create(Request $request, AulaAsignaturaDocente $asignacion)
     {
         try {
             $this->authorize('calificar', $asignacion);
 
-            $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))->get();
-            $corteSeleccionado = $request->query('corte_evaluativo_id', $cortes->first()->id ?? null);
+            // Cargar relaciones necesarias para la vista y evitar N+1
+            $asignacion->load('aula.grado', 'asignatura');
+
+            // Obtener cortes del año activo con eager loading de anioEscolar
+            $cortes = \App\Models\CorteEvaluativo::with('anioEscolar')
+                ->whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))
+                ->get();
+
+            // Si no hay cortes (no hay año activo), mostrar vista con estado vacío en lugar de error
+            if ($cortes->isEmpty()) {
+                return view('academico.notas.planilla', [
+                    'asignacion' => $asignacion,
+                    'cortes' => collect(),
+                    'corteSeleccionado' => null,
+                    'matriculas' => collect(),
+                    'actividades' => collect(),
+                    'notasActividades' => collect(),
+                    'estaBloqueado' => false,
+                    'corteActivo' => null,
+                    'sumaAcumulado' => 0,
+                    'sumaExamen' => 0,
+                    'pesoAcumulado' => 0,
+                    'pesoExamen' => 0,
+                ]);
+            }
+
+            $corteSeleccionado = $request->query('corte_evaluativo_id', $cortes->first()->id);
 
             // Traemos las actividades que el maestro configuró previamente para este parcial
             $actividades = \App\Models\ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
@@ -100,13 +210,11 @@ class NotaController extends Controller
                 ->groupBy('matricula_id');
 
             // Guía de pesos del corte (acumulado vs examen) para la planilla
-            $corteActivo = \App\Models\CorteEvaluativo::find($corteSeleccionado);
+            $corteActivo = $cortes->firstWhere('id', $corteSeleccionado);
             $sumaAcumulado = $actividades->where('tipo', 'acumulado')->sum('puntaje_maximo');
             $sumaExamen = $actividades->where('tipo', 'examen')->sum('puntaje_maximo');
-            $pesoAcumulado = $corteActivo->peso_acumulado ?? 0;
-            $pesoExamen = $corteActivo->peso_examen ?? 0;
-
-            $asignacion->load('aula.grado', 'asignatura');
+            $pesoAcumulado = $corteActivo?->peso_acumulado ?? 0;
+            $pesoExamen = $corteActivo?->peso_examen ?? 0;
 
             return view('academico.notas.planilla', compact(
                 'asignacion', 'cortes', 'corteSeleccionado', 'matriculas', 'actividades',
@@ -133,20 +241,18 @@ class NotaController extends Controller
             return back()->with('error', 'Debe seleccionar un periodo evaluativo válido.');
         }
 
-        // BARRERA 1: ¿El parcial está bloqueado?
-        if (\App\Models\CorteCerrado::where('aula_asignatura_docente_id', $asignacion->id)
-            ->where('corte_evaluativo_id', $corteId)
-            ->where('bloqueado', true)
-            ->exists()) {
-            return back()->with('error', 'El parcial está cerrado. Solicita autorización para modificar.');
-        }
-
         if (!$request->has('notas') || !is_array($request->notas)) {
             return back()->with('error', 'No se recibieron calificaciones para guardar.');
         }
 
         try {
+            // Zero Trust: Authorization PRIMERO, antes de cualquier lógica de negocio
             $this->authorize('calificar', $asignacion);
+
+            // BARRERA: ¿El parcial está bloqueado? (Policy también lo verifica, double-check)
+            if ($this->isCorteBloqueado($corteId, $asignacion->id)) {
+                return back()->with('error', 'El parcial está cerrado. Solicita autorización para modificar.');
+            }
 
             $actividades = \App\Models\ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
                                     ->where('corte_evaluativo_id', $corteId)
@@ -239,8 +345,33 @@ class NotaController extends Controller
         try {
             $this->authorize('calificar', $asignacion);
 
-            $cortes = \App\Models\CorteEvaluativo::whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))->get();
-            $corteSeleccionado = $request->query('corte_evaluativo_id', $cortes->first()->id ?? null);
+            // Cargar relaciones necesarias para la vista y evitar N+1
+            $asignacion->load('aula.grado', 'asignatura');
+
+            // Obtener cortes del año activo con eager loading de anioEscolar
+            $cortes = \App\Models\CorteEvaluativo::with('anioEscolar')
+                ->whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))
+                ->get();
+
+            // Si no hay cortes (no hay año activo), mostrar vista con estado vacío en lugar de error
+            if ($cortes->isEmpty()) {
+                return view('academico.notas.evaluar', [
+                    'asignacion' => $asignacion,
+                    'cortes' => collect(),
+                    'corteSeleccionado' => null,
+                    'matriculas' => collect(),
+                    'actividades' => collect(),
+                    'notasActividades' => collect(),
+                    'estaBloqueado' => false,
+                    'corteActivo' => null,
+                    'sumaAcumulado' => 0,
+                    'sumaExamen' => 0,
+                    'pesoAcumulado' => 0,
+                    'pesoExamen' => 0,
+                ]);
+            }
+
+            $corteSeleccionado = $request->query('corte_evaluativo_id', $cortes->first()->id);
 
             // Actividades que el maestro configuró para este parcial
             $actividades = \App\Models\ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
@@ -271,13 +402,11 @@ class NotaController extends Controller
                 ->groupBy('matricula_id');
 
             // Guía de pesos del corte
-            $corteActivo = \App\Models\CorteEvaluativo::find($corteSeleccionado);
+            $corteActivo = $cortes->firstWhere('id', $corteSeleccionado);
             $sumaAcumulado = $actividades->where('tipo', 'acumulado')->sum('puntaje_maximo');
             $sumaExamen = $actividades->where('tipo', 'examen')->sum('puntaje_maximo');
-            $pesoAcumulado = $corteActivo->peso_acumulado ?? 0;
-            $pesoExamen = $corteActivo->peso_examen ?? 0;
-
-            $asignacion->load('aula.grado', 'asignatura');
+            $pesoAcumulado = $corteActivo?->peso_acumulado ?? 0;
+            $pesoExamen = $corteActivo?->peso_examen ?? 0;
 
             return view('academico.notas.evaluar', compact(
                 'asignacion', 'cortes', 'corteSeleccionado', 'matriculas', 'actividades',

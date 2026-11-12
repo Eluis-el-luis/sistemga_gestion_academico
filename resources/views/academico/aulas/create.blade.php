@@ -34,7 +34,7 @@
                                     <option value="">Seleccione...</option>
                                     @foreach($anios as $anio)
                                         <option value="{{ $anio->id }}" {{ old('anio_escolar_id') == $anio->id ? 'selected' : '' }}>
-                                            {{ $anio->nombre }} {{ $anio->activo ? '(Vigente)' : '' }}
+                                            {{ $anio->nombre }} {{ $anio->es_activo ? '(Vigente)' : '' }}
                                         </option>
                                     @endforeach
                                 </select>

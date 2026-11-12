@@ -4,50 +4,61 @@ namespace App\Policies;
 
 use App\Models\Boletin;
 use App\Models\Usuario;
-use Illuminate\Auth\Access\Response;
+use App\Policies\Concerns\HasResourceOwnership;
 
 class BoletinPolicy
 {
-    /**
-     * El "Poder Absoluto" para Dirección y Subdirección.
-     * Al poner esto aquí, te ahorras validarlos en los demás métodos.
-     */
+    use HasResourceOwnership;
+
     public function before(Usuario $usuario, $ability): ?bool
     {
-        if ($usuario->hasRole(['Director', 'Subdirector'])) {
+        if (in_array($ability, ['viewAny', 'view']) && $this->isSuperAdmin($usuario)) {
             return true;
         }
         return null;
     }
 
-    /**
-     * Equivalente a (V)er en la Matriz.
-     */
     public function viewAny(Usuario $usuario): bool
     {
         return $usuario->hasPermissionTo('boletines.ver') || $usuario->hasPermissionTo('boletines.gestionar');
     }
 
-    /**
-     * Equivalente a (G)estionar en la Matriz.
-     */
+    public function view(Usuario $usuario, Boletin $boletin): bool
+    {
+        if (!$usuario->hasPermissionTo('boletines.ver') && !$usuario->hasPermissionTo('boletines.gestionar')) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($usuario)) {
+            return true;
+        }
+
+        // Docente guía del aula de la matrícula
+        return $this->ownsViaMatriculaAula($usuario, $boletin, 'matricula');
+    }
+
     public function create(Usuario $usuario): bool
     {
         return $usuario->hasPermissionTo('boletines.gestionar');
     }
 
-    /**
-     * Alcance de los datos (G)estionar.
-     */
     public function update(Usuario $usuario, Boletin $boletin): bool
     {
-        if (!$usuario->hasPermissionTo('boletines.gestionar')) return false;
-
-        $docente = $usuario->docente;
-        if ($docente) {
-            // El boletín pertenece a una matrícula, que pertenece a un aula
-            return $boletin->matricula->aula->docente_guia_id === $docente->id;
+        if (!$usuario->hasPermissionTo('boletines.gestionar')) {
+            return false;
         }
-        return false;
+
+        if ($this->isSuperAdmin($usuario)) {
+            return true;
+        }
+
+        // Docente guía Y Coordinador/Secretaria con permiso
+        return $this->ownsViaMatriculaAula($usuario, $boletin, 'matricula')
+            || $this->coordinatesModality($usuario, $boletin, 'matricula.aula.modalidad_id');
+    }
+
+    public function delete(Usuario $usuario, Boletin $boletin): bool
+    {
+        return $this->isSuperAdmin($usuario);
     }
 }

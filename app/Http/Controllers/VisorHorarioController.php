@@ -6,9 +6,11 @@ use App\Models\Aula;
 use App\Models\Docente;
 use App\Models\Horario;
 use Illuminate\Http\Request;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class VisorHorarioController extends Controller
 {
+    use AuthorizesRequests;
     /**
      * Pantalla principal: Elegir entre Docentes o Aulas
      */
@@ -105,10 +107,22 @@ class VisorHorarioController extends Controller
     public function aulas()
     {
         try {
-            $aulas = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
+            $this->authorize('viewAny', Aula::class);
+            
+            $user = auth()->user();
+            $query = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
                 ->orderBy('anio_escolar_id', 'desc')
-                ->orderBy('grado_id')
-                ->get();
+                ->orderBy('grado_id');
+
+            // Coordinador: solo aulas de su modalidad
+            if ($user->hasRole('Coordinador') && !$user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
+                $docente = $user->docente;
+                if ($docente && $docente->modalidad_coordina_id) {
+                    $query->where('modalidad_id', $docente->modalidad_coordina_id);
+                }
+            }
+
+            $aulas = $query->get();
 
             return view('academico.visor.aulas', compact('aulas'));
 
@@ -127,6 +141,9 @@ class VisorHorarioController extends Controller
     public function horarioAula(Aula $aula)
     {
         try {
+            // Authorization - usa la misma policy que AulaController
+            $this->authorize('view', $aula);
+
             $aula->load(['grado', 'modalidad', 'docenteGuia.usuario']);
 
             $asignaciones = \App\Models\AulaAsignaturaDocente::where('aula_id', $aula->id)->pluck('id');

@@ -101,6 +101,7 @@ class AulaAsignaturaController extends Controller
     }
 
     // NUEVO: Asignación Masiva de un Docente a una Asignatura en múltiples Aulas/Grados
+    // FIX CVE-2026-001: Validar ownership para Docente Guía - solo puede operar sobre SU aula
     public function asignarMasivo(Request $request)
     {
         $request->validate([
@@ -114,7 +115,25 @@ class AulaAsignaturaController extends Controller
 
         DB::beginTransaction();
         try {
-            $this->authorize('viewAny', Aula::class);
+            // FIX: Requerir permiso de gestión (create en Policy) en lugar de solo vista
+            $this->authorize('create', AulaAsignaturaDocente::class);
+
+            $usuario = auth()->user();
+            $docente = $usuario->docente;
+
+            // FIX CVE-2026-001: Si es Docente Guía (no Director/Subdirector/Gestor), restringir a SU aula
+            if ($docente && !$usuario->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
+                $aulaGuia = \App\Models\Aula::where('docente_guia_id', $docente->id)
+                    ->whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))
+                    ->first();
+
+                if (!$aulaGuia) {
+                    return back()->with('error', 'No tiene un aula asignada como Guía en el ciclo actual.');
+                }
+
+                // Forzar que solo pueda operar sobre su propia aula
+                $request->merge(['aulas_ids' => [$aulaGuia->id]]);
+            }
 
             $asignaturaId = (int) $request->asignatura_id;
             $docenteId = (int) $request->docente_id;
