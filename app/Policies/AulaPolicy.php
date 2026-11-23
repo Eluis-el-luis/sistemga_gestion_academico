@@ -3,92 +3,115 @@
 namespace App\Policies;
 
 use App\Models\Aula;
+use App\Models\AulaAsignaturaDocente;
 use App\Models\Usuario;
 use App\Policies\Concerns\HasResourceOwnership;
+use Illuminate\Support\Facades\Log;
 
 class AulaPolicy
 {
     use HasResourceOwnership;
 
-    public function before(Usuario $usuario, $ability): ?bool
+    public function before(Usuario $usuario, string $ability): ?bool
     {
-        if (in_array($ability, ['viewAny', 'view']) && $this->isSuperAdmin($usuario)) {
+        if (in_array($ability, ['viewAny', 'view'], true) && $this->isSuperAdmin($usuario)) {
             return true;
         }
+
         return null;
     }
 
     public function viewAny(Usuario $usuario): bool
     {
-        return $usuario->hasPermissionTo('aulas.ver') || $usuario->hasPermissionTo('aulas.gestionar');
+        try {
+            return $usuario->hasPermissionTo('aulas.ver')
+                || $usuario->hasPermissionTo('aulas.gestionar')
+                || $this->hasRoleKey($usuario, ['directora', 'subdirectora', 'secretaria', 'coordinador', 'docente_guia', 'docente_asignatura', 'docente_auxiliar', 'docente_suplente', 'psicologa', 'gestor_it']);
+        } catch (\Throwable $e) {
+            Log::error('Error en AulaPolicy::viewAny', [
+                'user_id' => $usuario->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     public function view(Usuario $usuario, Aula $aula): bool
     {
-        if (!$usuario->hasPermissionTo('aulas.ver') && !$usuario->hasPermissionTo('aulas.gestionar')) {
+        try {
+            if ($this->isSuperAdmin($usuario) || $this->hasRoleKey($usuario, ['gestor_it', 'secretaria', 'psicologa'])) {
+                return true;
+            }
+
+            if ($this->isCoordinador($usuario)) {
+                return $this->coordinatesModality($usuario, $aula, 'modalidad_id');
+            }
+
+            if ($this->ownsAula($usuario, $aula)) {
+                return true;
+            }
+
+            $docente = $usuario->docente;
+            if ($docente) {
+                return AulaAsignaturaDocente::where('aula_id', $aula->id)
+                    ->where('docente_id', $docente->id)
+                    ->where('activo', true)
+                    ->exists();
+            }
+
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('Error en AulaPolicy::view', [
+                'user_id' => $usuario->id,
+                'aula_id' => $aula->id,
+                'exception' => $e->getMessage(),
+            ]);
+
             return false;
         }
-
-        if ($this->isSuperAdmin($usuario)) {
-            return true;
-        }
-
-        // Gestor de Usuarios, Secretaria, Coordinador ven todas (o su modalidad)
-        if ($usuario->hasAnyRole(['Gestor de Usuarios', 'Secretaria'])) {
-            return true;
-        }
-
-        if ($usuario->hasRole('Coordinador')) {
-            return $this->coordinatesModality($usuario, $aula, 'modalidad_id');
-        }
-
-        // Docente Guía: solo su aula
-        if ($this->ownsAula($usuario, $aula)) {
-            return true;
-        }
-
-        // Docente por Asignatura: ve aulas donde imparte
-        $docente = $usuario->docente;
-        if ($docente) {
-            return \App\Models\AulaAsignaturaDocente::where('aula_id', $aula->id)
-                ->where('docente_id', $docente->id)
-                ->where('activo', true)
-                ->exists();
-        }
-
-        return false;
     }
 
     public function create(Usuario $usuario): bool
     {
-        return $usuario->hasPermissionTo('aulas.gestionar');
+        return $usuario->hasPermissionTo('aulas.gestionar') || $this->isSuperAdmin($usuario);
     }
 
     public function update(Usuario $usuario, Aula $aula): bool
     {
-        if (!$usuario->hasPermissionTo('aulas.gestionar')) {
+        try {
+            if ($this->isSuperAdmin($usuario) || $this->isGestorIt($usuario)) {
+                return true;
+            }
+
+            return $this->coordinatesModality($usuario, $aula, 'modalidad_id');
+        } catch (\Throwable $e) {
+            Log::error('Error en AulaPolicy::update', [
+                'user_id' => $usuario->id,
+                'aula_id' => $aula->id,
+                'exception' => $e->getMessage(),
+            ]);
+
             return false;
         }
-
-        if ($this->isSuperAdmin($usuario) || $usuario->hasRole('Gestor de Usuarios')) {
-            return true;
-        }
-
-        // Coordinador: solo aulas de su modalidad
-        return $this->coordinatesModality($usuario, $aula, 'modalidad_id');
     }
 
     public function delete(Usuario $usuario, Aula $aula): bool
     {
-        if (!$usuario->hasPermissionTo('aulas.gestionar')) {
+        try {
+            if ($this->isSuperAdmin($usuario)) {
+                return true;
+            }
+
+            return $this->coordinatesModality($usuario, $aula, 'modalidad_id');
+        } catch (\Throwable $e) {
+            Log::error('Error en AulaPolicy::delete', [
+                'user_id' => $usuario->id,
+                'aula_id' => $aula->id,
+                'exception' => $e->getMessage(),
+            ]);
+
             return false;
         }
-
-        if ($this->isSuperAdmin($usuario)) {
-            return true;
-        }
-
-        // Coordinador: solo aulas de su modalidad
-        return $this->coordinatesModality($usuario, $aula, 'modalidad_id');
     }
 }

@@ -3,56 +3,89 @@
 namespace App\Policies;
 
 use App\Models\Usuario;
+use App\Policies\Concerns\HasResourceOwnership;
 use Illuminate\Auth\Access\HandlesAuthorization;
+use Illuminate\Support\Facades\Log;
 
 class UsuarioPolicy
 {
-    use HandlesAuthorization;
+    use HandlesAuthorization, HasResourceOwnership;
 
     public function viewAny(Usuario $authUser): bool
     {
-        return $authUser->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Secretaria']);
+        try {
+            return $this->hasRoleKey($authUser, ['directora', 'subdirectora', 'gestor_it', 'secretaria']);
+        } catch (\Throwable $e) {
+            Log::error('Error en UsuarioPolicy::viewAny', [
+                'auth_user_id' => $authUser->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     public function create(Usuario $authUser): bool
     {
-        return $authUser->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Secretaria']);
+        try {
+            return $this->hasRoleKey($authUser, ['directora', 'subdirectora', 'gestor_it', 'secretaria']);
+        } catch (\Throwable $e) {
+            Log::error('Error en UsuarioPolicy::create', [
+                'auth_user_id' => $authUser->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     public function update(Usuario $authUser, Usuario $targetUser): bool
     {
-        // 1. BLINDAJE DE DIRECCIÓN: Su cuenta solo puede ser editada por ella misma.
-        if ($targetUser->hasRole('Director')) {
-            return $authUser->id === $targetUser->id;
-        }
+        try {
+            if ($this->isDirectora($targetUser)) {
+                return (int) $authUser->id === (int) $targetUser->id;
+            }
 
-        // 2. BLINDAJE DE SUBDIRECCIÓN: El Gestor de Usuarios NO puede editarla.
-        if ($targetUser->hasRole('Subdirector')) {
-            return $authUser->hasAnyRole(['Director', 'Subdirector']);
-        }
+            if ($this->isSubdirectora($targetUser)) {
+                return $this->isSuperAdmin($authUser);
+            }
 
-        // 3. REGLA GENERAL: Para el resto del personal, los roles autorizados tienen acceso.
-        return $authUser->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Secretaria']);
+            return $this->hasRoleKey($authUser, ['directora', 'subdirectora', 'gestor_it', 'secretaria']);
+        } catch (\Throwable $e) {
+            Log::error('Error en UsuarioPolicy::update', [
+                'auth_user_id' => $authUser->id,
+                'target_user_id' => $targetUser->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     public function delete(Usuario $authUser, Usuario $targetUser): bool
     {
-        // 1. PREVENCIÓN: Nadie puede bloquearse/eliminarse a sí mismo por error.
-        if ($authUser->id === $targetUser->id) {
+        try {
+            if ((int) $authUser->id === (int) $targetUser->id) {
+                return false;
+            }
+
+            if ($this->isDirectora($targetUser)) {
+                return false;
+            }
+
+            if ($this->isSubdirectora($targetUser)) {
+                return $this->isDirectora($authUser);
+            }
+
+            return $this->hasRoleKey($authUser, ['directora', 'subdirectora', 'gestor_it']);
+        } catch (\Throwable $e) {
+            Log::error('Error en UsuarioPolicy::delete', [
+                'auth_user_id' => $authUser->id,
+                'target_user_id' => $targetUser->id,
+                'exception' => $e->getMessage(),
+            ]);
+
             return false;
         }
-
-        // 2. BLINDAJE DE DIRECCIÓN: Totalmente intocable.
-        if ($targetUser->hasRole('Director')) {
-            return false;
-        }
-
-        // 3. BLINDAJE DE SUBDIRECCIÓN: Solo la Dirección puede bloquear/eliminar esta cuenta.
-        if ($targetUser->hasRole('Subdirector')) {
-            return $authUser->hasRole('Director');
-        }
-
-        // 4. REGLA GENERAL: Para el resto del personal, los tres roles pueden bloquear (incluyendo al Gestor).
-        return $authUser->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios']);
     }
 }

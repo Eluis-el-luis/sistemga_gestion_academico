@@ -11,6 +11,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -38,7 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->report(function (AuthorizationException $e, Request $request) {
             try {
-                $user = auth()->user();
+                $user = Auth::user();
                 Log::warning('Authorization denied', [
                     'user_id' => $user?->id,
                     'user_roles' => method_exists($user, 'getRoleNames') ? $user->getRoleNames()->toArray() : [],
