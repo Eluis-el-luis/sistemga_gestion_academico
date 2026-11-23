@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use Throwable;
 use ZipArchive;
 
@@ -192,8 +193,8 @@ class RespaldoService
     protected function cabeceraSql(?string $motivo, int $totalTablas): string
     {
         $config = config('database.connections.' . DB::connection()->getName(), []);
-        $usuario = auth()->check()
-            ? (($auth = auth()->user())->nombre_completo ?? $auth->name ?? $auth->email ?? 'usuario')
+        $usuario = Auth::check()
+            ? (($auth = Auth::user())->nombre_completo ?? $auth->name ?? $auth->email ?? 'usuario')
             : 'CLI (artisan)';
 
         $lineas = [
