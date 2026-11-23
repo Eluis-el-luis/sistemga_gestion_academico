@@ -3,30 +3,14 @@
 namespace App\Services;
 
 use App\Models\AnioEscolar;
-use App\Models\AulaAsignaturaDocente;
-use App\Models\CorteCerrado;
-use App\Models\CorteEvaluativo;
-use App\Models\ExamenReparacion;
-use App\Models\Matricula;
 use App\Models\Nota;
 use App\Models\Usuario;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
-/**
- * Servicio para la gestión del Año Escolar.
- * 
- * Encapsula la lógica de negocio estricta para:
- * - Restricción de "un solo año activo"
- * - Validación completa del proceso de cierre
- * - Transiciones de estado controladas
- */
 class AnioEscolarService
 {
-    /**
-     * Excepción personalizada para errores de validación de cierre
-     */
     public const ERROR_CORTES_NO_CERRADOS = 'cortes_no_cerrados';
     public const ERROR_PROMEDIOS_NO_GENERADOS = 'promedios_no_generados';
     public const ERROR_ESTADO_ESTUDIANTES_INDEFINIDO = 'estado_estudiantes_indefinido';
@@ -35,69 +19,55 @@ class AnioEscolarService
     public const ERROR_YA_CERRADO = 'ya_cerrado';
     public const ERROR_NO_ES_ACTIVO = 'no_es_activo';
 
-    /**
-     * Activa un año escolar.
-     * 
-     * Reglas:
-     * - Solo puede haber UN año escolar activo a la vez
-     * - El año debe estar en estado "planificacion"
-     * - Desactiva el año activo anterior si existe (cambia a planificación)
-     * 
-     * @throws ValidationException Si ya existe un año activo y no se puede cambiar
-     */
     public function activar(AnioEscolar $anioEscolar, ?Usuario $usuario = null): AnioEscolar
     {
-        // Validar que no esté cerrado
         if ($anioEscolar->es_cerrado) {
             throw ValidationException::withMessages([
                 'estado' => 'No se puede activar un año escolar cerrado.',
             ]);
         }
 
-        // Si ya es activo, no hay nada que hacer
         if ($anioEscolar->es_activo) {
             return $anioEscolar;
         }
 
-        // Validar que esté en planificación
         if (!$anioEscolar->es_planificacion) {
             throw ValidationException::withMessages([
                 'estado' => 'Solo se puede activar un año en estado "Planificación".',
             ]);
         }
 
-        return DB::transaction(function () use ($anioEscolar, $usuario) {
-            // Si hay un año activo, cambiarlo a planificación
-            $anioActivoActual = AnioEscolar::obtenerActivo();
-            
-            if ($anioActivoActual && $anioActivoActual->id !== $anioEscolar->id) {
-                $anioActivoActual->estado = AnioEscolar::ESTADO_PLANIFICACION;
-                $anioActivoActual->save();
-            }
+        try {
+            return DB::transaction(function () use ($anioEscolar, $usuario) {$anioActivoActual = AnioEscolar::obtenerActivo();
 
-            // Activar el nuevo año
-            $anioEscolar->estado = AnioEscolar::ESTADO_ACTIVO;
-            $anioEscolar->save();
+                if ($anioActivoActual && (int)$anioActivoActual->id !== (int) $anioEscolar->id) {$anioActivoActual->estado = AnioEscolar::ESTADO_PLANIFICACION;
+                    $anioActivoActual->save();
+                }
 
-            // Registrar en log de auditoría
-            $this->registrarAuditoria(
-                $anioEscolar,
-                'activado',
-                $usuario,
-                "Año escolar activado. Año anterior (si existía) pasado a Planificación."
-            );
+                $anioEscolar->estado = AnioEscolar::ESTADO_ACTIVO;
+                $anioEscolar->save();
 
-            return $anioEscolar->fresh();
-        });
+                $this->registrarAuditoria($anioEscolar,
+                    'activado',
+                    $usuario,
+                    'Año escolar activado. Año anterior (si existía) pasado a Planificación.'
+                );
+
+                return $anioEscolar->fresh();
+            });
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('Error al activar año escolar', [
+                'anio_escolar_id' => $anioEscolar->id,
+                'usuario_id' => $usuario?->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            throw new \RuntimeException('No fue posible activar el año escolar.', 0, $e);
+        }
     }
 
-    /**
-     * Cambia un año escolar a Planificación.
-     * 
-     * Reglas:
-     * - Solo si está en "activo" y NO hay otro año que deba estar activo
-     * - No se puede desde "cerrado"
-     */
     public function pasarAPlanificacion(AnioEscolar $anioEscolar, ?Usuario $usuario = null): AnioEscolar
     {
         if ($anioEscolar->es_cerrado) {
@@ -116,38 +86,33 @@ class AnioEscolarService
             ]);
         }
 
-        return DB::transaction(function () use ($anioEscolar, $usuario) {
-            $anioEscolar->estado = AnioEscolar::ESTADO_PLANIFICACION;
-            $anioEscolar->save();
+        try {
+            return DB::transaction(function () use ($anioEscolar, $usuario) {$anioEscolar->estado = AnioEscolar::ESTADO_PLANIFICACION;
+                $anioEscolar->save();
 
-            $this->registrarAuditoria(
-                $anioEscolar,
-                'pasado_a_planificacion',
-                $usuario,
-                "Año escolar pasado a Planificación desde Activo."
-            );
+                $this->registrarAuditoria($anioEscolar,
+                    'pasado_a_planificacion',
+                    $usuario,
+                    'Año escolar pasado a Planificación desde Activo.'
+                );
 
-            return $anioEscolar->fresh();
-        });
+                return $anioEscolar->fresh();
+            });
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('Error al pasar año escolar a planificación', [
+                'anio_escolar_id' => $anioEscolar->id,
+                'usuario_id' => $usuario?->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            throw new \RuntimeException('No fue posible cambiar el año escolar a Planificación.', 0, $e);
+        }
     }
 
-    /**
-     * Cierra un año escolar con validación estricta completa.
-     * 
-     * Validaciones obligatorias:
-     * 1. Todos los docentes han subido y cerrado sus actas de calificaciones (todos los cortes)
-     * 2. Los promedios finales definitivos están generados
-     * 3. El estado final de los estudiantes (Aprobado/Reprobado/Reparación) está definido
-     * 
-     * @param AnioEscolar $anioEscolar Año a cerrar (debe estar activo)
-     * @param Usuario $usuario Usuario que ejecuta el cierre
-     * @param array $data Datos adicionales (observaciones_cierre)
-     * 
-     * @throws ValidationException Si alguna validación falla
-     */
-    public function cerrar(AnioEscolar $anioEscolar, Usuario $usuario, array $data = []): AnioEscolar
+    public function cerrar(AnioEscolar $anioEscolar, Usuario $usuario, array$data = []): AnioEscolar
     {
-        // Validaciones previas de estado
         if ($anioEscolar->es_cerrado) {
             throw ValidationException::withMessages([
                 'estado' => 'El año escolar ya está cerrado.',
@@ -160,117 +125,123 @@ class AnioEscolarService
             ]);
         }
 
-        // Ejecutar validaciones estrictas de cierre
         $this->validarCierreCompleto($anioEscolar);
 
-        return DB::transaction(function () use ($anioEscolar, $usuario, $data) {
-            $anioEscolar->estado = AnioEscolar::ESTADO_CERRADO;
-            $anioEscolar->fecha_cierre = now();
-            $anioEscolar->cerrado_por = $usuario->id;
-            $anioEscolar->observaciones_cierre = $data['observaciones_cierre'] ?? null;
-            $anioEscolar->save();
+        try {
+            return DB::transaction(function () use ($anioEscolar,$usuario, $data) {$anioEscolar->estado = AnioEscolar::ESTADO_CERRADO;
+                $anioEscolar->fecha_cierre = now();
+                $anioEscolar->cerrado_por =$usuario->id;
+                $anioEscolar->observaciones_cierre =$data['observaciones_cierre'] ?? null;
+                $anioEscolar->save();
 
-            $this->registrarAuditoria(
-                $anioEscolar,
-                'cerrado',
-                $usuario,
-                "Año escolar cerrado definitivamente. Validaciones: cortes cerrados, promedios generados, estados de estudiantes definidos.",
-                [
-                    'observaciones' => $data['observaciones_cierre'] ?? null,
-                    'validaciones_pasadas' => [
-                        'cortes_cerrados' => true,
-                        'promedios_generados' => true,
-                        'estudiantes_con_estado_final' => true,
-                    ],
-                ]
-            );
+                $this->registrarAuditoria($anioEscolar,
+                    'cerrado',
+                    $usuario,
+                    'Año escolar cerrado definitivamente.',
+                    [
+                        'observaciones' => $data['observaciones_cierre'] ?? null,
+                        'validaciones_pasadas' => [
+                            'cortes_cerrados' => true,
+                            'promedios_generados' => true,
+                            'estudiantes_con_estado_final' => true,
+                        ],
+                    ]
+                );
 
-            return $anioEscolar->fresh();
-        });
+                return $anioEscolar->fresh();
+            });
+        } catch (\Throwable $e) {
+            Log::error('Error al cerrar año escolar', [
+                'anio_escolar_id' => $anioEscolar->id,
+                'usuario_id' => $usuario->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            throw new \RuntimeException('No fue posible completar el cierre del año escolar.', 0, $e);
+        }
     }
 
-    /**
-     * Valida todas las condiciones obligatorias para cerrar un año escolar.
-     * 
-     * @throws ValidationException Con mensajes detallados de qué validaciones fallaron
-     */
     public function validarCierreCompleto(AnioEscolar $anioEscolar): void
     {
         $errores = [];
 
-        // 1. Validar que todos los cortes estén cerrados por todos los docentes
-        if (!$this->validarTodosLosCortesCerrados($anioEscolar)) {
-            $asignacionesPendientes = $anioEscolar->getAsignacionesConCortesPendientes();
-            $detalle = $asignacionesPendientes->map(function ($a) {
-                return "{$a->asignatura->nombre} - {$a->docente->usuario->name} ({$a->aula->nombre})";
+        if (!$this->validarTodosLosCortesCerrados($anioEscolar)) {$asignacionesPendientes = $anioEscolar->getAsignacionesConCortesPendientes();$detalle = $asignacionesPendientes->map(function ($a) {
+                $docenteNombre =$a->docente?->usuario?->nombre_completo
+                    ?? $a->docente?->usuario?->name
+                    ?? 'Sin docente';
+
+                return ($a->asignatura?->nombre ?? 'Sin asignatura')
+                    . ' - ' . $docenteNombre
+                    . ' (' . ($a->aula?->nombre ?? 'Sin aula') . ')';
             })->implode('; ');
-            
+
             $errores[] = [
                 'codigo' => self::ERROR_CORTES_NO_CERRADOS,
                 'mensaje' => 'No todos los docentes han cerrado sus actas de calificaciones.',
-                'detalle' => $detalle ?: 'Hay asignaciones sin cerrar en uno o más cortes evaluativos.',
+                'detalle' => $detalle !== '' ?$detalle : 'Hay asignaciones sin cerrar en uno o más cortes evaluativos.',
             ];
         }
 
-        // 2. Validar que los promedios finales estén generados
-        if (!$this->validarPromediosFinalesGenerados($anioEscolar)) {
-            $errores[] = [
+        if (!$this->validarPromediosFinalesGenerados($anioEscolar)) {$errores[] = [
                 'codigo' => self::ERROR_PROMEDIOS_NO_GENERADOS,
                 'mensaje' => 'No todos los promedios finales definitivos han sido generados.',
-                'detalle' => 'Hay estudiantes con notas finales faltantes en alguna asignatura.',
+                'detalle' => 'Hay estudiantes con registros finales faltantes en alguna asignatura o modalidad.',
             ];
         }
 
-        // 3. Validar que todos los estudiantes tengan estado final definido
-        if (!$this->validarEstadosFinalesEstudiantes($anioEscolar)) {
-            $errores[] = [
+        if (!$this->validarEstadosFinalesEstudiantes($anioEscolar)) {$errores[] = [
                 'codigo' => self::ERROR_ESTADO_ESTUDIANTES_INDEFINIDO,
-                'mensaje' => 'No todos los estudiantes tienen su estado final definido (Aprobado/Reprobado/Reparación).',
-                'detalle' => 'Hay estudiantes sin nota final en alguna asignatura o sin examen de reparación definido para materias reprobadas.',
+                'mensaje' => 'No todos los estudiantes tienen su estado final definido.',
+                'detalle' => 'Hay estudiantes sin registro final o sin examen de reparación definido.',
             ];
         }
 
-        if (!empty($errores)) {
+        if ($errores !== []) {
             throw ValidationException::withMessages([
                 'validacion_cierre' => $errores,
             ]);
         }
     }
 
-    /**
-     * Valida que todos los cortes estén cerrados por todas las asignaciones activas.
-     */
     protected function validarTodosLosCortesCerrados(AnioEscolar $anioEscolar): bool
     {
         return $anioEscolar->getTodosLosCortesCerrados();
     }
 
-    /**
-     * Valida que todos los estudiantes tengan promedios finales generados.
-     * Verifica que cada matrícula activa tenga nota final (corte 4) en todas sus asignaturas.
-     */
     protected function validarPromediosFinalesGenerados(AnioEscolar $anioEscolar): bool
     {
-        $matriculasActivas = $anioEscolar->matriculas()
+        $matriculasActivas =$anioEscolar->matriculas()
             ->where('estado', 'activo')
-            ->with(['aula.asignaciones' => fn($q) => $q->where('activo', true)])
+            ->with(['aula.modalidad', 'aula.asignaciones' => fn ($q) =>$q->where('activo', true)])
             ->get();
 
         if ($matriculasActivas->isEmpty()) {
             return false;
         }
 
-        foreach ($matriculasActivas as $matricula) {
-            $asignaciones = $matricula->aula->asignaciones;
-            
-            foreach ($asignaciones as $asignacion) {
-                // Buscar nota del IV corte (número 4)
+        foreach ($matriculasActivas as $matricula) {$esPreescolar = str_contains(
+                mb_strtolower((string) optional($matricula->aula?->modalidad)->nombre, 'UTF-8'),
+                'preescolar'
+            );
+
+            foreach ($matricula->aula?->asignaciones ?? [] as $asignacion) {
                 $notaFinal = Nota::where('matricula_id', $matricula->id)
                     ->where('aula_asignatura_docente_id', $asignacion->id)
-                    ->whereHas('corteEvaluativo', fn($q) => $q->where('numero', 4))
+                    ->whereHas('corteEvaluativo', fn ($q) =>$q->where('numero', 4))
                     ->first();
 
-                if (!$notaFinal || is_null($notaFinal->nota_cuantitativa)) {
+                if (!$notaFinal) {
+                    return false;
+                }
+
+                if ($esPreescolar) {
+                    if (is_null($notaFinal->indicador_logro_id) && is_null($notaFinal->porcentaje_avance)) {
+                        return false;
+                    }
+                    continue;
+                }
+
+                if (is_null($notaFinal->nota_cuantitativa)) {
                     return false;
                 }
             }
@@ -279,37 +250,28 @@ class AnioEscolarService
         return true;
     }
 
-    /**
-     * Valida que todos los estudiantes tengan estado final definido.
-     * Estado final = Aprobado (nota >= 60) / Reprobado (nota < 60 sin reparación) / Reparación (nota < 60 con examen)
-     */
     protected function validarEstadosFinalesEstudiantes(AnioEscolar $anioEscolar): bool
     {
         return $anioEscolar->getTodosEstudiantesConEstadoFinal();
     }
 
-    /**
-     * Obtiene un reporte detallado de validaciones para el cierre (para UI).
-     */
     public function obtenerReporteValidacionesCierre(AnioEscolar $anioEscolar): array
     {
         $cortesCerrados = $this->validarTodosLosCortesCerrados($anioEscolar);
-        $promediosGenerados = $this->validarPromediosFinalesGenerados($anioEscolar);
-        $estadosDefinidos = $this->validarEstadosFinalesEstudiantes($anioEscolar);
-
-        $asignacionesPendientes = $anioEscolar->getAsignacionesConCortesPendientes();
+        $promediosGenerados =$this->validarPromediosFinalesGenerados($anioEscolar);$estadosDefinidos = $this->validarEstadosFinalesEstudiantes($anioEscolar);
+        $asignacionesPendientes =$anioEscolar->getAsignacionesConCortesPendientes();
 
         return [
-            'puede_cerrar' => $cortesCerrados && $promediosGenerados && $estadosDefinidos,
+            'puede_cerrar' => $cortesCerrados && $promediosGenerados &&$estadosDefinidos,
             'validaciones' => [
                 'cortes_cerrados' => [
                     'cumple' => $cortesCerrados,
-                    'mensaje' => $cortesCerrados 
+                    'mensaje' => $cortesCerrados
                         ? 'Todos los cortes evaluativos están cerrados por todos los docentes.'
                         : 'Faltan cortes por cerrar: ' . $asignacionesPendientes->count() . ' asignaciones pendientes.',
-                    'detalle' => $asignacionesPendientes->map(fn($a) => [
+                    'detalle' => $asignacionesPendientes->map(fn ($a) => [
                         'asignatura' => $a->asignatura?->nombre ?? 'Sin asignatura',
-                        'docente' => $a->docente?->usuario?->name ?? ($a->docente?->nombre_completo ?? 'Sin docente'),
+                        'docente' => $a->docente?->usuario?->nombre_completo ?? ($a->docente?->usuario?->name ?? 'Sin docente'),
                         'aula' => $a->aula?->nombre ?? 'Sin aula',
                     ])->values()->toArray(),
                 ],
@@ -317,46 +279,47 @@ class AnioEscolarService
                     'cumple' => $promediosGenerados,
                     'mensaje' => $promediosGenerados
                         ? 'Todos los promedios finales están generados.'
-                        : 'Hay estudiantes sin nota final en alguna asignatura (IV Corte).',
+                        : 'Hay estudiantes sin registro final en alguna asignatura (IV Corte).',
                 ],
                 'estados_estudiantes_definidos' => [
                     'cumple' => $estadosDefinidos,
                     'mensaje' => $estadosDefinidos
                         ? 'Todos los estudiantes tienen estado final definido.'
-                        : 'Hay estudiantes sin estado final (falta nota o examen de reparación).',
+                        : 'Hay estudiantes sin estado final (falta registro o examen de reparación).',
                 ],
             ],
             'resumen_estadistico' => $anioEscolar->getResumenEstadistico(),
         ];
     }
 
-    /**
-     * Crea un nuevo año escolar en estado Planificación.
-     */
     public function crear(array $data, ?Usuario $usuario = null): AnioEscolar
     {
-        return DB::transaction(function () use ($data, $usuario) {
-            $anioEscolar = AnioEscolar::create([
-                'nombre' => $data['nombre'],
-                'fecha_inicio' => $data['fecha_inicio'],
-                'fecha_fin' => $data['fecha_fin'],
-                'estado' => AnioEscolar::ESTADO_PLANIFICACION,
+        try {
+            return DB::transaction(function () use ($data, $usuario) {$anioEscolar = AnioEscolar::create([
+                    'nombre' => $data['nombre'],
+                    'fecha_inicio' => $data['fecha_inicio'],
+                    'fecha_fin' => $data['fecha_fin'],
+                    'estado' => AnioEscolar::ESTADO_PLANIFICACION,
+                ]);
+
+                $this->registrarAuditoria($anioEscolar,
+                    'creado',
+                    $usuario,
+                    'Año escolar creado en estado Planificación.'
+                );
+
+                return $anioEscolar;
+            });
+        } catch (\Throwable $e) {
+            Log::error('Error al crear año escolar', [
+                'usuario_id' => $usuario?->id,
+                'exception' => $e->getMessage(),
             ]);
 
-            $this->registrarAuditoria(
-                $anioEscolar,
-                'creado',
-                $usuario,
-                "Año escolar creado en estado Planificación."
-            );
-
-            return $anioEscolar;
-        });
+            throw new \RuntimeException('No fue posible crear el año escolar.', 0, $e);
+        }
     }
 
-    /**
-     * Actualiza datos básicos de un año escolar (solo si no está cerrado).
-     */
     public function actualizar(AnioEscolar $anioEscolar, array $data, ?Usuario $usuario = null): AnioEscolar
     {
         if ($anioEscolar->es_cerrado) {
@@ -365,22 +328,27 @@ class AnioEscolarService
             ]);
         }
 
-        $anioEscolar->fill($data);
-        $anioEscolar->save();
+        try {
+            $anioEscolar->fill($data);$anioEscolar->save();
 
-        $this->registrarAuditoria(
-            $anioEscolar,
-            'actualizado',
-            $usuario,
-            "Datos del año escolar actualizados."
-        );
+            $this->registrarAuditoria($anioEscolar,
+                'actualizado',
+                $usuario,
+                'Datos del año escolar actualizados.'
+            );
 
-        return $anioEscolar->fresh();
+            return $anioEscolar->fresh();
+        } catch (\Throwable $e) {
+            Log::error('Error al actualizar año escolar', [
+                'anio_escolar_id' => $anioEscolar->id,
+                'usuario_id' => $usuario?->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            throw new \RuntimeException('No fue posible actualizar el año escolar.', 0, $e);
+        }
     }
 
-    /**
-     * Elimina un año escolar (solo si está en planificación y no tiene dependencias).
-     */
     public function eliminar(AnioEscolar $anioEscolar, ?Usuario $usuario = null): bool
     {
         if (!$anioEscolar->es_planificacion) {
@@ -389,9 +357,8 @@ class AnioEscolarService
             ]);
         }
 
-        // Verificar que no tenga dependencias
-        $tieneDependencias = $anioEscolar->aulas()->exists() 
-            || $anioEscolar->matriculas()->exists() 
+        $tieneDependencias =$anioEscolar->aulas()->exists()
+            || $anioEscolar->matriculas()->exists()
             || $anioEscolar->asignaciones()->exists()
             || $anioEscolar->cortesEvaluativos()->exists();
 
@@ -401,51 +368,49 @@ class AnioEscolarService
             ]);
         }
 
-        $this->registrarAuditoria(
-            $anioEscolar,
-            'eliminado',
-            $usuario,
-            "Año escolar eliminado (estaba en Planificación sin dependencias)."
-        );
+        try {
+            $this->registrarAuditoria($anioEscolar,
+                'eliminado',
+                $usuario,
+                'Año escolar eliminado (estaba en Planificación sin dependencias).'
+            );
 
-        return $anioEscolar->delete();
+            return (bool) $anioEscolar->delete();
+        } catch (\Throwable $e) {
+            Log::error('Error al eliminar año escolar', [
+                'anio_escolar_id' => $anioEscolar->id,
+                'usuario_id' => $usuario?->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            throw new \RuntimeException('No fue posible eliminar el año escolar.', 0, $e);
+        }
     }
 
-    /**
-     * Obtiene el año escolar activo o crea uno por defecto si no existe (para desarrollo).
-     */
     public function obtenerOcrearActivo(?Usuario $usuario = null): AnioEscolar
     {
         $activo = AnioEscolar::obtenerActivo();
-        
         if ($activo) {
             return $activo;
         }
 
-        // Si no hay activo, buscar uno en planificación para activar
         $enPlanificacion = AnioEscolar::planificacion()->first();
-        
         if ($enPlanificacion) {
-            return $this->activar($enPlanificacion, $usuario);
+            return $this->activar($enPlanificacion,$usuario);
         }
 
-        // Como último recurso, crear uno por defecto (solo desarrollo)
         if (app()->environment('local', 'testing')) {
             $anio = now()->year;
+
             return $this->crear([
                 'nombre' => "{$anio}-" . ($anio + 1),
                 'fecha_inicio' => "{$anio}-02-01",
-                'fecha_fin' => ($anio + 1) . "-11-30",
-            ], $usuario);
+                'fecha_fin' => ($anio + 1) . '-11-30', ],$usuario);
         }
 
         throw new \RuntimeException('No hay año escolar activo ni en planificación para activar.');
     }
 
-    /**
-     * Registra auditoría de cambios en el año escolar.
-     * En producción, esto debería ir a una tabla de auditoría dedicada.
-     */
     protected function registrarAuditoria(
         AnioEscolar $anioEscolar,
         string $accion,
@@ -453,14 +418,22 @@ class AnioEscolarService
         string $descripcion,
         array $metadata = []
     ): void {
-        \Log::channel('auditoria')->info("AnioEscolar: {$accion}", array_merge([
-            'anio_escolar_id' => $anioEscolar->id,
-            'anio_escolar_nombre' => $anioEscolar->nombre,
-            'accion' => $accion,
-            'usuario_id' => $usuario?->id,
-            'usuario_nombre' => $usuario?->name,
-            'descripcion' => $descripcion,
-            'fecha' => now()->toISOString(),
-        ], $metadata));
+        try {
+            Log::channel('auditoria')->info("AnioEscolar: {$accion}", array_merge([
+                'anio_escolar_id' => $anioEscolar->id,
+                'anio_escolar_nombre' => $anioEscolar->nombre,
+                'accion' => $accion,
+                'usuario_id' => $usuario?->id,
+                'usuario_nombre' => $usuario?->nombre_completo ?? $usuario?->name,
+                'descripcion' => $descripcion,
+                'fecha' => now()->toISOString(),
+            ], $metadata));
+        } catch (\Throwable) {
+            Log::info("AnioEscolar: {$accion}", [
+                'anio_escolar_id' => $anioEscolar->id,
+                'usuario_id' => $usuario?->id,
+                'descripcion' => $descripcion,
+            ]);
+        }
     }
 }
