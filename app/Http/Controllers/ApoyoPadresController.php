@@ -4,31 +4,31 @@ namespace App\Http\Controllers;
 
 use App\Models\ApoyoPadres;
 use App\Models\Aula;
-use Illuminate\Http\Request;
+use App\Models\Usuario;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ApoyoPadresController extends Controller
 {
     use AuthorizesRequests;
 
-    /**
-     * Seguimiento de apoyo de padres por aula y mes.
-     */
     public function index(Request $request)
     {
         try {
             $this->authorize('viewAny', ApoyoPadres::class);
 
-            $usuario = auth()->user();
+            /** @var Usuario $usuario */
+            $usuario = Auth::user();
 
             $aulas = Aula::with(['grado', 'anioEscolar'])
                 ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'))
-                ->when($usuario->docente && !$usuario->hasRole(['Director', 'Subdirector']), function ($q) use ($usuario) {
+                ->when($usuario->docente && !$usuario->hasAnyRole(['directora', 'subdirectora', 'coordinador', 'Director', 'Subdirector', 'Coordinador']), function ($q) use ($usuario) {
                     $q->where('docente_guia_id', $usuario->docente->id);
                 })
                 ->get();
 
-            // Manejar caso sin aulas asignadas
             if ($aulas->isEmpty()) {
                 return view('academico.apoyo-padres.index', [
                     'aulas' => collect(),
@@ -38,42 +38,31 @@ class ApoyoPadresController extends Controller
             }
 
             $aulaSeleccionada = $request->query('aula_id', $aulas->first()->id);
-
-            $registros = collect();
-            if ($aulaSeleccionada) {
-                $registros = ApoyoPadres::where('aula_id', $aulaSeleccionada)
-                    ->orderBy('mes')
-                    ->get();
-            }
+            $registros = $aulaSeleccionada
+                ? ApoyoPadres::where('aula_id', $aulaSeleccionada)->orderBy('mes')->get()
+                : collect();
 
             return view('academico.apoyo-padres.index', compact('aulas', 'aulaSeleccionada', 'registros'));
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla la consulta de base de datos o permisos
-            return redirect()->route('dashboard')->with('error', 'Ocurrió un error al intentar cargar el módulo de Apoyo de Padres. Por favor, intenta de nuevo.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')->with('error', $this->formatearError($e, 'Ocurrió un error al intentar cargar el módulo de Apoyo de Padres.'));
         }
     }
 
-    /**
-     * Registra o actualiza el apoyo de padres de un aula en un mes.
-     */
     public function store(Request $request)
     {
-        // Se valida AFUERA del try-catch para mantener vivos los mensajes de validación del formulario
         $request->validate([
-            'aula_id' => 'required|exists:aula,id',
-            'mes' => 'required|date_format:Y-m',
-            'cantidad_apoyan' => 'required|integer|min:0',
-            'total_padres' => 'required|integer|min:1',
+            'aula_id' => ['required', 'integer', 'exists:aula,id'],
+            'mes' => ['required', 'date_format:Y-m'],
+            'cantidad_apoyan' => ['required', 'integer', 'min:0'],
+            'total_padres' => ['required', 'integer', 'min:1'],
         ]);
 
         try {
             $this->authorize('create', ApoyoPadres::class);
 
-            if ($request->cantidad_apoyan > $request->total_padres) {
+            if ((int) $request->cantidad_apoyan > (int) $request->total_padres) {
                 return back()->with('error', 'La cantidad de padres que apoyan no puede superar el total de padres.');
             }
 
@@ -89,34 +78,24 @@ class ApoyoPadresController extends Controller
             );
 
             return back()->with('success', 'Registro de apoyo de padres guardado correctamente.');
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si la base de datos falla al intentar guardar
-            return back()->withInput()->with('error', 'Hubo un problema al guardar el registro en la base de datos. Verifica la información e intenta de nuevo.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', $this->formatearError($e, 'Hubo un problema al guardar el registro de apoyo de padres.'));
         }
     }
 
-    /**
-     * Elimina un registro de apoyo de padres.
-     */
     public function destroy(ApoyoPadres $apoyo)
     {
         try {
             $this->authorize('delete', $apoyo);
-            
             $apoyo->delete();
 
             return back()->with('success', 'Registro de apoyo de padres eliminado.');
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla el borrado por algún problema interno de BD
-            return back()->with('error', 'No se pudo eliminar el registro. Es posible que el sistema esté protegiendo datos asociados.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'No se pudo eliminar el registro.'));
         }
     }
 }

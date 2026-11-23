@@ -2,36 +2,43 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Aula;
-use App\Models\BloqueHorario;
-use App\Models\Docente;
 use App\Http\Requests\StoreAulaRequest;
-use App\Services\AulaService; 
-use Illuminate\Http\Request;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Models\AnioEscolar;
+use App\Models\Asignatura;
+use App\Models\Aula;
 use App\Models\AulaAsignaturaDocente;
+use App\Models\BloqueHorario;
+use App\Models\CorteEvaluativo;
+use App\Models\Docente;
+use App\Models\Grado;
+use App\Models\MallaCurricular;
+use App\Models\Modalidad;
+use App\Models\Nota;
+use App\Models\Usuario;
+use App\Services\AulaService;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class AulaController extends Controller
 {
     use AuthorizesRequests;
 
-    protected $aulaService;
-
-    public function __construct(AulaService $aulaService)
-    {
-        $this->aulaService = $aulaService;
-    }
+    public function __construct(
+        protected AulaService $aulaService
+    ) {}
 
     private function getAulasPaginadas()
     {
-        $user = auth()->user();
+        /** @var Usuario $user */
+        $user = Auth::user();
         $query = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
-                     ->orderBy('anio_escolar_id', 'desc')
-                     ->orderBy('grado_id');
+            ->orderByDesc('anio_escolar_id')
+            ->orderBy('grado_id');
 
-        // Coordinador: solo aulas de su modalidad
-        if ($user->hasRole('Coordinador') && !$user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
+        if ($user->hasAnyRole(['coordinador', 'Coordinador']) && !$user->hasAnyRole(['directora', 'subdirectora', 'gestor_it', 'Director', 'Subdirector', 'Gestor de Usuarios'])) {
             $docente = $user->docente;
             if ($docente && $docente->modalidad_coordina_id) {
                 $query->where('modalidad_id', $docente->modalidad_coordina_id);
@@ -44,24 +51,20 @@ class AulaController extends Controller
     public function destroyAsignatura($aulaId, $asignacionId)
     {
         try {
-            // La barra invertida (\) fuerza a Laravel a buscar en la raíz del proyecto
-            $asignacion = \App\Models\AulaAsignaturaDocente::findOrFail($asignacionId);
+            $aula = Aula::findOrFail($aulaId);
+            $this->authorize('update', $aula);
+
+            $asignacion = AulaAsignaturaDocente::where('aula_id', $aula->id)->findOrFail($asignacionId);
             $asignacion->delete();
-            
+
             return back()->with('success', 'Asignatura eliminada de la carga horaria.');
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA
-            return back()->with('error', 'No se pudo eliminar la asignatura. Es posible que el registro ya no exista o haya un problema de conexión.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'No se pudo eliminar la asignatura de la carga horaria.'));
         }
     }
 
-    // =========================================================================
-    // 1. GESTIÓN DE AULAS (Estructura)
-    // =========================================================================
-    
     public function index()
     {
         try {
@@ -69,21 +72,18 @@ class AulaController extends Controller
             $aulas = $this->getAulasPaginadas();
 
             return view('academico.aulas.index', compact('aulas'));
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar el listado de aulas.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')->with('error', $this->formatearError($e, 'Ocurrió un error al cargar el listado de aulas.'));
         }
     }
 
     public function show(Aula $aula)
     {
         try {
-            // Authorization explícita - Policy maneja ownership (Docente Guía, Coordinador, etc.)
             $this->authorize('view', $aula);
 
-            // Carga óptima de relaciones del aula
             $aula->load([
                 'grado',
                 'modalidad',
@@ -92,16 +92,12 @@ class AulaController extends Controller
                 'matriculas.alumno',
             ]);
 
-            // Matrículas activas ordenadas por nombre del alumno
             $matriculas = $aula->matriculas->sortBy(fn ($m) => $m->alumno->nombre_completo ?? '');
-
-            // 4. Asignaturas y docentes asignados al aula, con sus bloques de horario
-            $asignaciones = AulaAsignaturaDocente::with(['asignatura', 'docente.usuario', 'horarios.bloque'])
+            $asignaciones = AulaAsignaturaDocente::with(['asignatura', 'docente.usuario', 'horarios.bloqueHorario'])
                 ->where('aula_id', $aula->id)
                 ->orderBy('id')
                 ->get();
 
-            // 5. Matriz de horario del aula (solo lectura para la pestaña correspondiente)
             $bloques = BloqueHorario::where('modalidad_id', $aula->modalidad_id)
                 ->where('turno', $aula->turno)
                 ->where('tipo_jornada', 'Regular')
@@ -122,22 +118,17 @@ class AulaController extends Controller
                 $fila = ['bloque' => $bloque, 'dias' => []];
                 foreach ($dias as $i => $dia) {
                     $diaBD = $diasBD[$i];
-                    $fila['dias'][$dia] = $bloque->es_recreo
-                        ? null
-                        : ($horariosIndex[$bloque->id][$diaBD] ?? null);
+                    $fila['dias'][$dia] = $bloque->es_recreo ? null : ($horariosIndex[$bloque->id][$diaBD] ?? null);
                 }
                 $matriz[] = $fila;
             }
 
-            // 6. Resumen de evaluaciones por corte (notas del aula)
             $matriculaIds = $matriculas->pluck('id');
-            $cortes = \App\Models\CorteEvaluativo::where('anio_escolar_id', $aula->anio_escolar_id)
-                ->orderBy('numero')
-                ->get();
+            $cortes = CorteEvaluativo::where('anio_escolar_id', $aula->anio_escolar_id)->orderBy('numero')->get();
 
             $evaluacionesPorCorte = [];
             foreach ($cortes as $corte) {
-                $notasCorte = \App\Models\Nota::whereIn('matricula_id', $matriculaIds)
+                $notasCorte = Nota::whereIn('matricula_id', $matriculaIds)
                     ->where('corte_evaluativo_id', $corte->id)
                     ->get();
 
@@ -151,7 +142,6 @@ class AulaController extends Controller
                 ];
             }
 
-            // Horas académicas totales asignadas (suma de horas_semanales de asignaciones activas)
             $horasTotales = $asignaciones->where('activo', true)->sum('horas_semanales');
 
             return view('academico.aulas.show', compact(
@@ -166,21 +156,10 @@ class AulaController extends Controller
                 'evaluacionesPorCorte',
                 'horasTotales'
             ));
-        } catch (\Exception $e) {
-            // REGISTRO DEL ERROR REAL para diagnóstico
-            \Illuminate\Support\Facades\Log::error('Error crítico en AulaController@show: ' . $e->getMessage(), [
-                'user_id' => auth()->id(),
-                'aula_id' => $aula->id,
-                'exception' => $e
-            ]);
-
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            if ($e instanceof HttpException) {
-                throw $e;
-            }
-            return redirect()->route('academico.aulas.index')->with('error', 'No se pudo cargar la información completa de esta aula. Intenta de nuevo.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('academico.aulas.index')->with('error', $this->formatearError($e, 'No se pudo cargar la información completa de esta aula.'));
         }
     }
 
@@ -189,60 +168,46 @@ class AulaController extends Controller
         try {
             $this->authorize('create', Aula::class);
 
-            $modalidades = \App\Models\Modalidad::all();
-            $grados = \App\Models\Grado::all();
-            
-            // Traemos TODOS los años escolares ordenados del más reciente al más antiguo
-            $anios = \App\Models\AnioEscolar::orderBy('nombre', 'desc')->get();
-            
-            // Si aún necesitas saber cuáles están activos para calcular los docentes ocupados vigentes:
-            $aniosActivosIds = \App\Models\AnioEscolar::where('estado', 'activo')->pluck('id');
-            
-            $docentesOcupados = Aula::whereIn('anio_escolar_id', $aniosActivosIds)
-                                        ->pluck('docente_guia_id')
-                                        ->toArray();
-
-            $docentes = \App\Models\Docente::with('usuario')
-                                        ->whereNotIn('id', $docentesOcupados)
-                                        ->get();
+            $modalidades = Modalidad::all();
+            $grados = Grado::all();
+            $anios = AnioEscolar::orderByDesc('nombre')->get();
+            $aniosActivosIds = AnioEscolar::where('estado', 'activo')->pluck('id');
+            $docentesOcupados = Aula::whereIn('anio_escolar_id', $aniosActivosIds)->pluck('docente_guia_id')->all();
+            $docentes = Docente::with('usuario')->whereNotIn('id', $docentesOcupados)->get();
 
             return view('academico.aulas.create', compact('modalidades', 'grados', 'anios', 'docentes'));
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return redirect()->route('academico.aulas.index')->with('error', 'Ocurrió un problema al abrir el formulario de apertura de aulas.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('academico.aulas.index')->with('error', $this->formatearError($e, 'Ocurrió un problema al abrir el formulario de apertura de aulas.'));
         }
     }
 
     public function store(StoreAulaRequest $request)
     {
-        // La validación del FormRequest ya se ejecutó de forma segura antes de entrar aquí
         $datos = $request->validated();
 
         try {
             $this->authorize('create', Aula::class);
 
-            // 🔒 FILTRO ANTI-DUPLICADOS (REGLA DE NEGOCIO ESTRICTA)
             $existeDuplicado = Aula::where('anio_escolar_id', $datos['anio_escolar_id'])
                 ->where('grado_id', $datos['grado_id'])
-                ->where('nombre', $datos['nombre']) // Identificador de la sección (A, B, etc.)
+                ->where('nombre', $datos['nombre'])
                 ->where('turno', $datos['turno'])
                 ->exists();
 
             if ($existeDuplicado) {
-                return back()->withInput()->with('error', '¡Bloqueo de seguridad! Ya existe un aula aperturada con esa misma combinación de Año Escolar, Grado, Sección y Turno.');
+                return back()->withInput()->with('error', 'Ya existe un aula aperturada con esa misma combinación de Año Escolar, Grado, Sección y Turno.');
             }
 
             $this->aulaService->crearAulaConMalla($datos);
 
             return redirect()->route('academico.aulas.index')
-                             ->with('success', 'Aula creada exitosamente. Las asignaturas de la malla curricular han sido asignadas automáticamente.');
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return back()->withInput()->with('error', 'Hubo un error inesperado al intentar crear el aula y asignar la malla curricular. Verifica los datos.');
+                ->with('success', 'Aula creada exitosamente. Las asignaturas de la malla curricular han sido asignadas automáticamente.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', $this->formatearError($e, 'Hubo un error inesperado al intentar crear el aula.'));
         }
     }
 
@@ -251,84 +216,66 @@ class AulaController extends Controller
         try {
             $this->authorize('update', $aula);
 
-            $modalidades = \App\Models\Modalidad::all();
-            $grados = \App\Models\Grado::all();
-            $anios = \App\Models\AnioEscolar::where('estado', 'activo')->get();
-            
+            $modalidades = Modalidad::all();
+            $grados = Grado::all();
+            $anios = AnioEscolar::where('estado', 'activo')->get();
             $docentesOcupados = Aula::where('anio_escolar_id', $aula->anio_escolar_id)
-                                    ->where('id', '!=', $aula->id)
-                                    ->pluck('docente_guia_id')
-                                    ->toArray();
-
-            $docentes = \App\Models\Docente::with('usuario')
-                                    ->whereNotIn('id', $docentesOcupados)
-                                    ->get();
+                ->where('id', '!=', $aula->id)
+                ->pluck('docente_guia_id')
+                ->all();
+            $docentes = Docente::with('usuario')->whereNotIn('id', $docentesOcupados)->get();
 
             return view('academico.aulas.edit', compact('aula', 'modalidades', 'grados', 'anios', 'docentes'));
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return redirect()->route('academico.aulas.index')->with('error', 'No se pudo cargar la información para editar esta aula.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('academico.aulas.index')->with('error', $this->formatearError($e, 'No se pudo cargar la información para editar esta aula.'));
         }
     }
 
     public function update(Request $request, Aula $aula)
     {
-        // Validación AFUERA del try-catch
         $validated = $request->validate([
-            'grado_id' => 'required|exists:grado,id',
-            'modalidad_id' => 'required|exists:modalidad,id',
-            'nombre' => 'required|string|max:20',
-            'turno' => 'required|string|max:20',
-            'cupo' => 'required|integer|min:1|max:50',
-            'anio_escolar_id' => 'required|exists:anio_escolar,id',
-            'docente_guia_id' => 'nullable|exists:docente,id',
+            'grado_id' => ['required', 'integer', 'exists:grado,id'],
+            'modalidad_id' => ['required', 'integer', 'exists:modalidad,id'],
+            'nombre' => ['required', 'string', 'max:20'],
+            'turno' => ['required', 'string', 'max:20'],
+            'cupo' => ['required', 'integer', 'min:1', 'max:50'],
+            'anio_escolar_id' => ['required', 'integer', 'exists:anio_escolar,id'],
+            'docente_guia_id' => ['nullable', 'integer', 'exists:docente,id'],
         ]);
 
         try {
             $this->authorize('update', $aula);
 
-            // Detectar si cambió el grado para re-sincronizar las asignaturas de la malla
-            $cambioGrado = $aula->grado_id !== (int) $validated['grado_id'];
-
+            $cambioGrado = (int) $aula->grado_id !== (int) $validated['grado_id'];
             $aula->update($validated);
 
             if ($cambioGrado) {
                 $this->aulaService->sincronizarMalla($aula);
             }
 
-            return redirect()->route('academico.aulas.index')
-                             ->with('success', 'Aula actualizada exitosamente.');
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return back()->withInput()->with('error', 'Ocurrió un problema al intentar actualizar el aula en la base de datos.');
+            return redirect()->route('academico.aulas.index')->with('success', 'Aula actualizada exitosamente.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', $this->formatearError($e, 'Ocurrió un problema al intentar actualizar el aula.'));
         }
     }
 
-    public function destroy(\App\Models\Aula $aula)
+    public function destroy(Aula $aula)
     {
         try {
             $this->authorize('delete', $aula);
-            
             $this->aulaService->eliminarAula($aula);
-            return redirect()->route('academico.aulas.index')
-                             ->with('success', 'Aula eliminada correctamente junto con sus asignaturas y matrículas.');
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // Este catch funciona perfecto como contingencia general y de integridad de BD
-            return back()->with('error', 'No se pudo eliminar el aula. Asegúrate de que no existan registros protegidos asociados a ella.');
+
+            return redirect()->route('academico.aulas.index')->with('success', 'Aula eliminada correctamente.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'No se pudo eliminar el aula.'));
         }
     }
-
-
-    // =========================================================================
-    // 2. GESTOR DE ASIGNACIONES (Módulo Independiente)
-    // =========================================================================
 
     public function indexAsignaciones()
     {
@@ -336,79 +283,69 @@ class AulaController extends Controller
             $this->authorize('viewAny', Aula::class);
             $aulas = $this->getAulasPaginadas();
 
-            // Datos para el Asignador Masivo por Materia y Nivel
             $todasAulasActivas = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
-                ->whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))
+                ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'))
                 ->orderBy('modalidad_id')
                 ->orderBy('grado_id')
                 ->orderBy('nombre')
                 ->get();
 
-            $asignaturas = \App\Models\Asignatura::orderBy('nombre')->get();
-            $docentes = \App\Models\Docente::with('usuario')->get()->sortBy(fn($d) => $d->usuario->nombre_completo ?? '');
-            $modalidades = \App\Models\Modalidad::orderBy('id')->get();
-
-            // Mapa de qué grados llevan cada asignatura en la Malla Curricular para auto-sugerir aulas
-            $mallaPorAsignatura = \App\Models\MallaCurricular::select('asignatura_id', 'grado_id')
+            $asignaturas = Asignatura::orderBy('nombre')->get();
+            $docentes = Docente::with('usuario')->get()->sortBy(fn ($d) => $d->usuario->nombre_completo ?? '');
+            $modalidades = Modalidad::orderBy('id')->get();
+            $mallaPorAsignatura = MallaCurricular::select('asignatura_id', 'grado_id')
                 ->get()
                 ->groupBy('asignatura_id')
-                ->map(fn($items) => $items->pluck('grado_id')->values());
+                ->map(fn ($items) => $items->pluck('grado_id')->values());
 
             return view('academico.asignaciones.index', compact(
-                'aulas', 'todasAulasActivas', 'asignaturas', 'docentes', 'modalidades', 'mallaPorAsignatura'
+                'aulas',
+                'todasAulasActivas',
+                'asignaturas',
+                'docentes',
+                'modalidades',
+                'mallaPorAsignatura'
             ));
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return redirect()->route('dashboard')->with('error', 'Hubo un error al intentar cargar el panel de asignaciones.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')->with('error', $this->formatearError($e, 'Hubo un error al intentar cargar el panel de asignaciones.'));
         }
     }
 
     public function showAsignaciones(Aula $aula)
     {
         try {
-            // Authorization explícita - Policy Aula maneja ownership (Docente Guía, Coordinador, etc.)
             $this->authorize('view', $aula);
-
             $aula->load(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario']);
 
-            $asignaciones = \App\Models\AulaAsignaturaDocente::with(['asignatura', 'docente.usuario'])
-                                ->where('aula_id', $aula->id)
-                                ->get();
+            $asignaciones = AulaAsignaturaDocente::with(['asignatura', 'docente.usuario'])
+                ->where('aula_id', $aula->id)
+                ->get();
 
-            $asignaturasYaAsignadas = $asignaciones->pluck('asignatura_id')->toArray();
-            $todasAsignaturas = \App\Models\Asignatura::whereNotIn('id', $asignaturasYaAsignadas)->get();
-
-            $todosDocentes = \App\Models\Docente::with('usuario')->get();
+            $asignaturasYaAsignadas = $asignaciones->pluck('asignatura_id')->all();
+            $todasAsignaturas = Asignatura::whereNotIn('id', $asignaturasYaAsignadas)->get();
+            $todosDocentes = Docente::with('usuario')->get();
 
             return view('academico.asignaciones.show', compact('aula', 'asignaciones', 'todosDocentes', 'todasAsignaturas'));
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return redirect()->route('academico.asignaciones.index')->with('error', 'No pudimos cargar los detalles de asignación para esta aula.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('academico.asignaciones.index')->with('error', $this->formatearError($e, 'No pudimos cargar los detalles de asignación para esta aula.'));
         }
     }
-
-
-    // =========================================================================
-    // 3. GESTOR DE HORARIOS
-    // =========================================================================
 
     public function indexHorarios()
     {
         try {
-            $this->authorize('viewAny', Aula::class); 
+            $this->authorize('viewAny', Aula::class);
             $aulas = $this->getAulasPaginadas();
 
-            // Apuntamos a la nueva vista exclusiva de horarios
             return view('academico.gestor-horarios.index', compact('aulas'));
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return redirect()->route('dashboard')->with('error', 'Ocurrió un error inesperado al intentar abrir el Gestor de Horarios.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')->with('error', $this->formatearError($e, 'Ocurrió un error inesperado al intentar abrir el Gestor de Horarios.'));
         }
     }
 }

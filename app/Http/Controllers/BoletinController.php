@@ -2,58 +2,52 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AsistenciaAula;
 use App\Models\Aula;
+use App\Models\AulaAsignaturaDocente;
 use App\Models\Boletin;
+use App\Models\CorteEvaluativo;
+use App\Models\EvaluacionFamiliar;
+use App\Models\GrupoMateria;
 use App\Models\Matricula;
 use App\Models\Nota;
-use App\Models\AulaAsignaturaDocente;
-use App\Models\CorteEvaluativo;
-use App\Models\AsistenciaAula;
+use App\Models\Usuario;
 use App\Services\NotaService;
-use Illuminate\Http\Request;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class BoletinController extends Controller
 {
     use AuthorizesRequests;
 
-    protected $notaService;
+    public function __construct(
+        protected NotaService $notaService
+    ) {}
 
-    public function __construct(NotaService $notaService)
-    {
-        $this->notaService = $notaService;
-    }
-
-    /**
-     * Listado de aulas / alumnos para generar boletines.
-     */
     public function index(Request $request)
     {
         try {
             $this->authorize('viewAny', Boletin::class);
-            $usuario = auth()->user();
-
+            /** @var Usuario $usuario */
+            $usuario = Auth::user();
             $aulas = $this->getAulasScope($usuario);
 
-            // Manejar caso sin aulas
             if ($aulas->isEmpty()) {
-                return view('academico.boletines.index', [
+                return view('academico.boletin.index', [
                     'aulas' => collect(),
                     'aulaSeleccionada' => null,
                     'aulaActual' => null,
                     'matriculas' => collect(),
                     'todosAprobados' => false,
-                    'corteActivo' => null,
                 ]);
             }
 
             $aulaSeleccionada = $request->query('aula_id', $aulas->first()->id);
-
             $aulaActual = $aulas->firstWhere('id', $aulaSeleccionada);
-
             $matriculas = collect();
             $todosAprobados = false;
-            $corteActivo = null;
 
             if ($aulaSeleccionada) {
                 $anioEscolarId = Aula::where('id', $aulaSeleccionada)->value('anio_escolar_id');
@@ -62,51 +56,48 @@ class BoletinController extends Controller
                 $corteActivo = CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)
                     ->where('fecha_inicio', '<=', $hoy)
                     ->where('fecha_fin', '>=', $hoy)
-                    ->first() ?? CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)->orderBy('numero', 'desc')->first();
+                    ->first() ?? CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)->orderByDesc('numero')->first();
 
-                $matriculas = Matricula::with(['alumno', 'boletines' => function($q) use ($corteActivo) {
+                $matriculas = Matricula::with(['alumno', 'boletines' => function ($q) use ($corteActivo) {
                     if ($corteActivo) {
                         $q->where('corte_evaluativo_id', $corteActivo->id);
                     }
                 }])
-                ->where('aula_id', $aulaSeleccionada)
-                ->where('estado', 'activo')
-                ->orderBy('id')
-                ->get();
+                    ->where('aula_id', $aulaSeleccionada)
+                    ->where('estado', 'activo')
+                    ->orderBy('id')
+                    ->get();
 
-                // Validar si todos los alumnos activos tienen el boletín en caja para este corte
                 if ($matriculas->isNotEmpty() && $corteActivo) {
-                    $todosAprobados = $matriculas->every(fn($m) => $m->boletines->isNotEmpty());
+                    $todosAprobados = $matriculas->every(fn ($m) => $m->boletines->isNotEmpty());
                 }
             }
 
             return view('academico.boletin.index', compact('aulas', 'aulaSeleccionada', 'aulaActual', 'matriculas', 'todosAprobados'));
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si fallan las relaciones de base de datos al armar el panel
-            return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar el panel de boletines. Por favor, intenta nuevamente.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')->with('error', $this->formatearError($e, 'Ocurrió un error al cargar el panel de boletines.'));
         }
     }
 
     public function aprobarBoletin(Request $request, Matricula $matricula)
     {
         try {
+            $this->authorize('update', $matricula);
+
             $anioEscolarId = $matricula->anio_escolar_id;
             $hoy = now()->timezone('America/Managua')->toDateString();
-            
+
             $corteActivo = CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)
                 ->where('fecha_inicio', '<=', $hoy)
                 ->where('fecha_fin', '>=', $hoy)
-                ->first() ?? CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)->orderBy('numero', 'desc')->first();
+                ->first() ?? CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)->orderByDesc('numero')->first();
 
             if (!$corteActivo) {
                 return back()->with('error', 'No hay un corte evaluativo activo para validar calificaciones.');
             }
 
-            // 1. REGLA: Verificar que todas las asignaturas de esta aula tengan nota para este alumno
             $asignacionesIds = AulaAsignaturaDocente::where('aula_id', $matricula->aula_id)
                 ->where('anio_escolar_id', $anioEscolarId)
                 ->pluck('id');
@@ -114,14 +105,17 @@ class BoletinController extends Controller
             $notasRegistradas = Nota::where('matricula_id', $matricula->id)
                 ->where('corte_evaluativo_id', $corteActivo->id)
                 ->whereIn('aula_asignatura_docente_id', $asignacionesIds)
-                ->whereNotNull('nota_cuantitativa')
+                ->where(function ($q) {
+                    $q->whereNotNull('nota_cuantitativa')
+                        ->orWhereNotNull('indicador_logro_id')
+                        ->orWhereNotNull('porcentaje_avance');
+                })
                 ->pluck('aula_asignatura_docente_id');
 
             if ($notasRegistradas->count() < $asignacionesIds->count()) {
-                return back()->with('error', 'No se puede dar el Visto Bueno. El estudiante tiene asignaturas pendientes sin nota registrada en este corte.');
+                return back()->with('error', 'No se puede dar el Visto Bueno. El estudiante tiene asignaturas pendientes en este corte.');
             }
 
-            // 2. Guardar en la caja institucional
             Boletin::updateOrCreate(
                 [
                     'matricula_id' => $matricula->id,
@@ -134,19 +128,13 @@ class BoletinController extends Controller
             );
 
             return back()->with('success', 'Boletín verificado y guardado en la caja del aula correctamente.');
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Protege el updateOrCreate y las validaciones de conteo de notas
-            return back()->with('error', 'Hubo un problema al intentar validar y aprobar el boletín. Verifica los datos e intenta de nuevo.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'Hubo un problema al intentar validar y aprobar el boletín.'));
         }
     }
 
-    /**
-     * Muestra el boletín de un alumno (vista imprimible, se guarda como PDF vía el navegador).
-     */
     public function show(Request $request, Matricula $matricula)
     {
         try {
@@ -161,48 +149,34 @@ class BoletinController extends Controller
             ]);
 
             $anioEscolarId = $matricula->anio_escolar_id;
-
-            // Cortes evaluativos del año (ordenados por número: I, II, III, IV)
-            $cortes = CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)
-                ->orderBy('numero')
-                ->get();
-
-            // CORRECCIÓN 1: Obtener el corte ACTIVO basándonos en la fecha actual
+            $cortes = CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)->orderBy('numero')->get();
             $hoy = now()->timezone('America/Managua')->toDateString();
-            
+
             $corteActual = $request->query('corte_evaluativo_id')
-                ? $cortes->firstWhere('id', $request->query('corte_evaluativo_id'))
-                : ($cortes->first(fn($c) => $c->fecha_inicio <= $hoy && $c->fecha_fin >= $hoy) ?? $cortes->last());
+                ? $cortes->firstWhere('id', (int) $request->query('corte_evaluativo_id'))
+                : ($cortes->first(fn ($c) => $c->fecha_inicio <= $hoy && $c->fecha_fin >= $hoy) ?? $cortes->last());
 
             $numeroActual = $corteActual->numero ?? 1;
 
-            // Asignaturas de esta aula en el año activo
             $asignaciones = AulaAsignaturaDocente::with('asignatura.grupoMateria')
                 ->where('aula_id', $matricula->aula_id)
                 ->where('anio_escolar_id', $anioEscolarId)
                 ->get();
 
-            // Mapa de corte numérico -> id
             $cortePorNumero = $cortes->keyBy('numero');
-
-            // Construir la estructura por áreas reales (campo 'area' de la asignatura).
             $areas = [];
             $acumuladoCortes = [1 => [], 2 => [], 3 => [], 4 => []];
 
             foreach ($asignaciones as $asignacion) {
-                // Resumen integrado por asignatura (cortes, semestres, nota final, aprobado)
                 $resumen = $this->notaService->calcularResumenAsignatura($matricula, $asignacion);
-
                 $cortesData = [1 => null, 2 => null, 3 => null, 4 => null];
-                $notasFinales = [];
+
                 foreach ([1, 2, 3, 4] as $numero) {
                     if (isset($resumen['cortes'][$numero]) && $resumen['cortes'][$numero] !== null) {
                         $cuan = (float) $resumen['cortes'][$numero];
                         $cua = $this->notaService->calcularIndicadorLogro((int) round($cuan));
-
                         $cortesData[$numero] = ['cua' => $cua, 'cuan' => number_format($cuan, 0)];
                         $acumuladoCortes[$numero][] = $cuan;
-                        $notasFinales[$numero] = $cuan;
                     }
                 }
 
@@ -212,7 +186,6 @@ class BoletinController extends Controller
                     : null;
 
                 $area = $asignacion->asignatura->grupoMateria->nombre ?? 'Otros';
-
                 $areas[$area][] = [
                     'nombre' => $asignacion->asignatura->nombre,
                     'cortes' => $cortesData,
@@ -221,19 +194,13 @@ class BoletinController extends Controller
                 ];
             }
 
-            // Ordenar las áreas según el 'orden' del grupo de materia.
-            $ordenGrupos = \App\Models\GrupoMateria::pluck('orden', 'nombre')->toArray();
-            uksort($areas, function ($a, $b) use ($ordenGrupos) {
-                $oa = $ordenGrupos[$a] ?? 999;
-                $ob = $ordenGrupos[$b] ?? 999;
-                return $oa <=> $ob;
-            });
+            $ordenGrupos = GrupoMateria::pluck('orden', 'nombre')->all();
+            uksort($areas, fn ($a, $b) => ($ordenGrupos[$a] ?? 999) <=> ($ordenGrupos[$b] ?? 999));
 
-            // Promedios por corte
             $promedios = [];
             foreach ([1, 2, 3, 4] as $numero) {
                 $valores = $acumuladoCortes[$numero];
-                if (count($valores) > 0) {
+                if ($valores !== []) {
                     $promCuan = round(array_sum($valores) / count($valores), 2);
                     $promedios[$numero] = [
                         'cua' => $this->notaService->calcularIndicadorLogro((int) round($promCuan)),
@@ -244,7 +211,6 @@ class BoletinController extends Controller
                 }
             }
 
-            // CORRECCIÓN 2: Asistencia por corte (solo procesar hasta el parcial actual)
             $asistencia = [];
             foreach ([1, 2, 3, 4] as $numero) {
                 if ($numero <= $numeroActual) {
@@ -260,16 +226,12 @@ class BoletinController extends Controller
                         'justificadas' => $registros->where('estado_asistencia', 'Ausencia Justificada')->count(),
                     ];
                 } else {
-                    $asistencia[$numero] = [
-                        'injustificadas' => '',
-                        'justificadas' => '',
-                    ];
+                    $asistencia[$numero] = ['injustificadas' => '', 'justificadas' => ''];
                 }
             }
 
             $compromiso = [];
-            $evaluacionesReales = \App\Models\EvaluacionFamiliar::where('matricula_id', $matricula->id)->get();
-
+            $evaluacionesReales = EvaluacionFamiliar::where('matricula_id', $matricula->id)->get();
             foreach ([1, 2, 3, 4] as $numero) {
                 if ($numero <= $numeroActual) {
                     $corte = $cortePorNumero->get($numero);
@@ -279,36 +241,29 @@ class BoletinController extends Controller
                     $compromiso[$numero] = '';
                 }
             }
-            
-            return view('academico.boletin.show', compact(
-                'matricula', 'areas', 'promedios', 'asistencia', 'compromiso', 'corteActual'
-            ));
 
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si hay fallos matemáticos, servicios no disponibles o datos vacíos
-            return back()->with('error', 'Ocurrió un error al generar el boletín. Es posible que falten datos de calificaciones o asistencia para procesar el documento.');
+            return view('academico.boletin.show', compact(
+                'matricula',
+                'areas',
+                'promedios',
+                'asistencia',
+                'compromiso',
+                'corteActual'
+            ));
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'Ocurrió un error al generar el boletín.'));
         }
     }
 
-    /**
-     * Registro académico / constancia de notas del alumno (para trámites).
-     * Muestra una transcripción imprimible con todas las asignaturas,
-     * su nota por corte, nota final y promedio general.
-     */
     public function constancia(Request $request, Matricula $matricula)
     {
         try {
             $this->authorize('view', $matricula);
-
             $matricula->load(['alumno', 'aula.grado', 'aula.modalidad', 'aula.docenteGuia.usuario', 'anioEscolar']);
 
-            $cortes = CorteEvaluativo::where('anio_escolar_id', $matricula->anio_escolar_id)
-                ->orderBy('numero')
-                ->get();
-
+            $cortes = CorteEvaluativo::where('anio_escolar_id', $matricula->anio_escolar_id)->orderBy('numero')->get();
             $asignaciones = AulaAsignaturaDocente::with('asignatura.grupoMateria')
                 ->where('aula_id', $matricula->aula_id)
                 ->where('anio_escolar_id', $matricula->anio_escolar_id)
@@ -316,9 +271,9 @@ class BoletinController extends Controller
 
             $filas = [];
             $promediosFinales = [];
+
             foreach ($asignaciones as $asignacion) {
                 $resumen = $this->notaService->calcularResumenAsignatura($matricula, $asignacion);
-
                 $cortesValores = [];
                 foreach ($cortes as $corte) {
                     $cortesValores[$corte->numero] = $resumen['cortes'][$corte->numero] ?? null;
@@ -338,50 +293,38 @@ class BoletinController extends Controller
                 }
             }
 
-            $promedioGeneral = count($promediosFinales) > 0
+            $promedioGeneral = $promediosFinales !== []
                 ? round(array_sum($promediosFinales) / count($promediosFinales), 2)
                 : null;
 
             return view('academico.boletin.constancia', compact('matricula', 'cortes', 'filas', 'promedioGeneral'));
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si el servicio de notas falla o el alumno no tiene el historial completo
-            return back()->with('error', 'No se pudo generar la constancia de notas. Verifica que el estudiante tenga un historial académico válido.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'No se pudo generar la constancia de notas.'));
         }
     }
 
-    /**
-     * Scope centralizado para aulas según ownership del usuario
-     */
-    protected function getAulasScope(\App\Models\Usuario $usuario)
+    protected function getAulasScope(Usuario $usuario)
     {
-        $query = \App\Models\Aula::with(['grado', 'anioEscolar'])
+        $query = Aula::with(['grado', 'anioEscolar'])
             ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'));
 
-        // Super-admin (Director/Subdirector/Gestor/Secretaria/Coordinador) ven todas las aulas del año activo
-        if ($usuario->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Secretaria', 'Coordinador'])) {
+        if ($usuario->hasAnyRole(['directora', 'subdirectora', 'gestor_it', 'secretaria', 'coordinador', 'Director', 'Subdirector', 'Gestor de Usuarios', 'Secretaria', 'Coordinador'])) {
             return $query->get();
         }
 
-        // Docente Guía: solo su aula
-        if ($usuario->hasRole('Docente Guia')) {
-            $docente = $usuario->docente;
-            if ($docente) {
-                return $query->where('docente_guia_id', $docente->id)->get();
-            }
+        $docente = $usuario->docente;
+        if (!$docente) {
             return collect();
         }
 
-        // Docente por Asignatura: aulas donde imparte
-        if ($usuario->hasRole('Docente por Asignatura')) {
-            $docente = $usuario->docente;
-            if ($docente) {
-                return $query->whereHas('asignaciones', fn($q) => $q->where('docente_id', $docente->id)->where('activo', true))->get();
-            }
-            return collect();
+        if ($usuario->hasAnyRole(['docente_guia', 'Docente Guia'])) {
+            return $query->where('docente_guia_id', $docente->id)->get();
+        }
+
+        if ($usuario->hasAnyRole(['docente_asignatura', 'docente_auxiliar', 'docente_suplente', 'Docente por Asignatura'])) {
+            return $query->whereHas('asignaciones', fn ($q) => $q->where('docente_id', $docente->id)->where('activo', true))->get();
         }
 
         return collect();

@@ -2,41 +2,38 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Matricula;
-use App\Models\CorteEvaluativo;
-use App\Models\AulaAsignaturaDocente;
-use App\Models\Nota;
 use App\Models\AsistenciaAula;
+use App\Models\Aula;
+use App\Models\AulaAsignaturaDocente;
+use App\Models\CorteEvaluativo;
 use App\Models\EvaluacionFamiliar;
 use App\Models\GrupoMateria;
+use App\Models\Matricula;
 use App\Services\NotaService;
 use App\Services\ReporteService;
-use Illuminate\Http\Request;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use ZipArchive;
 
 class BoletinPdfController extends Controller
 {
     use AuthorizesRequests;
 
-    protected $notaService;
-    protected $reporteService;
+    public function __construct(
+        protected NotaService $notaService,
+        protected ReporteService $reporteService
+    ) {}
 
-    public function __construct(NotaService $notaService, ReporteService $reporteService)
-    {
-        $this->notaService = $notaService;
-        $this->reporteService = $reporteService;
-    }
-
-    /**
-     * Generar PDF del boletín de un alumno para un corte específico.
-     */
     public function boletin(Request $request, Matricula $matricula)
     {
         try {
             $this->authorize('view', $matricula);
 
-            $data = $this->prepareBoletinData($matricula, $request->query('corte_evaluativo_id'));
+            $corteParam = $request->query('corte_evaluativo_id');
+            $data = $this->prepareBoletinData($matricula, $corteParam ? (int) $corteParam : null);
             $data['logo'] = $this->logoDataUri();
 
             $pdf = Pdf::loadView('pdf.boletin', $data)
@@ -50,25 +47,19 @@ class BoletinPdfController extends Controller
             $filename = "boletin_{$matricula->alumno->codigo_unico_persona}_corte{$data['corteActual']->numero}_{$data['matricula']->anioEscolar->nombre}.pdf";
 
             return $pdf->download($filename);
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA
-            return back()->with('error', 'No se pudo generar el boletín en PDF. Verifica los datos e intenta de nuevo.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'No se pudo generar el boletín en PDF.'));
         }
     }
 
-    /**
-     * Generar PDF de constancia de notas (historial académico).
-     */
     public function constancia(Request $request, Matricula $matricula)
     {
         try {
             $this->authorize('view', $matricula);
 
             $data = $this->prepareConstanciaData($matricula);
-
             $pdf = Pdf::loadView('pdf.constancia', $data)
                 ->setPaper('letter', 'landscape')
                 ->setOptions([
@@ -80,26 +71,19 @@ class BoletinPdfController extends Controller
             $filename = "constancia_notas_{$matricula->alumno->codigo_unico_persona}_{$data['matricula']->anioEscolar->nombre}.pdf";
 
             return $pdf->download($filename);
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA
-            return back()->with('error', 'No se pudo generar la constancia de notas en PDF. Verifica los datos e intenta de nuevo.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'No se pudo generar la constancia de notas en PDF.'));
         }
     }
 
-    /**
-     * Generar PDF de certificado de notas (formato oficial MINED comparativo:
-     * grado de la matrícula + grado inmediatamente anterior).
-     */
     public function certificado(Request $request, Matricula $matricula)
     {
         try {
             $this->authorize('view', $matricula);
 
             $data = $this->datosCertificado($matricula);
-
             $pdf = Pdf::loadView('pdf.certificado_notas', $data)
                 ->setPaper('letter', 'portrait')
                 ->setOptions([
@@ -111,37 +95,28 @@ class BoletinPdfController extends Controller
             $filename = "certificado_notas_{$matricula->alumno->codigo_unico_persona}_{$matricula->anioEscolar->nombre}.pdf";
 
             return $pdf->download($filename);
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA
-            return back()->with('error', 'No se pudo generar el certificado de notas en PDF. Verifica los datos e intenta de nuevo.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'No se pudo generar el certificado de notas en PDF.'));
         }
     }
 
-    /**
-     * Generar PDFs masivos para un aula completa (ZIP).
-     */
     public function masivo(Request $request)
     {
-        // Validación AFUERA del try-catch
         $request->validate([
-            'aula_id' => 'required|exists:aula,id',
-            'corte_evaluativo_id' => 'nullable|exists:corte_evaluativo,id',
-            'tipo' => 'required|in:boletin,constancia,certificado',
+            'aula_id' => ['required', 'integer', 'exists:aula,id'],
+            'corte_evaluativo_id' => ['nullable', 'integer', 'exists:corte_evaluativo,id'],
+            'tipo' => ['required', 'in:boletin,constancia,certificado'],
         ]);
 
         try {
-            // La generación masiva puede tardar: liberamos el bloqueo de sesión
-            // para que el resto de la aplicación siga respondiendo a este usuario,
-            // y ampliamos los límites de ejecución del proceso.
             session()->save();
             @set_time_limit(0);
             @ini_set('memory_limit', '512M');
 
-            $aula = \App\Models\Aula::with(['grado', 'anioEscolar'])->findOrFail($request->aula_id);
-            $corteId = $request->corte_evaluativo_id;
+            $aula = Aula::with(['grado', 'anioEscolar'])->findOrFail($request->aula_id);
+            $corteId = $request->corte_evaluativo_id ? (int) $request->corte_evaluativo_id : null;
 
             $matriculas = Matricula::with('alumno')
                 ->where('aula_id', $aula->id)
@@ -153,15 +128,15 @@ class BoletinPdfController extends Controller
                 return back()->with('error', 'No hay estudiantes matriculados en esta sección.');
             }
 
-            $zip = new \ZipArchive();
+            $zip = new ZipArchive();
             $zipName = "{$request->tipo}s_{$aula->nombre}_{$aula->grado->nombre}_{$aula->anioEscolar->nombre}.zip";
             $tempPath = storage_path("app/temp/{$zipName}");
 
-            if (!file_exists(dirname($tempPath))) {
+            if (!is_dir(dirname($tempPath))) {
                 mkdir(dirname($tempPath), 0755, true);
             }
 
-            if ($zip->open($tempPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            if ($zip->open($tempPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
                 return back()->with('error', 'No se pudo crear el archivo ZIP.');
             }
 
@@ -170,49 +145,34 @@ class BoletinPdfController extends Controller
                     $pdfContent = $this->generatePdfContent($matricula, $request->tipo, $corteId);
                     $filename = $this->getPdfFilename($matricula, $request->tipo, $corteId);
                     $zip->addFromString($filename, $pdfContent);
-                } catch (\Exception $e) {
-                    if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                        throw $e;
-                    }
-                    \Log::error("Error generando PDF para {$matricula->alumno->nombre_completo}: " . $e->getMessage());
+                } catch (AuthorizationException $e) {
+                    throw $e;
+                } catch (\Throwable $e) {
+                    Log::error("Error generando PDF masivo para matrícula {$matricula->id}: " . $e->getMessage());
                 }
             }
 
             $zip->close();
 
             return response()->download($tempPath)->deleteFileAfterSend(true);
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA
-            return back()->with('error', 'Ocurrió un error al generar los PDFs masivos. Verifica la sección e intenta de nuevo.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'Ocurrió un error al generar los PDFs masivos.'));
         }
     }
 
-    /**
-     * Preparar datos para el boletín (reutiliza lógica de BoletinController).
-     */
     protected function prepareBoletinData(Matricula $matricula, ?int $corteId = null): array
     {
-        $matricula->load([
-            'alumno',
-            'aula.grado',
-            'aula.modalidad',
-            'aula.docenteGuia.usuario',
-            'anioEscolar',
-        ]);
+        $matricula->load(['alumno', 'aula.grado', 'aula.modalidad', 'aula.docenteGuia.usuario', 'anioEscolar']);
 
         $anioEscolarId = $matricula->anio_escolar_id;
-        $cortes = CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)
-            ->orderBy('numero')
-            ->get();
-
+        $cortes = CorteEvaluativo::where('anio_escolar_id', $anioEscolarId)->orderBy('numero')->get();
         $hoy = now()->timezone('America/Managua')->toDateString();
 
         $corteActual = $corteId
             ? $cortes->firstWhere('id', $corteId)
-            : ($cortes->first(fn($c) => $c->fecha_inicio <= $hoy && $c->fecha_fin >= $hoy) ?? $cortes->last());
+            : ($cortes->first(fn ($c) => $c->fecha_inicio <= $hoy && $c->fecha_fin >= $hoy) ?? $cortes->last());
 
         $numeroActual = $corteActual->numero ?? 1;
 
@@ -227,17 +187,14 @@ class BoletinPdfController extends Controller
 
         foreach ($asignaciones as $asignacion) {
             $resumen = $this->notaService->calcularResumenAsignatura($matricula, $asignacion);
-
             $cortesData = [1 => null, 2 => null, 3 => null, 4 => null];
-            $notasFinales = [];
+
             foreach ([1, 2, 3, 4] as $numero) {
                 if (isset($resumen['cortes'][$numero]) && $resumen['cortes'][$numero] !== null) {
                     $cuan = (float) $resumen['cortes'][$numero];
                     $cua = $this->notaService->calcularIndicadorLogro((int) round($cuan));
-
                     $cortesData[$numero] = ['cua' => $cua, 'cuan' => number_format($cuan, 0)];
                     $acumuladoCortes[$numero][] = $cuan;
-                    $notasFinales[$numero] = $cuan;
                 }
             }
 
@@ -247,7 +204,6 @@ class BoletinPdfController extends Controller
                 : null;
 
             $area = $asignacion->asignatura->grupoMateria->nombre ?? 'Otros';
-
             $areas[$area][] = [
                 'nombre' => $asignacion->asignatura->nombre,
                 'cortes' => $cortesData,
@@ -256,17 +212,13 @@ class BoletinPdfController extends Controller
             ];
         }
 
-        $ordenGrupos = GrupoMateria::pluck('orden', 'nombre')->toArray();
-        uksort($areas, function ($a, $b) use ($ordenGrupos) {
-            $oa = $ordenGrupos[$a] ?? 999;
-            $ob = $ordenGrupos[$b] ?? 999;
-            return $oa <=> $ob;
-        });
+        $ordenGrupos = GrupoMateria::pluck('orden', 'nombre')->all();
+        uksort($areas, fn ($a, $b) => ($ordenGrupos[$a] ?? 999) <=> ($ordenGrupos[$b] ?? 999));
 
         $promedios = [];
         foreach ([1, 2, 3, 4] as $numero) {
             $valores = $acumuladoCortes[$numero];
-            if (count($valores) > 0) {
+            if ($valores !== []) {
                 $promCuan = round(array_sum($valores) / count($valores), 2);
                 $promedios[$numero] = [
                     'cua' => $this->notaService->calcularIndicadorLogro((int) round($promCuan)),
@@ -292,10 +244,7 @@ class BoletinPdfController extends Controller
                     'justificadas' => $registros->where('estado_asistencia', 'Ausencia Justificada')->count(),
                 ];
             } else {
-                $asistencia[$numero] = [
-                    'injustificadas' => '',
-                    'justificadas' => '',
-                ];
+                $asistencia[$numero] = ['injustificadas' => '', 'justificadas' => ''];
             }
         }
 
@@ -323,17 +272,11 @@ class BoletinPdfController extends Controller
         ];
     }
 
-    /**
-     * Preparar datos para constancia de notas.
-     */
     protected function prepareConstanciaData(Matricula $matricula): array
     {
         $matricula->load(['alumno', 'aula.grado', 'aula.modalidad', 'aula.docenteGuia.usuario', 'anioEscolar']);
 
-        $cortes = CorteEvaluativo::where('anio_escolar_id', $matricula->anio_escolar_id)
-            ->orderBy('numero')
-            ->get();
-
+        $cortes = CorteEvaluativo::where('anio_escolar_id', $matricula->anio_escolar_id)->orderBy('numero')->get();
         $asignaciones = AulaAsignaturaDocente::with('asignatura.grupoMateria')
             ->where('aula_id', $matricula->aula_id)
             ->where('anio_escolar_id', $matricula->anio_escolar_id)
@@ -341,9 +284,9 @@ class BoletinPdfController extends Controller
 
         $filas = [];
         $promediosFinales = [];
+
         foreach ($asignaciones as $asignacion) {
             $resumen = $this->notaService->calcularResumenAsignatura($matricula, $asignacion);
-
             $cortesValores = [];
             foreach ($cortes as $corte) {
                 $cortesValores[$corte->numero] = $resumen['cortes'][$corte->numero] ?? null;
@@ -363,7 +306,7 @@ class BoletinPdfController extends Controller
             }
         }
 
-        $promedioGeneral = count($promediosFinales) > 0
+        $promedioGeneral = $promediosFinales !== []
             ? round(array_sum($promediosFinales) / count($promediosFinales), 2)
             : null;
 
@@ -375,43 +318,25 @@ class BoletinPdfController extends Controller
         ];
     }
 
-    /**
-     * Generar contenido PDF en memoria.
-     */
     protected function generatePdfContent(Matricula $matricula, string $tipo, ?int $corteId = null): string
     {
-        switch ($tipo) {
-            case 'boletin':
-                $data = $this->prepareBoletinData($matricula, $corteId);
-                $data['logo'] = $this->logoDataUri();
-                $pdf = Pdf::loadView('pdf.boletin', $data)
-                    ->setPaper('letter', 'landscape')
-                    ->setOptions(['defaultFont' => 'DejaVu Sans']);
-                return $pdf->output();
-
-            case 'constancia':
-                $data = $this->prepareConstanciaData($matricula);
-                $pdf = Pdf::loadView('pdf.constancia', $data)
-                    ->setPaper('letter', 'landscape')
-                    ->setOptions(['defaultFont' => 'DejaVu Sans']);
-                return $pdf->output();
-
-            case 'certificado':
-                $pdf = Pdf::loadView('pdf.certificado_notas', $this->datosCertificado($matricula))
-                    ->setPaper('letter', 'portrait')
-                    ->setOptions(['defaultFont' => 'DejaVu Sans']);
-                return $pdf->output();
-
-            default:
-                throw new \InvalidArgumentException("Tipo de PDF no soportado: {$tipo}");
-        }
+        return match ($tipo) {
+            'boletin' => Pdf::loadView('pdf.boletin', array_merge($this->prepareBoletinData($matricula, $corteId), ['logo' => $this->logoDataUri()]))
+                ->setPaper('letter', 'landscape')
+                ->setOptions(['defaultFont' => 'DejaVu Sans'])
+                ->output(),
+            'constancia' => Pdf::loadView('pdf.constancia', $this->prepareConstanciaData($matricula))
+                ->setPaper('letter', 'landscape')
+                ->setOptions(['defaultFont' => 'DejaVu Sans'])
+                ->output(),
+            'certificado' => Pdf::loadView('pdf.certificado_notas', $this->datosCertificado($matricula))
+                ->setPaper('letter', 'portrait')
+                ->setOptions(['defaultFont' => 'DejaVu Sans'])
+                ->output(),
+            default => throw new \InvalidArgumentException("Tipo de PDF no soportado: {$tipo}"),
+        };
     }
 
-    /**
-     * Datos del certificado MINED para una matrícula: el servicio agrupa el
-     * histórico del estudiante y devuelve el grado de la matrícula más el
-     * grado inmediatamente anterior (servicio con límite configurable).
-     */
     protected function datosCertificado(Matricula $matricula): array
     {
         $datos = $this->reporteService->certificadoNotas(
@@ -419,31 +344,16 @@ class BoletinPdfController extends Controller
             $matricula->anio_escolar_id,
             $matricula->aula->grado_id
         );
-
         $datos['logo'] = $this->logoDataUri();
 
         return $datos;
     }
 
-    /**
-     * Logo del colegio embebido como data URI (base64).
-     *
-     * DomPDF cargaba asset('img/logo.png') mediante HTTP contra el MISMO
-     * servidor de desarrollo (php artisan serve atiende una petición a la
-     * vez), provocando un bloqueo mutuo: la petición del PDF quedaba colgada
-     * esperando la imagen, y al mantener bloqueada la sesión, toda la
-     * aplicación dejaba de responder para ese usuario. Embeber la imagen en
-     * el HTML evita por completo la petición HTTP interna.
-     */
     protected function logoDataUri(): string
     {
         $path = public_path('img/logo.png');
 
-        if (is_file($path)) {
-            return 'data:image/png;base64,' . base64_encode(file_get_contents($path));
-        }
-
-        return '';
+        return is_file($path) ? 'data:image/png;base64,' . base64_encode(file_get_contents($path)) : '';
     }
 
     protected function getPdfFilename(Matricula $matricula, string $tipo, ?int $corteId = null): string
@@ -453,7 +363,9 @@ class BoletinPdfController extends Controller
 
         if ($tipo === 'boletin' && $corteId) {
             $corte = CorteEvaluativo::find($corteId);
-            return "boletin_{$cup}_corte{$corte->numero}_{$anio}.pdf";
+            if ($corte) {
+                return "boletin_{$cup}_corte{$corte->numero}_{$anio}.pdf";
+            }
         }
 
         return "{$tipo}_{$cup}_{$anio}.pdf";

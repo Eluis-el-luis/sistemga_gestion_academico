@@ -3,71 +3,60 @@
 namespace App\Http\Controllers;
 
 use App\Models\Aula;
+use App\Models\AulaAsignaturaDocente;
+use App\Models\BloqueHorario;
 use App\Models\Docente;
 use App\Models\Horario;
-use Illuminate\Http\Request;
+use App\Models\Usuario;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class VisorHorarioController extends Controller
 {
     use AuthorizesRequests;
-    /**
-     * Pantalla principal: Elegir entre Docentes o Aulas
-     */
-    public function index()
+
+    public function index(): View|RedirectResponse
     {
         try {
             return view('academico.visor.index');
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla al cargar la vista principal del visor
-            return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar el visor de horarios.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')
+                ->with('error', $this->formatearError($e, 'No fue posible cargar el visor de horarios.'));
         }
     }
 
-    /**
-     * Listado de todos los docentes
-     */
-    public function docentes()
+    public function docentes(): View|RedirectResponse
     {
         try {
-            // Traemos a los docentes con su usuario y ordenamos la colección con Laravel
-            // Esto evita errores de nombres de tablas (users vs usuarios) en SQL
             $docentes = Docente::with('usuario')
                 ->get()
-                ->sortBy(function($docente) {
-                    return $docente->usuario->nombre_completo ?? 'Z'; 
-                });
+                ->sortBy(fn ($docente) => $docente->usuario->nombre_completo ?? 'Z');
 
             return view('academico.visor.docentes', compact('docentes'));
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla la consulta o el ordenamiento de docentes
-            return redirect()->route('dashboard')->with('error', 'No se pudo cargar el listado de docentes para el visor.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')
+                ->with('error', $this->formatearError($e, 'No fue posible cargar el listado de docentes para el visor.'));
         }
     }
 
-    /**
-     * Horario específico de un Docente
-     */
-    public function horarioDocente(Docente $docente)
+    public function horarioDocente(Docente $docente): View|RedirectResponse
     {
         try {
             $docente->load('usuario');
 
-            $horarios = Horario::with(['bloque', 'aulaAsignaturaDocente.asignatura', 'aulaAsignaturaDocente.aula.grado'])
-                ->whereHas('aulaAsignaturaDocente', function ($query) use ($docente) {
-                    $query->where('docente_id', $docente->id);
-                })
+            $horarios = Horario::with(['bloqueHorario', 'aulaAsignaturaDocente.asignatura', 'aulaAsignaturaDocente.aula.grado'])
+                ->whereHas('aulaAsignaturaDocente', fn ($query) => $query->where('docente_id', $docente->id))
                 ->get();
 
-            // Bloques únicos que el docente tiene (ordenados por hora de inicio)
-            $bloques = $horarios->map->bloque
+            $bloques = $horarios->map->bloqueHorario
                 ->filter()
                 ->unique('id')
                 ->sortBy('hora_inicio');
@@ -91,31 +80,26 @@ class VisorHorarioController extends Controller
             }
 
             return view('academico.visor.horario_docente', compact('docente', 'matriz', 'dias'));
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla la construcción de la matriz horaria del docente
-            return redirect()->route('academico.visor.docentes')->with('error', 'Ocurrió un error al cargar el horario individual del docente.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('academico.visor.docentes')
+                ->with('error', $this->formatearError($e, 'No fue posible cargar el horario individual del docente.'));
         }
     }
 
-    /**
-     * Listado de todas las aulas (Lockers para consulta)
-     */
-    public function aulas()
+    public function aulas(): View|RedirectResponse
     {
         try {
             $this->authorize('viewAny', Aula::class);
-            
-            $user = auth()->user();
+
+            /** @var Usuario $user */
+            $user = Auth::user();
             $query = Aula::with(['grado', 'modalidad', 'anioEscolar', 'docenteGuia.usuario'])
-                ->orderBy('anio_escolar_id', 'desc')
+                ->orderByDesc('anio_escolar_id')
                 ->orderBy('grado_id');
 
-            // Coordinador: solo aulas de su modalidad
-            if ($user->hasRole('Coordinador') && !$user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
+            if ($user->hasAnyRole(['coordinador', 'Coordinador']) && !$user->hasAnyRole(['directora', 'subdirectora', 'gestor_it', 'Director', 'Subdirector', 'Gestor de Usuarios'])) {
                 $docente = $user->docente;
                 if ($docente && $docente->modalidad_coordina_id) {
                     $query->where('modalidad_id', $docente->modalidad_coordina_id);
@@ -125,35 +109,27 @@ class VisorHorarioController extends Controller
             $aulas = $query->get();
 
             return view('academico.visor.aulas', compact('aulas'));
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla la consulta de aulas
-            return redirect()->route('dashboard')->with('error', 'No se pudo cargar el listado de aulas para el visor.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')
+                ->with('error', $this->formatearError($e, 'No fue posible cargar el listado de aulas para el visor.'));
         }
     }
 
-    /**
-     * Horario específico de un Aula
-     */
-    public function horarioAula(Aula $aula)
+    public function horarioAula(Aula $aula): View|RedirectResponse
     {
         try {
-            // Authorization - usa la misma policy que AulaController
             $this->authorize('view', $aula);
 
             $aula->load(['grado', 'modalidad', 'docenteGuia.usuario']);
+            $asignaciones = AulaAsignaturaDocente::where('aula_id', $aula->id)->pluck('id');
 
-            $asignaciones = \App\Models\AulaAsignaturaDocente::where('aula_id', $aula->id)->pluck('id');
-
-            $horarios = Horario::with(['bloque', 'aulaAsignaturaDocente.asignatura', 'aulaAsignaturaDocente.docente.usuario'])
+            $horarios = Horario::with(['bloqueHorario', 'aulaAsignaturaDocente.asignatura', 'aulaAsignaturaDocente.docente.usuario'])
                 ->whereIn('aula_asignatura_docente_id', $asignaciones)
                 ->get();
 
-            // Bloques oficiales de la modalidad + turno + jornada Regular (incluye recreos)
-            $bloques = \App\Models\BloqueHorario::where('modalidad_id', $aula->modalidad_id)
+            $bloques = BloqueHorario::where('modalidad_id', $aula->modalidad_id)
                 ->where('turno', $aula->turno)
                 ->where('tipo_jornada', 'Regular')
                 ->orderBy('hora_inicio')
@@ -172,23 +148,17 @@ class VisorHorarioController extends Controller
                 $fila = ['bloque' => $bloque, 'dias' => []];
                 foreach ($dias as $i => $dia) {
                     $diaBD = $diasBD[$i];
-                    if ($bloque->es_recreo) {
-                        $fila['dias'][$dia] = null;
-                    } else {
-                        $fila['dias'][$dia] = $horariosIndex[$bloque->id][$diaBD] ?? null;
-                    }
+                    $fila['dias'][$dia] = $bloque->es_recreo ? null : ($horariosIndex[$bloque->id][$diaBD] ?? null);
                 }
                 $matriz[] = $fila;
             }
 
             return view('academico.visor.horario_aula', compact('aula', 'matriz', 'dias'));
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla al armar la matriz del aula
-            return redirect()->route('academico.visor.aulas')->with('error', 'Ocurrió un error al cargar el horario de esta aula.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('academico.visor.aulas')
+                ->with('error', $this->formatearError($e, 'No fue posible cargar el horario de esta aula.'));
         }
     }
 }

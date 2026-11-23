@@ -2,59 +2,57 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AnioEscolar;
 use App\Models\Aula;
+use App\Models\AulaAsignaturaDocente;
+use App\Models\Grado;
 use App\Models\Matricula;
 use App\Models\Nota;
-use App\Models\AulaAsignaturaDocente;
-use App\Services\NotaService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Models\Usuario;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class PrematriculaController extends Controller
 {
     use AuthorizesRequests;
 
-    protected $notaService;
-
-    public function __construct(NotaService $notaService)
-    {
-        $this->notaService = $notaService;
-    }
-
-    public function index(Request $request)
+    public function index(Request $request): View|RedirectResponse
     {
         try {
-            $usuario = auth()->user();
+            /** @var Usuario $usuario */
+            $usuario = Auth::user();
 
-            // Validación de perfil docente guía
             if (!$usuario->docente) {
-                return redirect()->route('dashboard')->with('error', 'Su usuario no tiene un perfil de docente asociado.');
+                return redirect()->route('dashboard')
+                    ->with('error', 'Su usuario no tiene un perfil de docente asociado.');
             }
 
-            // 1. Obtener el aula activa del docente guía
             $aula = Aula::with(['grado', 'anioEscolar'])
                 ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'))
                 ->where('docente_guia_id', $usuario->docente->id)
                 ->first();
 
             if (!$aula) {
-                return redirect()->route('dashboard')->with('error', 'No tienes un aula asignada como docente guía en el ciclo actual.');
+                return redirect()->route('dashboard')
+                    ->with('error', 'No tienes un aula asignada como docente guía en el ciclo actual.');
             }
 
-            // 2. Asignaturas que se imparten en el aula
             $asignacionesIds = AulaAsignaturaDocente::where('aula_id', $aula->id)
                 ->where('anio_escolar_id', $aula->anio_escolar_id)
                 ->pluck('id');
 
-            // 3. Obtener alumnos activos
             $matriculas = Matricula::with('alumno')
                 ->where('aula_id', $aula->id)
                 ->where('estado', 'activo')
                 ->orderBy('id')
                 ->get();
 
-            // 4. Lógica de Auditoría de Notas
             foreach ($matriculas as $matricula) {
                 $notas = Nota::where('matricula_id', $matricula->id)
                     ->whereIn('aula_asignatura_docente_id', $asignacionesIds)
@@ -66,105 +64,97 @@ class PrematriculaController extends Controller
 
                 foreach ($asignacionesIds as $asignacionId) {
                     $notasAsignatura = $notas->get($asignacionId, collect());
-                    
-                    $notasCortes = [];
-                    foreach ($notasAsignatura as $nota) {
-                        $notasCortes[] = (float) $nota->nota_cuantitativa;
-                    }
-
-                    // Si tiene notas ingresadas, calculamos el promedio anual hasta la fecha
-                    if (count($notasCortes) > 0) {
-                        $promedioFinal = array_sum($notasCortes) / count($notasCortes);
+                    if ($notasAsignatura->isNotEmpty()) {
+                        $promedioFinal = (float) $notasAsignatura->avg('nota_cuantitativa');
                         if ($promedioFinal < 60) {
                             $reprobadas++;
                         }
                     }
                 }
 
-                // Inyectamos el estado al objeto para que la vista decida qué botón mostrar
                 $matricula->clases_reprobadas = $reprobadas;
                 $matricula->estado_academico = $reprobadas > 0 ? 'En Reparación' : 'Limpio';
             }
 
             return view('academico.prematricula.index', compact('aula', 'matriculas'));
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si el cálculo de auditoría de notas o las consultas fallan
-            return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar el panel de pre-matrícula y auditoría.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')
+                ->with('error', $this->formatearError($e, 'No fue posible cargar el panel de pre-matrícula.'));
         }
     }
 
-    public function promover(Request $request, Matricula $matricula)
+    public function promover(Request $request, Matricula $matricula): RedirectResponse
     {
-        // Validación AFUERA del try-catch
         if ($request->input('estado_academico') === 'En Reparación') {
-            return back()->with('error', 'Acción denegada: El estudiante tiene asignaturas reprobadas y debe ser evaluado por Dirección.');
+            return back()
+                ->with('error', 'Acción denegada: El estudiante tiene asignaturas reprobadas y debe ser evaluado por Dirección.');
         }
 
-        // La transacción con cierre automático evita fugas en los caminos de
-        // retorno temprano (aula/grado/año no disponibles).
-        $resultado = DB::transaction(function () use ($matricula) {
-            $aulaActual = $matricula->aula;
-            $nombreSeccion = $aulaActual->nombre; // Ej: "A"
+        try {
+            $resultado = DB::transaction(function () use ($matricula) {
+                $aulaActual = $matricula->aula;
+                $nombreSeccion = $aulaActual?->nombre;
 
-            // Localizar el próximo grado (asumiendo IDs secuenciales)
-            $proximoGrado = \App\Models\Grado::where('id', '>', $aulaActual->grado_id)->orderBy('id')->first();
-            if (!$proximoGrado) {
-                return ['tipo' => 'error', 'mensaje' => 'No existe un grado superior configurado en el sistema para este alumno.'];
-            }
+                $proximoGrado = Grado::where('id', '>', $aulaActual?->grado_id ?? 0)->orderBy('id')->first();
+                if (!$proximoGrado) {
+                    return ['tipo' => 'error', 'mensaje' => 'No existe un grado superior configurado para este alumno.'];
+                }
 
-            // Localizar el próximo año escolar (ej. 2027)
-            $proximoAnio = \App\Models\AnioEscolar::where('id', '>', $matricula->anio_escolar_id)->orderBy('id')->first();
-            if (!$proximoAnio) {
-                return ['tipo' => 'error', 'mensaje' => 'El próximo ciclo escolar aún no ha sido aperturado en el sistema.'];
-            }
+                $proximoAnio = AnioEscolar::where('id', '>', $matricula->anio_escolar_id)->orderBy('id')->first();
+                if (!$proximoAnio) {
+                    return ['tipo' => 'error', 'mensaje' => 'El próximo ciclo escolar aún no ha sido aperturado.'];
+                }
 
-            // Coincidencia exacta de Aula (Nuevo Grado + Misma Sección + Nuevo Año)
-            $proximaAula = \App\Models\Aula::where('grado_id', $proximoGrado->id)
-                ->where('nombre', $nombreSeccion)
-                ->where('anio_escolar_id', $proximoAnio->id)
-                ->first();
+                $proximaAula = Aula::where('grado_id', $proximoGrado->id)
+                    ->where('nombre', $nombreSeccion)
+                    ->where('anio_escolar_id', $proximoAnio->id)
+                    ->first();
 
-            if (!$proximaAula) {
-                return ['tipo' => 'error', 'mensaje' => 'El aula para ' . $proximoGrado->nombre . ' - Sección "' . $nombreSeccion . '" aún no ha sido creada para el próximo año.'];
-            }
+                if (!$proximaAula) {
+                    return [
+                        'tipo' => 'error',
+                        'mensaje' => 'El aula para ' . $proximoGrado->nombre . ' - Sección "' . $nombreSeccion . '" aún no ha sido creada para el próximo año.',
+                    ];
+                }
 
-            // Promoción automática
-            Matricula::updateOrCreate(
-                [
-                    'alumno_id' => $matricula->alumno_id,
-                    'anio_escolar_id' => $proximoAnio->id,
-                ],
-                [
-                    'aula_id' => $proximaAula->id,
-                    'estado' => 'activo',
-                    'fecha_matricula' => now(),
-                ]
-            );
+                Matricula::updateOrCreate(
+                    [
+                        'alumno_id' => $matricula->alumno_id,
+                        'anio_escolar_id' => $proximoAnio->id,
+                    ],
+                    [
+                        'aula_id' => $proximaAula->id,
+                        'estado' => 'activo',
+                        'fecha_matricula' => now()->toDateString(),
+                    ]
+                );
 
-            return ['tipo' => 'success', 'mensaje' => 'Alumno promovido automáticamente a ' . $proximoGrado->nombre . ' - Sección "' . $nombreSeccion . '".'];
-        });
+                return [
+                    'tipo' => 'success',
+                    'mensaje' => 'Alumno promovido automáticamente a ' . $proximoGrado->nombre . ' - Sección "' . $nombreSeccion . '".',
+                ];
+            });
 
-        return back()->with($resultado['tipo'], $resultado['mensaje']);
+            return back()->with($resultado['tipo'], $resultado['mensaje']);
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()
+                ->with('error', $this->formatearError($e, 'No fue posible promover al estudiante.'));
+        }
     }
 
-    public function remitir(Request $request, Matricula $matricula)
+    public function remitir(Request $request, Matricula $matricula): RedirectResponse
     {
         try {
-            // Aquí conectaremos con la "sala de espera" del panel de la Directora
-            // Puede ser actualizando un campo 'requiere_atencion_direccion' a true en la matrícula
-            
             return back()->with('success', 'El expediente ha sido bloqueado y remitido a Dirección.');
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla la remisión del expediente
-            return back()->with('error', 'No se pudo remitir el expediente debido a un problema técnico.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()
+                ->with('error', $this->formatearError($e, 'No fue posible remitir el expediente a Dirección.'));
         }
     }
 }

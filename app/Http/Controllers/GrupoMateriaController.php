@@ -2,23 +2,24 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\GrupoMateria;
 use App\Models\Asignatura;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Models\GrupoMateria;
+use App\Models\Usuario;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class GrupoMateriaController extends Controller
 {
     use AuthorizesRequests;
 
-    /**
-     * Listado de grupos con sus materias y formulario de asignación.
-     */
     public function index()
     {
-        // UX: Redirección suave en lugar del abort(403)
-        if (!auth()->user()->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
+        /** @var Usuario $user */
+        $user = Auth::user();
+        if (!$user->hasAnyRole(['directora', 'subdirectora', 'gestor_it', 'Director', 'Subdirector', 'Gestor de Usuarios'])) {
             return redirect()->route('dashboard')->with('error', 'No tiene permisos para gestionar las agrupaciones de materias.');
         }
 
@@ -27,28 +28,24 @@ class GrupoMateriaController extends Controller
             $asignaturas = Asignatura::orderBy('nombre')->get();
 
             return view('academico.grupo-materia.index', compact('grupos', 'asignaturas'));
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla la conexión a BD al cargar los grupos
-            return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar la gestión de agrupaciones.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')->with('error', $this->formatearError($e, 'Ocurrió un error al cargar la gestión de agrupaciones.'));
         }
     }
 
-    /**
-     * Crea un nuevo grupo de materias.
-     */
     public function store(Request $request)
     {
-        if (!auth()->user()->hasAnyRole(['Director', 'Subdirector'])) {
+        /** @var Usuario $user */
+        $user = Auth::user();
+        if (!$user->hasAnyRole(['directora', 'subdirectora', 'Director', 'Subdirector'])) {
             return back()->with('error', 'No tiene permisos para crear agrupaciones.');
         }
 
-        // Validación AFUERA del try-catch
         $request->validate([
-            'nombre' => 'required|string|max:120',
-            'orden' => 'nullable|integer|min:0',
+            'nombre' => ['required', 'string', 'max:120'],
+            'orden' => ['nullable', 'integer', 'min:0'],
         ]);
 
         try {
@@ -58,27 +55,24 @@ class GrupoMateriaController extends Controller
             ]);
 
             return back()->with('success', 'Grupo de materias creado correctamente.');
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return back()->withInput()->with('error', 'Ocurrió un problema técnico al crear el grupo.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', $this->formatearError($e, 'Ocurrió un problema técnico al crear el grupo.'));
         }
     }
 
-    /**
-     * Actualiza el nombre/orden de un grupo.
-     */
     public function update(Request $request, GrupoMateria $grupo)
     {
-        if (!auth()->user()->hasAnyRole(['Director', 'Subdirector'])) {
+        /** @var Usuario $user */
+        $user = Auth::user();
+        if (!$user->hasAnyRole(['directora', 'subdirectora', 'Director', 'Subdirector'])) {
             return back()->with('error', 'No tiene permisos para editar agrupaciones.');
         }
 
-        // Validación AFUERA del try-catch
         $request->validate([
-            'nombre' => 'required|string|max:120',
-            'orden' => 'nullable|integer|min:0',
+            'nombre' => ['required', 'string', 'max:120'],
+            'orden' => ['nullable', 'integer', 'min:0'],
         ]);
 
         try {
@@ -88,68 +82,67 @@ class GrupoMateriaController extends Controller
             ]);
 
             return back()->with('success', 'Grupo actualizado correctamente.');
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return back()->withInput()->with('error', 'No se pudo actualizar el grupo en la base de datos.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', $this->formatearError($e, 'No se pudo actualizar el grupo en la base de datos.'));
         }
     }
 
-    /**
-     * Elimina un grupo (las materias quedan sin grupo, es decir, en "Otros").
-     */
     public function destroy(GrupoMateria $grupo)
     {
-        if (!auth()->user()->hasAnyRole(['Director', 'Subdirector'])) {
+        /** @var Usuario $user */
+        $user = Auth::user();
+        if (!$user->hasAnyRole(['directora', 'subdirectora', 'Director', 'Subdirector'])) {
             return back()->with('error', 'No tiene permisos para eliminar agrupaciones.');
         }
 
+        DB::beginTransaction();
         try {
-            // Desasignar las materias del grupo antes de eliminar
             Asignatura::where('grupo_materia_id', $grupo->id)->update(['grupo_materia_id' => null]);
             $grupo->delete();
+            DB::commit();
 
             return back()->with('success', 'Grupo eliminado. Las materias asociadas quedaron sin grupo.');
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            return back()->with('error', 'No se pudo eliminar el grupo. Compruebe que no existan dependencias protegidas.');
+        } catch (AuthorizationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return back()->with('error', $this->formatearError($e, 'No se pudo eliminar el grupo.'));
         }
     }
 
-    /**
-     * Asigna materias a grupos (formulario masivo).
-     */
     public function asignarMaterias(Request $request)
     {
-        if (!auth()->user()->hasAnyRole(['Director', 'Subdirector'])) {
+        /** @var Usuario $user */
+        $user = Auth::user();
+        if (!$user->hasAnyRole(['directora', 'subdirectora', 'gestor_it', 'Director', 'Subdirector', 'Gestor de Usuarios'])) {
             return back()->with('error', 'No tiene permisos para asignar materias.');
         }
 
-        // Validación AFUERA
         $request->validate([
-            'asignaciones' => 'nullable|array',
-            'asignaciones.*' => 'nullable|exists:grupo_materia,id',
+            'asignaciones' => ['nullable', 'array'],
+            'asignaciones.*' => ['nullable', 'integer', 'exists:grupo_materia,id'],
         ]);
 
         DB::beginTransaction();
         try {
             foreach ($request->asignaciones ?? [] as $asignaturaId => $grupoId) {
-                Asignatura::where('id', $asignaturaId)
+                Asignatura::where('id', (int) $asignaturaId)
                     ->update(['grupo_materia_id' => $grupoId ?: null]);
             }
-            
             DB::commit();
+
             return back()->with('success', 'Asignación de materias a grupos actualizada correctamente.');
-            
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
+        } catch (AuthorizationException $e) {
             DB::rollBack();
-            return back()->with('error', 'Hubo un problema al aplicar las asignaciones masivas. Ningún cambio fue guardado por seguridad.');
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return back()->with('error', $this->formatearError($e, 'Hubo un problema al aplicar las asignaciones masivas.'));
         }
     }
 }

@@ -2,37 +2,37 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActividadEvaluativa;
 use App\Models\AulaAsignaturaDocente;
 use App\Models\CorteEvaluativo;
-use App\Models\ActividadEvaluativa;
-use Illuminate\Http\Request;
+use App\Models\Matricula;
+use App\Models\NotaActividad;
+use App\Models\Usuario;
+use App\Services\NotaService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ActividadEvaluativaController extends Controller
 {
     use AuthorizesRequests;
 
-    public function index(Request $request, \App\Models\AulaAsignaturaDocente $asignacion)
+    public function index(Request $request, AulaAsignaturaDocente $asignacion)
     {
         try {
-            // FIX CVE-2026-002: Verificación de autorización obligatoria
-            // La policy 'ver' permite: Directiva (total), Coordinador (supervisión modalidad), Docentes (ownership)
             $this->authorize('ver', $asignacion);
 
-            // 1. Determinar si el usuario en sesión es supervisor (Directiva O Coordinador)
-            /** @var \App\Models\Usuario $user */
-            $user = auth()->user();
-            $esDirectiva = $user->hasAnyRole(['Director', 'Subdirector']);
-            $esCoordinador = $user->hasRole('Coordinador');
+            /** @var Usuario $user */
+            $user = Auth::user();
+            $esDirectiva = $user->hasAnyRole(['directora', 'subdirectora', 'Director', 'Subdirector']);
+            $esCoordinador = $user->hasAnyRole(['coordinador', 'Coordinador']);
             $modoSupervision = $esDirectiva || $esCoordinador;
 
-            // 2. Obtener los cortes evaluativos del año activo con eager loading
-            $cortes = \App\Models\CorteEvaluativo::with('anioEscolar')
-                ->whereHas('anioEscolar', fn($q) => $q->where('estado', 'activo'))
+            $cortes = CorteEvaluativo::with('anioEscolar')
+                ->whereHas('anioEscolar', fn ($q) => $q->where('estado', 'activo'))
                 ->get();
 
-            // Si no hay cortes (no hay año activo), mostrar vista con estado vacío
             if ($cortes->isEmpty()) {
                 return view('academico.notas.actividades', [
                     'asignacion' => $asignacion,
@@ -43,72 +43,62 @@ class ActividadEvaluativaController extends Controller
                     'actividades' => collect(),
                     'sumaAcumulados' => 0,
                     'sumaExamen' => 0,
+                    'esCoordinador' => $esCoordinador,
                 ]);
             }
 
-            // IMPORTANTE: La vista manda el filtro como 'corte_id' en el select
             $corteSeleccionado = $request->query('corte_id', $cortes->first()->id);
             $corteActivo = $cortes->firstWhere('id', $corteSeleccionado);
 
-            // 3. Traer las actividades correspondientes
-            $actividades = \App\Models\ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
+            $actividades = ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
                 ->where('corte_evaluativo_id', $corteSeleccionado)
                 ->get();
 
-            // 4. Matemáticas para las barras de progreso
             $sumaAcumulados = $actividades->where('tipo', 'acumulado')->sum('puntaje_maximo');
             $sumaExamen = $actividades->where('tipo', 'examen')->sum('puntaje_maximo');
 
             return view('academico.notas.actividades', compact(
-                'asignacion', 
-                'modoSupervision', 
-                'cortes', 
-                'corteSeleccionado', 
-                'corteActivo', 
+                'asignacion',
+                'modoSupervision',
+                'cortes',
+                'corteSeleccionado',
+                'corteActivo',
                 'actividades',
-                'sumaAcumulados', 
+                'sumaAcumulados',
                 'sumaExamen',
                 'esCoordinador'
             ));
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla la carga de la vista o la BD
-            return back()->with('error', 'Lo sentimos, hubo un problema técnico al cargar las actividades evaluativas. Por favor, inténtalo de nuevo.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'Hubo un problema técnico al cargar las actividades evaluativas.'));
         }
     }
 
     public function store(Request $request, AulaAsignaturaDocente $asignacion)
     {
-        // Se valida AFUERA del try-catch para que Laravel devuelva los textos rojos de error en el formulario si falta un dato.
         $request->validate([
-            'nombre' => 'required|string|max:255',
-            'puntaje_maximo' => 'required|numeric|min:1',
-            'corte_evaluativo_id' => 'required|exists:corte_evaluativo,id',
-            'tipo' => 'required|in:acumulado,examen',
-            'descripcion' => 'nullable|string|max:500',
-            'fecha' => 'nullable|date',
+            'nombre' => ['required', 'string', 'max:255'],
+            'puntaje_maximo' => ['required', 'numeric', 'min:1'],
+            'corte_evaluativo_id' => ['required', 'integer', 'exists:corte_evaluativo,id'],
+            'tipo' => ['required', 'in:acumulado,examen'],
+            'descripcion' => ['nullable', 'string', 'max:500'],
+            'fecha' => ['nullable', 'date'],
         ]);
 
         try {
             $this->authorize('calificar', $asignacion);
 
             $corte = CorteEvaluativo::findOrFail($request->corte_evaluativo_id);
-
-            // Sumamos solo las actividades del MISMO TIPO
-            $sumaActual = ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
+            $sumaActual = (float) ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
                 ->where('corte_evaluativo_id', $corte->id)
                 ->where('tipo', $request->tipo)
                 ->sum('puntaje_maximo');
 
-            $nuevoTotal = $sumaActual + $request->puntaje_maximo;
-            
-            // Asignamos el límite correcto
-            $limite = $request->tipo === 'acumulado' ? $corte->peso_acumulado : $corte->peso_examen;
-            
-            if ($nuevoTotal > $limite) {
+            $nuevoTotal = $sumaActual + (float) $request->puntaje_maximo;
+            $limite = (float) ($request->tipo === 'acumulado' ? $corte->peso_acumulado : $corte->peso_examen);
+
+            if ($limite > 0 && $nuevoTotal > $limite) {
                 return back()->with('error', 'Límite excedido. Te restan ' . ($limite - $sumaActual) . ' puntos disponibles en el ' . $request->tipo . '.');
             }
 
@@ -123,13 +113,10 @@ class ActividadEvaluativaController extends Controller
             ]);
 
             return back()->with('success', 'Actividad guardada correctamente.');
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla la creación en la base de datos
-            return back()->with('error', 'Ocurrió un error inesperado al intentar guardar la actividad. Verifica los datos e intenta nuevamente.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', $this->formatearError($e, 'Ocurrió un error inesperado al intentar guardar la actividad.'));
         }
     }
 
@@ -137,28 +124,25 @@ class ActividadEvaluativaController extends Controller
     {
         $this->authorize('calificar', $asignacion);
 
-        // Validación por fuera del try-catch
         $request->validate([
-            'nombre' => 'required|string|max:255',
-            'puntaje_maximo' => 'required|numeric|min:1',
-            'descripcion' => 'nullable|string|max:500',
-            'fecha' => 'nullable|date',
+            'nombre' => ['required', 'string', 'max:255'],
+            'puntaje_maximo' => ['required', 'numeric', 'min:1'],
+            'descripcion' => ['nullable', 'string', 'max:500'],
+            'fecha' => ['nullable', 'date'],
         ]);
 
         try {
             $corte = CorteEvaluativo::findOrFail($actividad->corte_evaluativo_id);
-
-            // Sumamos las demás actividades del MISMO tipo (excluyendo la actual)
-            $sumaOtras = ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
+            $sumaOtras = (float) ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacion->id)
                 ->where('corte_evaluativo_id', $corte->id)
                 ->where('tipo', $actividad->tipo)
                 ->where('id', '!=', $actividad->id)
                 ->sum('puntaje_maximo');
 
-            $nuevoTotal = $sumaOtras + $request->puntaje_maximo;
-            $limite = $actividad->tipo === 'acumulado' ? $corte->peso_acumulado : $corte->peso_examen;
+            $nuevoTotal = $sumaOtras + (float) $request->puntaje_maximo;
+            $limite = (float) ($actividad->tipo === 'acumulado' ? $corte->peso_acumulado : $corte->peso_examen);
 
-            if ($nuevoTotal > $limite) {
+            if ($limite > 0 && $nuevoTotal > $limite) {
                 return back()->with('error', 'Límite excedido. Te restan ' . ($limite - $sumaOtras) . ' puntos disponibles en el ' . $actividad->tipo . '.');
             }
 
@@ -169,18 +153,13 @@ class ActividadEvaluativaController extends Controller
                 'fecha' => $request->fecha,
             ]);
 
-            // El puntaje máximo pudo cambiar con notas ya registradas:
-            // recalculamos la nota final del corte para mantenerla consistente.
             $this->recalcularNotasParcial($asignacion->id, $actividad->corte_evaluativo_id);
 
             return back()->with('success', 'Actividad actualizada y notas del corte recalculadas.');
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla la actualización
-            return back()->with('error', 'Lo sentimos, hubo un problema al actualizar esta actividad. Por favor, inténtalo de nuevo.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'Hubo un problema al actualizar esta actividad.'));
         }
     }
 
@@ -189,60 +168,51 @@ class ActividadEvaluativaController extends Controller
         try {
             $this->authorize('calificar', $asignacion);
 
-            // Guardamos referencias antes de borrar para recalcular
             $corteId = $actividad->corte_evaluativo_id;
             $asignacionId = $asignacion->id;
 
-            // Borramos las notas individuales de esta actividad
-            \App\Models\NotaActividad::where('actividad_evaluativa_id', $actividad->id)->delete();
+            NotaActividad::where('actividad_evaluativa_id', $actividad->id)->delete();
             $actividad->delete();
 
-            // Recalculamos la nota final de cada matrícula del parcial
             $this->recalcularNotasParcial($asignacionId, $corteId);
 
             return back()->with('success', 'Actividad eliminada y notas recalculadas.');
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si hay un problema de base de datos o de integridad referencial
-            return back()->with('error', 'Hubo un error al intentar eliminar la actividad. Es posible que el sistema esté protegiendo datos asociados.');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'Hubo un error al intentar eliminar la actividad.'));
         }
     }
 
-    /**
-     * Recalcula la nota final del corte de un parcial para todas las matrículas.
-     */
     protected function recalcularNotasParcial(int $asignacionId, int $corteId): void
     {
-        // Nota: Este método auxiliar no necesita su propio try-catch porque 
-        // siempre se ejecuta dentro de otro método (como destroy) que ya está protegido.
-        
         $actividades = ActividadEvaluativa::where('aula_asignatura_docente_id', $asignacionId)
             ->where('corte_evaluativo_id', $corteId)
             ->get();
 
-        // Mismo denominador que NotaController@store: pesos oficiales del corte
-        // (normalmente 100), con respaldo en la suma configurada si no hay pesos.
         $corte = CorteEvaluativo::find($corteId);
         $totalConfigurado = (float) $actividades->sum('puntaje_maximo');
-        $totalPosible = (float) (($corte->peso_acumulado ?? 0) + ($corte->peso_examen ?? 0));
+        $totalPosible = (float) (($corte?->peso_acumulado ?? 0) + ($corte?->peso_examen ?? 0));
         if ($totalPosible <= 0) {
             $totalPosible = $totalConfigurado;
         }
-        $actividadIds = $actividades->pluck('id');
 
-        $matriculas = \App\Models\Matricula::where('aula_id', \App\Models\AulaAsignaturaDocente::find($asignacionId)->aula_id)
+        $actividadIds = $actividades->pluck('id');
+        $asignacionModel = AulaAsignaturaDocente::find($asignacionId);
+        if (!$asignacionModel) {
+            return;
+        }
+
+        $matriculas = Matricula::where('aula_id', $asignacionModel->aula_id)
             ->where('estado', 'activo')
             ->pluck('id');
 
         foreach ($matriculas as $matriculaId) {
-            $suma = \App\Models\NotaActividad::where('matricula_id', $matriculaId)
+            $suma = (float) NotaActividad::where('matricula_id', $matriculaId)
                 ->whereIn('actividad_evaluativa_id', $actividadIds)
                 ->sum('nota_obtenida');
 
-            app(\App\Services\NotaService::class)->registrarNotaFinal($matriculaId, $asignacionId, $corteId, (float) $suma, $totalPosible);
+            app(NotaService::class)->registrarNotaFinal($matriculaId, $asignacionId, $corteId, $suma, $totalPosible, Auth::id());
         }
     }
 }

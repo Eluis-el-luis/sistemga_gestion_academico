@@ -2,286 +2,277 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Docente;
+use App\Models\Modalidad;
 use App\Models\Usuario;
-use Spatie\Permission\Models\Role;
-use Illuminate\Http\Request;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\View\View;
+use Spatie\Permission\Models\Role;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class UsuarioController extends Controller
 {
     use AuthorizesRequests;
 
-    public function index(Request $request)
+    public function index(Request $request): View|RedirectResponse
     {
         try {
             $this->authorize('viewAny', Usuario::class);
-            
+
+            /** @var Usuario $authUser */
+            $authUser = Auth::user();
             $query = Usuario::with('roles');
-            $authUser = auth()->user();
-            
-            // 1. Cargar modalidades para enviarlas al select de la vista
-            $modalidades = \App\Models\Modalidad::orderBy('id')->get();
+            $modalidades = Modalidad::orderBy('id')->get();
 
-            // 2. FILTRO DE JERARQUÍA (Ocultar jefes al Gestor)
-            if ($authUser->hasRole('Gestor de Usuarios') && !$authUser->hasAnyRole(['Director', 'Subdirector'])) {
+            if ($authUser->hasAnyRole(['gestor_it', 'Gestor de Usuarios']) && !$authUser->hasAnyRole(['directora', 'subdirectora', 'Director', 'Subdirector'])) {
                 $query->whereDoesntHave('roles', function ($q) {
-                    $q->whereIn('name', ['Director', 'Subdirector']);
+                    $q->whereIn('name', ['directora', 'subdirectora', 'Director', 'Subdirector']);
                 });
             }
 
-            // 3. NUEVO FILTRO: Agrupar por Modalidad (incluye Modalidad Base)
             if ($request->filled('modalidad')) {
-                $modalidadId = $request->modalidad;
-                
+                $modalidadId = (int) $request->input('modalidad');
+
                 $query->whereHas('docente', function ($q) use ($modalidadId) {
-                    $q->where('modalidad_id', $modalidadId) // Filtra por Modalidad Base
-                      ->orWhere('modalidad_coordina_id', $modalidadId) // Filtra si es coordinador
-                      // O si imparte clases en algún aula de esa modalidad
-                      ->orWhereExists(function ($subquery) use ($modalidadId) {
-                          $subquery->select(DB::raw(1))
-                                   ->from('aula_asignatura_docente')
-                                   ->join('aula', 'aula_asignatura_docente.aula_id', '=', 'aula.id')
-                                   ->whereColumn('aula_asignatura_docente.docente_id', 'docente.id')
-                                   ->where('aula.modalidad_id', $modalidadId)
-                                   ->where('aula_asignatura_docente.activo', true);
-                      });
+                    $q->where('modalidad_id', $modalidadId)
+                        ->orWhere('modalidad_coordina_id', $modalidadId)
+                        ->orWhereExists(function ($subquery) use ($modalidadId) {
+                            $subquery->select(DB::raw(1))
+                                ->from('aula_asignatura_docente')
+                                ->join('aula', 'aula_asignatura_docente.aula_id', '=', 'aula.id')
+                                ->whereColumn('aula_asignatura_docente.docente_id', 'docente.id')
+                                ->where('aula.modalidad_id', $modalidadId)
+                                ->where('aula_asignatura_docente.activo', true);
+                        });
                 });
             }
 
-            // 4. BUSCADOR BLINDADO
             if ($request->filled('buscar')) {
-                $busqueda = $request->buscar;
-                
-                // Agrupamos la búsqueda en un closure para no romper las reglas anteriores
-                $query->where(function($q) use ($busqueda) {
-                    $q->where('nombre_completo', 'like', "%{$busqueda}%")
-                      ->orWhere('email', 'like', "%{$busqueda}%");
+                $termino = '%' . mb_strtolower(trim((string) $request->input('buscar')), 'UTF-8') . '%';
+
+                $query->where(function ($q) use ($termino) {
+                    $q->whereRaw('LOWER(nombre_completo) LIKE ?', [$termino])
+                        ->orWhereRaw('LOWER(email) LIKE ?', [$termino]);
                 });
             }
-            
-            // Se añade withQueryString() para que al cambiar de página no se pierda el filtro aplicado
-            $usuarios = $query->orderBy('nombre_completo', 'asc')->paginate(15)->withQueryString();
-            
-            return view('academico.usuarios.index', compact('usuarios', 'modalidades'));
 
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla alguna relación o la consulta de filtrado
-            return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar el listado de usuarios del sistema.');
+            $usuarios = $query->orderBy('nombre_completo', 'asc')->paginate(15)->withQueryString();
+
+            return view('academico.usuarios.index', compact('usuarios', 'modalidades'));
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')
+                ->with('error', $this->formatearError($e, 'No fue posible cargar el listado de usuarios.'));
         }
     }
 
-    public function create()
+    public function create(): View|RedirectResponse
     {
         try {
             $this->authorize('create', Usuario::class);
 
-            // 1. Ocultamos 'Alumno' por defecto en el panel de personal,
-            //    excepto para la Secretaría que debe poder dar de alta cuentas de alumnos.
-            $rolesExcluidos = auth()->user()->hasRole('Secretaria') ? [] : ['Alumno'];
-            
-            // 2. Si ya hay Director, ocultamos la casilla
-            if (\App\Models\Usuario::role('Director')->exists()) {
-                $rolesExcluidos[] = 'Director';
-            }
-            
-            // 3. Si ya hay Subdirector, ocultamos la casilla
-            if (\App\Models\Usuario::role('Subdirector')->exists()) {
-                $rolesExcluidos[] = 'Subdirector';
+            /** @var Usuario $authUser */
+            $authUser = Auth::user();
+            $rolesExcluidos = $authUser->hasAnyRole(['secretaria', 'Secretaria']) ? [] : ['Alumno'];
+
+            if (Usuario::role(['directora', 'Director'])->exists()) {
+                array_push($rolesExcluidos, 'directora', 'Director');
             }
 
-            // Consultamos a Spatie trayendo solo los roles permitidos
-            $roles = \Spatie\Permission\Models\Role::whereNotIn('name', $rolesExcluidos)->get();
-            
-            // Cargar las modalidades para el selector de Modalidad Base
-            $modalidades = \App\Models\Modalidad::orderBy('id')->get();
+            if (Usuario::role(['subdirectora', 'Subdirector'])->exists()) {
+                array_push($rolesExcluidos, 'subdirectora', 'Subdirector');
+            }
+
+            $roles = Role::whereNotIn('name', array_unique($rolesExcluidos))->get();
+            $modalidades = Modalidad::orderBy('id')->get();
 
             return view('academico.usuarios.create', compact('roles', 'modalidades'));
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla al cargar el formulario de creación
-            return redirect()->route('academico.usuarios.index')->with('error', 'No se pudo abrir el formulario de registro de usuario.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('academico.usuarios.index')
+                ->with('error', $this->formatearError($e, 'No fue posible abrir el formulario de registro de usuario.'));
         }
     }
 
-    public function edit(Usuario $usuario)
+    public function edit(Usuario $usuario): View|RedirectResponse
     {
         try {
             $this->authorize('update', $usuario);
 
-            // La Secretaría puede asignar el rol 'Alumno' al editar cuentas operativas.
-            $rolesExcluidos = auth()->user()->hasRole('Secretaria') ? [] : ['Alumno'];
-            
-            // En la edición, ocultamos el rol SOLO si está ocupado por OTRA persona.
-            if (\App\Models\Usuario::role('Director')->where('id', '!=', $usuario->id)->exists()) {
-                $rolesExcluidos[] = 'Director';
-            }
-            
-            if (\App\Models\Usuario::role('Subdirector')->where('id', '!=', $usuario->id)->exists()) {
-                $rolesExcluidos[] = 'Subdirector';
+            /** @var Usuario $authUser */
+            $authUser = Auth::user();
+            $rolesExcluidos = $authUser->hasAnyRole(['secretaria', 'Secretaria']) ? [] : ['Alumno'];
+
+            if (Usuario::role(['directora', 'Director'])->where('id', '!=', $usuario->id)->exists()) {
+                array_push($rolesExcluidos, 'directora', 'Director');
             }
 
-            $roles = \Spatie\Permission\Models\Role::whereNotIn('name', $rolesExcluidos)->get();
-            
-            // Cargar las modalidades para el selector de Modalidad Base
-            $modalidades = \App\Models\Modalidad::orderBy('id')->get();
+            if (Usuario::role(['subdirectora', 'Subdirector'])->where('id', '!=', $usuario->id)->exists()) {
+                array_push($rolesExcluidos, 'subdirectora', 'Subdirector');
+            }
+
+            $roles = Role::whereNotIn('name', array_unique($rolesExcluidos))->get();
+            $modalidades = Modalidad::orderBy('id')->get();
 
             return view('academico.usuarios.edit', compact('usuario', 'roles', 'modalidades'));
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla al cargar la edición
-            return redirect()->route('academico.usuarios.index')->with('error', 'No se pudo cargar la información del usuario para su edición.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('academico.usuarios.index')
+                ->with('error', $this->formatearError($e, 'No fue posible cargar la información del usuario.'));
         }
     }
 
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
-        // Validación AFUERA del try-catch para proteger las alertas del formulario
-        $request->validate([
-            'nombre_completo' => 'required|string|max:120',
-            'email'           => 'required|email|unique:usuario,email',
-            'password'        => 'required|string|min:8',
-            'roles'           => 'required|array|min:1',
-            'codigo_unico_persona'  => 'nullable|string|max:20',
-            'sexo'            => 'nullable|in:M,F',
-            'modalidad_id'          => 'nullable|exists:modalidad,id',
-            'modalidad_coordina_id' => 'nullable|exists:modalidad,id'
+        $validated = $request->validate([
+            'nombre_completo' => ['required', 'string', 'max:120'],
+            'email' => ['required', 'email', 'unique:usuario,email'],
+            'password' => ['required', 'string', 'min:8'],
+            'roles' => ['required', 'array', 'min:1'],
+            'codigo_unico_persona' => ['nullable', 'string', 'max:20'],
+            'sexo' => ['nullable', 'in:M,F'],
+            'modalidad_id' => ['nullable', 'integer', 'exists:modalidad,id'],
+            'modalidad_coordina_id' => ['nullable', 'integer', 'exists:modalidad,id'],
         ]);
 
-        $rolesSeleccionados = $request->roles ?? [];
-        $esDirector = in_array('Director', $rolesSeleccionados);
-        $esSubdirector = in_array('Subdirector', $rolesSeleccionados);
+        $rolesSeleccionados = $validated['roles'];
+        $esDirectora = count(array_intersect($rolesSeleccionados, ['directora', 'Director'])) > 0;
+        $esSubdirectora = count(array_intersect($rolesSeleccionados, ['subdirectora', 'Subdirector'])) > 0;
 
-        if ($esDirector && \App\Models\Usuario::role('Director')->exists()) {
-            return back()->withInput()->withErrors(['roles' => 'Ya existe una cuenta de Dirección asignada en el sistema.']);
+        if ($esDirectora && Usuario::role(['directora', 'Director'])->exists()) {
+            return back()->withInput()
+                ->withErrors(['roles' => 'Ya existe una cuenta de Dirección asignada en el sistema.']);
         }
 
-        if ($esSubdirector && \App\Models\Usuario::role('Subdirector')->exists()) {
-            return back()->withInput()->withErrors(['roles' => 'Ya existe una cuenta de Subdirección asignada en el sistema.']);
+        if ($esSubdirectora && Usuario::role(['subdirectora', 'Subdirector'])->exists()) {
+            return back()->withInput()
+                ->withErrors(['roles' => 'Ya existe una cuenta de Subdirección asignada en el sistema.']);
         }
 
-        // Autorizar ANTES de abrir transacción: una AuthorizationException no
-        // debe dejar la transacción abierta.
         $this->authorize('create', Usuario::class);
 
         try {
-            DB::transaction(function () use ($request) {
-                // Creamos el usuario
+            DB::transaction(function () use ($validated) {
                 $usuario = Usuario::create([
-                    'nombre_completo' => $request->nombre_completo,
-                    'email'           => $request->email,
-                    'password'        => bcrypt($request->password),
-                    'activo'          => true,
+                    'nombre_completo' => $validated['nombre_completo'],
+                    'email' => $validated['email'],
+                    'password' => Hash::make($validated['password']),
+                    'activo' => true,
                 ]);
 
-                // Spatie asigna los permisos correctamente en su tabla intermedia
-                $usuario->assignRole($request->roles);
+                $usuario->assignRole($validated['roles']);
 
-                $esDocente = collect($request->roles)->contains(function ($rol) {
-                    return str_contains($rol, 'Docente') || $rol === 'Coordinador';
+                $esDocente = collect($validated['roles'])->contains(function ($rol) {
+                    $lower = mb_strtolower((string) $rol, 'UTF-8');
+
+                    return str_contains($lower, 'docente') || str_contains($lower, 'coordinador');
                 });
 
                 if ($esDocente) {
-                    \App\Models\Docente::create([
-                        'usuario_id'            => $usuario->id,
-                        'codigo_unico_persona'  => $request->codigo_unico_persona ?? 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
-                        'sexo'                  => $request->sexo ?? 'M',
-                        'modalidad_id'          => $request->modalidad_id,
-                        'es_coordinador'        => collect($request->roles)->contains('Coordinador'),
-                        'modalidad_coordina_id' => collect($request->roles)->contains('Coordinador') ? $request->modalidad_coordina_id : null,
+                    $esCoordinador = count(array_intersect($validated['roles'], ['coordinador', 'Coordinador'])) > 0;
+
+                    Docente::create([
+                        'usuario_id' => $usuario->id,
+                        'codigo_unico_persona' => $validated['codigo_unico_persona'] ?? ('DOC-' . str_pad((string) $usuario->id, 4, '0', STR_PAD_LEFT)),
+                        'sexo' => $validated['sexo'] ?? 'M',
+                        'modalidad_id' => $validated['modalidad_id'] ?? null,
+                        'es_coordinador' => $esCoordinador,
+                        'modalidad_coordina_id' => $esCoordinador ? ($validated['modalidad_coordina_id'] ?? null) : null,
                     ]);
                 }
             });
 
             return redirect()->route('academico.usuarios.index')
-                             ->with('success', 'Personal registrado y accesos configurados correctamente.');
-
-        } catch (\Exception $e) {
-            // CONTINGENCIA: Si falla la inserción en la base de datos
-            return back()->withInput()->with('error', 'Ocurrió un error técnico al registrar al usuario. El proceso fue cancelado por seguridad.');
+                ->with('success', 'Personal registrado y accesos configurados correctamente.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->withInput()
+                ->with('error', $this->formatearError($e, 'No fue posible registrar al usuario.'));
         }
     }
 
-    public function update(Request $request, Usuario $usuario)
+    public function update(Request $request, Usuario $usuario): RedirectResponse
     {
-        // Validación AFUERA
-        $request->validate([
-            'nombre_completo' => 'required|string|max:120',
-            'email'           => 'required|email|unique:usuario,email,' . $usuario->id,
-            'activo'          => 'required|boolean',
-            'roles'           => 'required|array|min:1',
-            'codigo_unico_persona'  => 'nullable|string|max:20',
-            'sexo'            => 'nullable|in:M,F',
-            'modalidad_id'          => 'nullable|exists:modalidad,id',
-            'modalidad_coordina_id' => 'nullable|exists:modalidad,id'
+        $validated = $request->validate([
+            'nombre_completo' => ['required', 'string', 'max:120'],
+            'email' => ['required', 'email', 'unique:usuario,email,' . $usuario->id],
+            'activo' => ['required', 'boolean'],
+            'roles' => ['required', 'array', 'min:1'],
+            'codigo_unico_persona' => ['nullable', 'string', 'max:20'],
+            'sexo' => ['nullable', 'in:M,F'],
+            'modalidad_id' => ['nullable', 'integer', 'exists:modalidad,id'],
+            'modalidad_coordina_id' => ['nullable', 'integer', 'exists:modalidad,id'],
         ]);
 
-        $rolesSeleccionados = $request->roles ?? [];
-        $esDirector = in_array('Director', $rolesSeleccionados);
-        $esSubdirector = in_array('Subdirector', $rolesSeleccionados);
+        $rolesSeleccionados = $validated['roles'];
+        $esDirectora = count(array_intersect($rolesSeleccionados, ['directora', 'Director'])) > 0;
+        $esSubdirectora = count(array_intersect($rolesSeleccionados, ['subdirectora', 'Subdirector'])) > 0;
 
-        if ($esDirector && \App\Models\Usuario::role('Director')->where('id', '!=', $usuario->id)->exists()) {
-            return back()->withInput()->withErrors(['roles' => 'Ya existe otra cuenta de Dirección asignada en el sistema.']);
+        if ($esDirectora && Usuario::role(['directora', 'Director'])->where('id', '!=', $usuario->id)->exists()) {
+            return back()->withInput()
+                ->withErrors(['roles' => 'Ya existe otra cuenta de Dirección asignada en el sistema.']);
         }
 
-        if ($esSubdirector && \App\Models\Usuario::role('Subdirector')->where('id', '!=', $usuario->id)->exists()) {
-            return back()->withInput()->withErrors(['roles' => 'Ya existe otra cuenta de Subdirección asignada en el sistema.']);
+        if ($esSubdirectora && Usuario::role(['subdirectora', 'Subdirector'])->where('id', '!=', $usuario->id)->exists()) {
+            return back()->withInput()
+                ->withErrors(['roles' => 'Ya existe otra cuenta de Subdirección asignada en el sistema.']);
         }
 
-        // Autorizar ANTES de abrir transacción: una AuthorizationException no
-        // debe dejar la transacción abierta (esto además rompía las pruebas).
         $this->authorize('update', $usuario);
 
         try {
-            DB::transaction(function () use ($request, $usuario) {
-                // Actualizamos únicamente los datos propios del usuario
+            DB::transaction(function () use ($validated, $usuario) {
                 $usuario->update([
-                    'nombre_completo' => $request->nombre_completo,
-                    'email'           => $request->email,
-                    'activo'          => $request->activo,
+                    'nombre_completo' => $validated['nombre_completo'],
+                    'email' => $validated['email'],
+                    'activo' => (bool) $validated['activo'],
                 ]);
 
-                // Spatie se encarga de guardar la relación del rol
-                $usuario->syncRoles($request->roles);
+                $usuario->syncRoles($validated['roles']);
 
-                $esDocente = collect($request->roles)->contains(function ($rol) {
-                    return str_contains($rol, 'Docente') || $rol === 'Coordinador';
+                $esDocente = collect($validated['roles'])->contains(function ($rol) {
+                    $lower = mb_strtolower((string) $rol, 'UTF-8');
+
+                    return str_contains($lower, 'docente') || str_contains($lower, 'coordinador');
                 });
 
                 if ($esDocente) {
-                    \App\Models\Docente::updateOrCreate(
+                    $esCoordinador = count(array_intersect($validated['roles'], ['coordinador', 'Coordinador'])) > 0;
+
+                    Docente::updateOrCreate(
                         ['usuario_id' => $usuario->id],
                         [
-                            'codigo_unico_persona'  => $request->codigo_unico_persona ?? $usuario->docente?->codigo_unico_persona ?? 'DOC-' . str_pad($usuario->id, 4, '0', STR_PAD_LEFT),
-                            'sexo'                  => $request->sexo ?? $usuario->docente?->sexo ?? 'M',
-                            'modalidad_id'          => $request->modalidad_id,
-                            'es_coordinador'        => collect($request->roles)->contains('Coordinador'),
-                            'modalidad_coordina_id' => collect($request->roles)->contains('Coordinador') ? $request->modalidad_coordina_id : null,
+                            'codigo_unico_persona' => $validated['codigo_unico_persona'] ?? $usuario->docente?->codigo_unico_persona ?? ('DOC-' . str_pad((string) $usuario->id, 4, '0', STR_PAD_LEFT)),
+                            'sexo' => $validated['sexo'] ?? $usuario->docente?->sexo ?? 'M',
+                            'modalidad_id' => $validated['modalidad_id'] ?? null,
+                            'es_coordinador' => $esCoordinador,
+                            'modalidad_coordina_id' => $esCoordinador ? ($validated['modalidad_coordina_id'] ?? null) : null,
                         ]
                     );
                 }
             });
 
             return redirect()->route('academico.usuarios.index')
-                             ->with('success', 'Perfil y accesos actualizados correctamente.');
-
-        } catch (\Exception $e) {
-            // CONTINGENCIA: Si falla el update
-            return back()->withInput()->with('error', 'Ocurrió un problema técnico al actualizar la información del usuario.');
+                ->with('success', 'Perfil y accesos actualizados correctamente.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()->withInput()
+                ->with('error', $this->formatearError($e, 'No fue posible actualizar la información del usuario.'));
         }
     }
 
-    public function destroy(Usuario $usuario)
+    public function destroy(Usuario $usuario): RedirectResponse
     {
         try {
             $this->authorize('delete', $usuario);
@@ -290,39 +281,34 @@ class UsuarioController extends Controller
             $mensaje = $usuario->activo ? 'Usuario reactivado en el sistema.' : 'Usuario desactivado por seguridad.';
 
             return redirect()->route('academico.usuarios.index')->with('success', $mensaje);
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si la base de datos bloquea el cambio de estado
-            return back()->with('error', 'No se pudo cambiar el estado de activación del usuario.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()
+                ->with('error', $this->formatearError($e, 'No fue posible cambiar el estado de activación del usuario.'));
         }
     }
 
-    public function resetPassword(Request $request, Usuario $usuario)
+    public function resetPassword(Request $request, Usuario $usuario): RedirectResponse
     {
-        // Validación AFUERA
-        $request->validate([
-            'password' => 'required|string|min:8',
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'min:8'],
         ]);
 
         try {
             $this->authorize('update', $usuario);
 
             $usuario->update([
-                'password' => bcrypt($request->password)
+                'password' => Hash::make($validated['password']),
             ]);
 
             return redirect()->route('academico.usuarios.index')
-                             ->with('success', 'Contraseña de ' . ($usuario->nombre_completo ?? $usuario->name) . ' restablecida exitosamente.');
-
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si falla el reseteo de contraseña
-            return back()->with('error', 'No se pudo restablecer la contraseña debido a un error del servidor.');
+                ->with('success', 'Contraseña de ' . ($usuario->nombre_completo ?? $usuario->name) . ' restablecida exitosamente.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()
+                ->with('error', $this->formatearError($e, 'No fue posible restablecer la contraseña.'));
         }
     }
 }

@@ -2,133 +2,139 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Usuario;
 use App\Services\RespaldoService;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use Illuminate\View\View;
 use Throwable;
 
-/**
- * Módulo de Respaldos de la Base de Datos (Dirección).
- *
- * Creado tras el incidente de Oct 2026 donde se perdió el contenido de la
- * base de datos de Supabase y solo existían las migraciones para recuperar
- * la estructura (ver Contexto.md, secciones 15.6 y 16).
- *
- * Acceso: Director y Subdirector pueden ver, crear y descargar respaldos.
- * Eliminar y RESTAURAR es exclusivo del Director, con confirmación escrita.
- */
 class RespaldoController extends Controller
 {
-    public function __construct(protected RespaldoService $respaldos) {}
+    public function __construct(
+        protected RespaldoService $respaldos
+    ) {}
 
-    /** Pantalla principal: estado de la conexión y lista de respaldos. */
-    public function index()
+    public function index(): View|RedirectResponse
     {
-        if (! auth()->user()->hasAnyRole(['Director', 'Subdirector'])) {
+        /** @var Usuario|null $user */
+        $user = Auth::user();
+        if (!$user || !$user->hasAnyRole(['directora', 'subdirectora', 'Director', 'Subdirector'])) {
             abort(403, 'Solo la Dirección puede acceder al módulo de respaldos.');
         }
 
         try {
             $conexion = $this->respaldos->estadoConexion();
             $lista = $this->respaldos->listar();
+
+            return view('academico.respaldos.index', compact('conexion', 'lista'));
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
         } catch (Throwable $e) {
-            Log::error('No se pudo inicializar el módulo de respaldos', ['error' => $e->getMessage()]);
-
-            return back()->with('error', 'No se pudo leer el estado de los respaldos: '.$e->getMessage());
+            return back()->with('error', $this->formatearError($e, 'No fue posible leer el estado de los respaldos.'));
         }
-
-        return view('academico.respaldos.index', compact('conexion', 'lista'));
     }
 
-    /** Genera un nuevo respaldo completo de la base de datos. */
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
-        if (! auth()->user()->hasAnyRole(['Director', 'Subdirector'])) {
+        /** @var Usuario|null $user */
+        $user = Auth::user();
+        if (!$user || !$user->hasAnyRole(['directora', 'subdirectora', 'Director', 'Subdirector'])) {
             abort(403, 'Solo la Dirección puede generar respaldos.');
         }
 
-        $request->validate([
-            'motivo' => 'nullable|string|max:100',
+        $validated = $request->validate([
+            'motivo' => ['nullable', 'string', 'max:100'],
         ]);
 
         try {
-            $resultado = $this->respaldos->crearRespaldo($request->input('motivo') ?: 'manual-desde-interfaz');
+            $resultado = $this->respaldos->crearRespaldo($validated['motivo'] ?? 'manual-desde-interfaz');
+            $tamanio = number_format($resultado['bytes'] / 1024, 1) . ' KB';
+            $duracion = number_format($resultado['duracion_ms'] / 1000, 1) . ' s';
+
+            return back()->with(
+                'success',
+                "Respaldo generado correctamente: {$resultado['tablas']} tablas, "
+                . number_format($resultado['filas']) . " filas ({$tamanio} en {$duracion})."
+            );
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
         } catch (Throwable $e) {
-            Log::error('Fallo la generación de un respaldo', ['error' => $e->getMessage()]);
-
-            return back()->with('error', 'No se pudo completar el respaldo: '.$e->getMessage());
+            return back()->with('error', $this->formatearError($e, 'No fue posible completar el respaldo.'));
         }
-
-        $tamanio = number_format($resultado['bytes'] / 1024, 1).' KB';
-        $duracion = number_format($resultado['duracion_ms'] / 1000, 1).' s';
-
-        return back()->with(
-            'success',
-            "Respaldo generado correctamente: {$resultado['tablas']} tablas, ".
-            number_format($resultado['filas'])." filas ({$tamanio} en {$duracion})."
-        );
     }
 
-    /** Descarga el archivo .zip del respaldo. */
-    public function descargar(string $nombre)
+    public function descargar(string $nombre): BinaryFileResponse|RedirectResponse
     {
-        if (! auth()->user()->hasAnyRole(['Director', 'Subdirector'])) {
+        /** @var Usuario|null $user */
+        $user = Auth::user();
+        if (!$user || !$user->hasAnyRole(['directora', 'subdirectora', 'Director', 'Subdirector'])) {
             abort(403, 'Solo la Dirección puede descargar respaldos.');
         }
 
-        $ruta = $this->respaldos->rutaValida($nombre);
+        try {
+            $ruta = $this->respaldos->rutaValida($nombre);
 
-        return response()->download($ruta, $nombre);
+            return response()->download($ruta, $nombre);
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'No fue posible descargar el respaldo.'));
+        }
     }
 
-    /** Elimina un respaldo del disco (solo Director). */
-    public function destroy(string $nombre)
+    public function destroy(string $nombre): RedirectResponse
     {
-        if (! auth()->user()->hasRole('Director')) {
-            abort(403, 'Solo el Director puede eliminar respaldos.');
+        /** @var Usuario|null $user */
+        $user = Auth::user();
+        if (!$user || !$user->hasAnyRole(['directora', 'Director'])) {
+            abort(403, 'Solo la Directora puede eliminar respaldos.');
         }
 
         try {
             $this->respaldos->eliminar($nombre);
-        } catch (Throwable $e) {
-            return back()->with('error', 'No se pudo eliminar el respaldo: '.$e->getMessage());
-        }
 
-        return back()->with('success', 'Respaldo eliminado.');
+            return back()->with('success', 'Respaldo eliminado.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'No fue posible eliminar el respaldo.'));
+        }
     }
 
-    /**
-     * RESTAURA la base de datos desde un respaldo (solo Director).
-     *
-     * Requiere que el usuario escriba la palabra "RESTAURAR" como
-     * confirmación. El servicio crea además un respaldo de seguridad del
-     * estado actual antes de aplicar la restauración.
-     */
-    public function restaurar(Request $request, string $nombre)
+    public function restaurar(Request $request, string $nombre): RedirectResponse
     {
-        if (! auth()->user()->hasRole('Director')) {
-            abort(403, 'Solo el Director puede restaurar respaldos.');
+        /** @var Usuario|null $user */
+        $user = Auth::user();
+        if (!$user || !$user->hasAnyRole(['directora', 'Director'])) {
+            abort(403, 'Solo la Directora puede restaurar respaldos.');
         }
 
-        $request->validate([
+        $validated = $request->validate([
             'confirmacion' => ['required', 'string'],
         ]);
 
-        if (trim($request->input('confirmacion')) !== 'RESTAURAR') {
+        if (trim($validated['confirmacion']) !== 'RESTAURAR') {
             return back()->with('error', 'La confirmación no coincide. Debe escribirse exactamente la palabra RESTAURAR.');
         }
 
         try {
             $resultado = $this->respaldos->restaurar($nombre);
-        } catch (Throwable $e) {
-            return back()->with('error', 'La restauración no se aplicó: '.$e->getMessage());
-        }
 
-        return back()->with(
-            'success',
-            "Base de datos restaurada desde {$resultado['archivo']} (".
-            number_format($resultado['filas']).' filas). Respaldo del estado previo: '.
-            $resultado['respaldo_previo'].'.'
-        );
+            return back()->with(
+                'success',
+                "Base de datos restaurada desde {$resultado['archivo']} ("
+                . number_format($resultado['filas']) . ' filas). Respaldo del estado previo: '
+                . $resultado['respaldo_previo'] . '.'
+            );
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'La restauración no se aplicó.'));
+        }
     }
 }

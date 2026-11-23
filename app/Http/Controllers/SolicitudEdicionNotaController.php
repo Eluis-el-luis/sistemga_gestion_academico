@@ -2,96 +2,84 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Nota;
+use App\Models\CorteCerrado;
 use App\Models\SolicitudEdicionNota;
+use App\Models\Usuario;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class SolicitudEdicionNotaController extends Controller
 {
-    /**
-     * Solo Dirección y Subdirección pueden gestionar las solicitudes de desbloqueo.
-     */
     protected function autorizar(): void
     {
-        if (!Auth::user()->hasAnyRole(['Director', 'Subdirector'])) {
-            // UX: Lanzamos una excepción que será atrapada o redirigida amablemente
+        /** @var Usuario|null $user */
+        $user = Auth::user();
+        if (!$user || !$user->hasAnyRole(['directora', 'subdirectora', 'Director', 'Subdirector'])) {
             abort(403, 'No tiene permisos para gestionar solicitudes de edición de notas.');
         }
     }
 
-    /**
-     * Lista de solicitudes pendientes y resueltas.
-     */
-    public function index(Request $request)
+    public function index(Request $request): View|RedirectResponse
     {
         try {
             $this->autorizar();
 
-            $estado = $request->query('estado', 'Pendiente');
+            $estado = (string) $request->query('estado', 'Pendiente');
 
-            $solicitudes = SolicitudEdicionNota::with(['docente.usuario', 'nota.matricula.alumno', 'nota.aulaAsignaturaDocente.asignatura', 'autorizadoPor'])
+            $solicitudes = SolicitudEdicionNota::with([
+                'docente.usuario',
+                'nota.matricula.alumno',
+                'nota.aulaAsignaturaDocente.asignatura',
+                'autorizadoPor',
+            ])
                 ->when($estado !== 'Todas', fn ($q) => $q->where('estado', $estado))
                 ->orderByDesc('created_at')
                 ->get();
 
             return view('academico.notas.solicitudes', compact('solicitudes', 'estado'));
-
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
-            return redirect()->route('dashboard')->with('error', $e->getMessage());
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si la consulta a la base de datos falla
-            return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar el buzón de solicitudes de edición.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')
+                ->with('error', $this->formatearError($e, 'No fue posible cargar las solicitudes de edición de notas.'));
         }
     }
 
-    /**
-     * Aprueba una solicitud y desbloquea todas las notas del parcial (asignación + corte).
-     */
-    public function aprobar(SolicitudEdicionNota $solicitud)
+    public function aprobar(SolicitudEdicionNota $solicitud): RedirectResponse
     {
-        DB::beginTransaction();
         try {
             $this->autorizar();
 
-            $notaReferencia = $solicitud->nota;
-            if ($notaReferencia) {
-                // Desbloqueamos el parcial completo (asignación + corte)
-                \App\Models\CorteCerrado::where('aula_asignatura_docente_id', $notaReferencia->aula_asignatura_docente_id)
-                    ->where('corte_evaluativo_id', $notaReferencia->corte_evaluativo_id)
-                    ->delete();
-            }
+            DB::transaction(function () use ($solicitud) {
+                $notaReferencia = $solicitud->nota;
+                if ($notaReferencia) {
+                    CorteCerrado::where('aula_asignatura_docente_id', $notaReferencia->aula_asignatura_docente_id)
+                        ->where('corte_evaluativo_id', $notaReferencia->corte_evaluativo_id)
+                        ->delete();
+                }
 
-            $solicitud->update([
-                'estado' => 'Aprobada',
-                'autorizado_por' => Auth::id(),
-                'fecha_resolucion' => now(),
-            ]);
+                $solicitud->update([
+                    'estado' => 'Aprobada',
+                    'autorizado_por' => Auth::id(),
+                    'fecha_resolucion' => now(),
+                ]);
+            });
 
-            DB::commit();
             return back()->with('success', 'Solicitud aprobada. El parcial fue desbloqueado para edición.');
-
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
-            DB::rollBack();
-            return back()->with('error', $e->getMessage());
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            DB::rollBack();
-            // CONTINGENCIA: Si la transacción falla
-            return back()->with('error', 'No se pudo aprobar la solicitud debido a un problema técnico. El cambio fue cancelado.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()
+                ->with('error', $this->formatearError($e, 'No fue posible aprobar la solicitud de desbloqueo.'));
         }
     }
 
-    /**
-     * Rechaza una solicitud de desbloqueo.
-     */
-    public function rechazar(Request $request, SolicitudEdicionNota $solicitud)
+    public function rechazar(Request $request, SolicitudEdicionNota $solicitud): RedirectResponse
     {
         try {
             $this->autorizar();
@@ -103,15 +91,11 @@ class SolicitudEdicionNotaController extends Controller
             ]);
 
             return back()->with('success', 'Solicitud rechazada.');
-
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
-            return back()->with('error', $e->getMessage());
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                throw $e;
-            }
-            // CONTINGENCIA: Si el update falla
-            return back()->with('error', 'Ocurrió un error técnico al intentar rechazar la solicitud.');
+        } catch (AuthorizationException|HttpException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return back()
+                ->with('error', $this->formatearError($e, 'No fue posible rechazar la solicitud de desbloqueo.'));
         }
     }
 }

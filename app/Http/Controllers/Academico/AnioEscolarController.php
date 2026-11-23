@@ -3,15 +3,17 @@
 namespace App\Http\Controllers\Academico;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\AnioEscolar\CambiarEstadoAnioEscolarRequest;
 use App\Http\Requests\AnioEscolar\StoreAnioEscolarRequest;
 use App\Http\Requests\AnioEscolar\UpdateAnioEscolarRequest;
-use App\Http\Requests\AnioEscolar\CambiarEstadoAnioEscolarRequest;
 use App\Models\AnioEscolar;
 use App\Services\AnioEscolarService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class AnioEscolarController extends Controller
@@ -24,62 +26,68 @@ class AnioEscolarController extends Controller
         $this->authorizeResource(AnioEscolar::class, 'anioEscolar');
     }
 
-    /**
-     * Lista todos los años escolares con sus estados y estadísticas.
-     */
-    public function index(): View
+    public function index(): View|RedirectResponse
     {
-        $aniosEscolares = AnioEscolar::ordenado()
-            ->withCount(['aulas', 'matriculas', 'cortesEvaluativos'])
-            ->get();
+        try {
+            $aniosEscolares = AnioEscolar::ordenado()
+                ->withCount(['aulas', 'matriculas', 'cortesEvaluativos'])
+                ->get();
 
-        $anioActivo = AnioEscolar::obtenerActivo();
+            $anioActivo = AnioEscolar::obtenerActivo();
 
-        return view('academico.anios-escolares.index', compact('aniosEscolares', 'anioActivo'));
+            return view('academico.anios-escolares.index', compact('aniosEscolares', 'anioActivo'));
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('dashboard')->with('error', $this->formatearError($e, 'No fue posible cargar los años escolares.'));
+        }
     }
 
-    /**
-     * Muestra el formulario para crear un nuevo año escolar.
-     */
-    public function create(): View
+    public function create(): View|RedirectResponse
     {
-        return view('academico.anios-escolares.create');
+        try {
+            return view('academico.anios-escolares.create');
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('academico.anios-escolares.index')->with('error', $this->formatearError($e, 'No se pudo abrir el formulario de año escolar.'));
+        }
     }
 
-    /**
-     * Almacena un nuevo año escolar en Planificación.
-     */
     public function store(StoreAnioEscolarRequest $request): RedirectResponse
     {
-        $anioEscolar = $this->anioEscolarService->crear(
-            $request->validated(),
-            Auth::user()
-        );
+        try {
+            $anioEscolar = $this->anioEscolarService->crear($request->validated(), Auth::user());
 
-        return redirect()
-            ->route('academico.anios-escolares.index')
-            ->with('success', "Año escolar «{$anioEscolar->nombre}» creado correctamente en estado Planificación.");
+            return redirect()
+                ->route('academico.anios-escolares.index')
+                ->with('success', "Año escolar «{$anioEscolar->nombre}» creado correctamente en estado Planificación.");
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors())->withInput();
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', $this->formatearError($e, 'No fue posible crear el año escolar.'));
+        }
     }
 
-    /**
-     * Muestra el detalle de un año escolar con validaciones de cierre.
-     */
-    public function show(AnioEscolar $anioEscolar): View
+    public function show(AnioEscolar $anioEscolar): View|RedirectResponse
     {
-        $reporteValidaciones = $this->anioEscolarService->obtenerReporteValidacionesCierre($anioEscolar);
-        $transiciones = $anioEscolar->getTransicionesPermitidas();
+        try {
+            $reporteValidaciones = $this->anioEscolarService->obtenerReporteValidacionesCierre($anioEscolar);
+            $transiciones = $anioEscolar->getTransicionesPermitidas();
 
-        return view('academico.anios-escolares.show', compact(
-            'anioEscolar',
-            'reporteValidaciones',
-            'transiciones'
-        ));
+            return view('academico.anios-escolares.show', compact(
+                'anioEscolar',
+                'reporteValidaciones',
+                'transiciones'
+            ));
+        } catch (AuthorizationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            return redirect()->route('academico.anios-escolares.index')->with('error', $this->formatearError($e, 'No fue posible mostrar el detalle del año escolar.'));
+        }
     }
 
-    /**
-     * Muestra el formulario para editar un año escolar (solo Planificación).
-     */
-    public function edit(AnioEscolar $anioEscolar): View
+    public function edit(AnioEscolar $anioEscolar): View|RedirectResponse
     {
         if ($anioEscolar->es_cerrado) {
             abort(403, 'No se puede editar un año escolar cerrado.');
@@ -88,25 +96,21 @@ class AnioEscolarController extends Controller
         return view('academico.anios-escolares.edit', compact('anioEscolar'));
     }
 
-    /**
-     * Actualiza los datos básicos de un año escolar.
-     */
     public function update(UpdateAnioEscolarRequest $request, AnioEscolar $anioEscolar): RedirectResponse
     {
-        $anioEscolar = $this->anioEscolarService->actualizar(
-            $anioEscolar,
-            $request->validated(),
-            Auth::user()
-        );
+        try {
+            $this->anioEscolarService->actualizar($anioEscolar, $request->validated(), Auth::user());
 
-        return redirect()
-            ->route('academico.anios-escolares.show', $anioEscolar)
-            ->with('success', 'Año escolar actualizado correctamente.');
+            return redirect()
+                ->route('academico.anios-escolares.show', $anioEscolar)
+                ->with('success', 'Año escolar actualizado correctamente.');
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors())->withInput();
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', $this->formatearError($e, 'No fue posible actualizar el año escolar.'));
+        }
     }
 
-    /**
-     * Cambia el estado del año escolar (Activar / Planificación / Cerrar).
-     */
     public function cambiarEstado(CambiarEstadoAnioEscolarRequest $request, AnioEscolar $anioEscolar): RedirectResponse
     {
         $estado = $request->validated('estado');
@@ -131,53 +135,60 @@ class AnioEscolarController extends Controller
             return redirect()
                 ->route('academico.anios-escolares.show', $anioEscolar)
                 ->with('success', $mensajes[$estado] ?? 'Estado cambiado correctamente.');
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return back()
-                ->withErrors($e->errors())
-                ->withInput();
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors())->withInput();
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', $this->formatearError($e, 'No fue posible cambiar el estado del año escolar.'));
         }
     }
 
-    /**
-     * Elimina un año escolar (solo Planificación sin dependencias).
-     */
     public function destroy(AnioEscolar $anioEscolar): RedirectResponse
     {
-        $this->anioEscolarService->eliminar($anioEscolar, Auth::user());
+        try {
+            $this->anioEscolarService->eliminar($anioEscolar, Auth::user());
 
-        return redirect()
-            ->route('academico.anios-escolares.index')
-            ->with('success', 'Año escolar eliminado correctamente.');
+            return redirect()
+                ->route('academico.anios-escolares.index')
+                ->with('success', 'Año escolar eliminado correctamente.');
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        } catch (\Throwable $e) {
+            return back()->with('error', $this->formatearError($e, 'No fue posible eliminar el año escolar.'));
+        }
     }
 
-    /**
-     * API: Obtiene el año escolar activo actual.
-     */
-    public function activo(): \Illuminate\Http\JsonResponse
+    public function activo(): JsonResponse
     {
-        $anioActivo = AnioEscolar::obtenerActivo();
+        try {
+            $anioActivo = AnioEscolar::obtenerActivo();
 
-        if (!$anioActivo) {
+            if (!$anioActivo) {
+                return response()->json([
+                    'activo' => false,
+                    'mensaje' => 'No hay año escolar activo.',
+                ], 404);
+            }
+
+            return response()->json([
+                'activo' => true,
+                'anio_escolar' => $anioActivo->load('cortesEvaluativos'),
+            ]);
+        } catch (\Throwable $e) {
             return response()->json([
                 'activo' => false,
-                'mensaje' => 'No hay año escolar activo.',
-            ], 404);
+                'mensaje' => $this->formatearError($e, 'Error al consultar el año escolar activo.'),
+            ], 500);
         }
-
-        return response()->json([
-            'activo' => true,
-            'anio_escolar' => $anioActivo->load('cortesEvaluativos'),
-        ]);
     }
 
-    /**
-     * API: Obtiene reporte de validaciones para cierre (para modal/confirmación).
-     */
-    public function validacionesCierre(AnioEscolar $anioEscolar): \Illuminate\Http\JsonResponse
+    public function validacionesCierre(AnioEscolar $anioEscolar): JsonResponse
     {
-        $reporte = $this->anioEscolarService->obtenerReporteValidacionesCierre($anioEscolar);
-
-        return response()->json($reporte);
+        try {
+            return response()->json($this->anioEscolarService->obtenerReporteValidacionesCierre($anioEscolar));
+        } catch (\Throwable $e) {
+            return response()->json([
+                'mensaje' => $this->formatearError($e, 'Error al consultar validaciones de cierre.'),
+            ], 500);
+        }
     }
 }
