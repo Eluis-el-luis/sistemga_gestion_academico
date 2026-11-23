@@ -3,13 +3,12 @@
 namespace App\Http\Requests\AnioEscolar;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreAnioEscolarRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('configuracion.gestionar');
+        return (bool) $this->user()?->can('configuracion.gestionar');
     }
 
     public function rules(): array
@@ -19,7 +18,7 @@ class StoreAnioEscolarRequest extends FormRequest
                 'required',
                 'string',
                 'max:20',
-                'regex:/^\d{4}-\d{4}$/', // Formato: 2026-2027
+                'regex:/^\d{4}-\d{4}$/',
                 'unique:anio_escolar,nombre',
             ],
             'fecha_inicio' => [
@@ -50,13 +49,11 @@ class StoreAnioEscolarRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        // Normalizar el nombre si viene en formato diferente
-        if ($this->has('nombre')) {
-            $nombre = $this->input('nombre');
-            // Si viene como "2026" o "2026/2027", normalizar a "2026-2027"
+        if ($this->filled('nombre')) {
+            $nombre = trim((string) $this->input('nombre'));
             if (preg_match('/^(\d{4})[\/\-]?(\d{4})?$/', $nombre, $matches)) {
                 $inicio = $matches[1];
-                $fin = $matches[2] ?? (int)$inicio + 1;
+                $fin = $matches[2] ?? ((int) $inicio + 1);
                 $this->merge(['nombre' => "{$inicio}-{$fin}"]);
             }
         }

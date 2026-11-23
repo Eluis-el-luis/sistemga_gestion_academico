@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\AnioEscolar;
 
+use App\Models\AnioEscolar;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -9,12 +10,13 @@ class UpdateAnioEscolarRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('configuracion.gestionar');
+        return (bool) $this->user()?->can('configuracion.gestionar');
     }
 
     public function rules(): array
     {
         $anioEscolar = $this->route('anioEscolar');
+        $ignoreId = $anioEscolar instanceof AnioEscolar ? $anioEscolar->id : null;
 
         return [
             'nombre' => [
@@ -22,7 +24,7 @@ class UpdateAnioEscolarRequest extends FormRequest
                 'string',
                 'max:20',
                 'regex:/^\d{4}-\d{4}$/',
-                Rule::unique('anio_escolar', 'nombre')->ignore($anioEscolar->id),
+                Rule::unique('anio_escolar', 'nombre')->ignore($ignoreId),
             ],
             'fecha_inicio' => [
                 'sometimes',
@@ -49,11 +51,11 @@ class UpdateAnioEscolarRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if ($this->has('nombre')) {
-            $nombre = $this->input('nombre');
+        if ($this->filled('nombre')) {
+            $nombre = trim((string) $this->input('nombre'));
             if (preg_match('/^(\d{4})[\/\-]?(\d{4})?$/', $nombre, $matches)) {
                 $inicio = $matches[1];
-                $fin = $matches[2] ?? (int)$inicio + 1;
+                $fin = $matches[2] ?? ((int) $inicio + 1);
                 $this->merge(['nombre' => "{$inicio}-{$fin}"]);
             }
         }

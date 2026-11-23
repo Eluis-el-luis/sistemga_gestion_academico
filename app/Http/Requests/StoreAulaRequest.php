@@ -16,27 +16,27 @@ class StoreAulaRequest extends FormRequest
     {
         return [
             'nombre' => [
-                'required', 'string', 'max:20',
+                'required',
+                'string',
+                'max:20',
                 Rule::unique('aula')->where(function ($query) {
-                    return $query->where('anio_escolar_id', $this->anio_escolar_id)
-                                 ->where('grado_id', $this->grado_id);
+                    return $query->where('anio_escolar_id', $this->input('anio_escolar_id'))
+                        ->where('grado_id', $this->input('grado_id'));
                 }),
             ],
-            'grado_id' => 'required|exists:grado,id',
-            'modalidad_id' => 'required|exists:modalidad,id',
-            'turno' => 'required|string|max:20',
-            
-            // MAGIA AQUÍ: Validamos que el docente no se repita en el mismo año escolar
+            'grado_id' => ['required', 'integer', 'exists:grado,id'],
+            'modalidad_id' => ['required', 'integer', 'exists:modalidad,id'],
+            'turno' => ['required', 'string', 'max:20'],
             'docente_guia_id' => [
                 'required',
+                'integer',
                 'exists:docente,id',
                 Rule::unique('aula')->where(function ($query) {
-                    return $query->where('anio_escolar_id', $this->anio_escolar_id);
+                    return $query->where('anio_escolar_id', $this->input('anio_escolar_id'));
                 }),
             ],
-            
-            'anio_escolar_id' => 'required|exists:anio_escolar,id',
-            'cupo' => 'required|integer|min:1|max:50',
+            'anio_escolar_id' => ['required', 'integer', 'exists:anio_escolar,id'],
+            'cupo' => ['required', 'integer', 'min:1', 'max:50'],
         ];
     }
 

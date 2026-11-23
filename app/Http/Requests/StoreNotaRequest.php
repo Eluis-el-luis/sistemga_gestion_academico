@@ -2,27 +2,30 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use App\Models\AulaAsignaturaDocente;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 
 class StoreNotaRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     * Zero Trust: Authorization ANTES de validación de datos
-     */
     public function authorize(): bool
     {
-        $asignacion = $this->route('asignacion');
-        
-        if (!$asignacion instanceof \App\Models\AulaAsignaturaDocente) {
-            return false;
-        }
-
         try {
-            $this->authorize('calificar', $asignacion);
-            return true;
-        } catch (AuthorizationException $e) {
+            $asignacion = $this->route('asignacion');
+
+            if (!$asignacion instanceof AulaAsignaturaDocente || !$this->user()) {
+                return false;
+            }
+
+            return Gate::forUser($this->user())->allows('calificar', $asignacion);
+        } catch (\Throwable $e) {
+            Log::error('Error en StoreNotaRequest::authorize', [
+                'user_id' => $this->user()?->id,
+                'exception' => $e->getMessage(),
+            ]);
+
             return false;
         }
     }
@@ -30,10 +33,14 @@ class StoreNotaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'corte_evaluativo_id' => 'required|exists:corte_evaluativo,id',
-            'notas' => 'required|array',
-            'notas.*' => 'array',
-            'notas.*.*' => 'nullable|numeric|min:0|max:100',
+            'corte_evaluativo_id' => ['required', 'integer', 'exists:corte_evaluativo,id'],
+            'notas' => ['required', 'array'],
+            'notas.*' => ['array'],
+            'notas.*.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'indicadores' => ['nullable', 'array'],
+            'indicadores.*' => ['nullable', 'integer', 'exists:indicador_logro,id'],
+            'porcentajes' => ['nullable', 'array'],
+            'porcentajes.*' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ];
     }
 
