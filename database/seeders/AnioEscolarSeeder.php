@@ -16,7 +16,7 @@ class AnioEscolarSeeder extends Seeder
             'nombre' => '2026',
             'fecha_inicio' => Carbon::create('2026', '02', '01')->toDateString(),
             'fecha_fin' => Carbon::create('2026', '11', '30')->toDateString(),
-            'activo' => true,
+            'estado' => 'activo',
         ]);
         
         // Puedes agregar un año futuro de prueba si lo deseas
@@ -24,7 +24,7 @@ class AnioEscolarSeeder extends Seeder
             'nombre' => '2027',
             'fecha_inicio' => Carbon::create('2027', '02', '01')->toDateString(),
             'fecha_fin' => Carbon::create('2027', '11', '30')->toDateString(),
-            'activo' => false,
+            'estado' => 'activo',
         ]);
     }
 }

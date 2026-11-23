@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SolicitudEdicionNota extends Model
 {
@@ -21,17 +22,17 @@ class SolicitudEdicionNota extends Model
         'fecha_resolucion' => 'datetime',
     ];
 
-    public function docente()
+    public function docente(): BelongsTo
     {
         return $this->belongsTo(Docente::class, 'docente_id');
     }
 
-    public function nota()
+    public function nota(): BelongsTo
     {
         return $this->belongsTo(Nota::class, 'nota_id');
     }
 
-    public function autorizadoPor()
+    public function autorizadoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'autorizado_por');
     }

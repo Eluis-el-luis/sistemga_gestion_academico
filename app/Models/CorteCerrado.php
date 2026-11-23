@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CorteCerrado extends Model
 {
@@ -21,17 +22,17 @@ class CorteCerrado extends Model
         'fecha_cierre' => 'datetime',
     ];
 
-    public function aulaAsignaturaDocente()
+    public function aulaAsignaturaDocente(): BelongsTo
     {
         return $this->belongsTo(AulaAsignaturaDocente::class, 'aula_asignatura_docente_id');
     }
 
-    public function corteEvaluativo()
+    public function corteEvaluativo(): BelongsTo
     {
         return $this->belongsTo(CorteEvaluativo::class, 'corte_evaluativo_id');
     }
 
-    public function cerradoPor()
+    public function cerradoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'cerrado_por');
     }

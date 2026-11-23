@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AsistenciaPersonal extends Model
 {
@@ -17,11 +18,15 @@ class AsistenciaPersonal extends Model
         'hora_entrada',
         'turno',
         'estado',
-        'observaciones'
+        'observaciones',
     ];
 
-    public function usuario()
+    protected $casts = [
+        'fecha' => 'date',
+    ];
+
+    public function usuario(): BelongsTo
     {
-        return $this->belongsTo(Usuario::class);
+        return $this->belongsTo(Usuario::class, 'usuario_id');
     }
 }

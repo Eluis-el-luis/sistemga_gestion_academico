@@ -85,7 +85,7 @@ class PermisoSeeder extends Seeder
 
         // 5. Asignar permisos al Subdirector (Supervisión total, sin gestión usuarios)
         $subdirector->syncPermissions([
-            'alumnos.supervisar','alumnos.ver', 'notas.ver', 'asistencia.ver', 'asistencia.gestionar','indicadores.ver', 
+            'alumnos.gestionar','alumnos.supervisar','alumnos.ver', 'notas.ver', 'asistencia.ver', 'asistencia.gestionar','indicadores.ver', 
             'boletines.ver', 'malla.gestionar', 'aulas.gestionar', 'aulas.ver', 'asignaturas_aula.gestionar', 
             'horarios.ver', 'horarios.gestionar', 'avance.ver', 'apoyo_padres.ver', 'reparacion.ver', 
             'reportes.supervisar', 'configuracion.gestionar', 'configuracion.ver',

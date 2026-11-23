@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AsistenciaAsignatura extends Model
 {
@@ -17,28 +18,25 @@ class AsistenciaAsignatura extends Model
         'bloque_horario_id',
         'fecha',
         'estado_incidencia',
-        'observacion'
+        'observacion',
     ];
 
-    /**
-     * Semántica de estados:
-     * - La tabla solo registra INCIDENCIAS (excepciones a la presencia).
-     * - Estados válidos: 'Fuga', 'Llegada Tardía', 'Permiso de Salida'.
-     * - NO se registra 'Presente' como fila; la ausencia de registro = alumno presente en ese bloque.
-     * - Índice único sobre (matricula_id, asignatura_id, bloque_horario_id, fecha) evita duplicados.
-     */
-    public function matricula()
+    protected $casts = [
+        'fecha' => 'date',
+    ];
+
+    public function matricula(): BelongsTo
     {
-        return $this->belongsTo(Matricula::class);
+        return $this->belongsTo(Matricula::class, 'matricula_id');
     }
 
-    public function asignatura()
+    public function asignatura(): BelongsTo
     {
-        return $this->belongsTo(Asignatura::class);
+        return $this->belongsTo(Asignatura::class, 'asignatura_id');
     }
 
-    public function bloqueHorario()
+    public function bloqueHorario(): BelongsTo
     {
-        return $this->belongsTo(BloqueHorario::class);
+        return $this->belongsTo(BloqueHorario::class, 'bloque_horario_id');
     }
 }

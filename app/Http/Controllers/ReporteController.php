@@ -53,7 +53,6 @@ class ReporteController extends Controller
         }
         
         // 4. Permisos granulares para reportes MINED específicos (Docente Guía)
-        // El middleware/autorización ya inyectó los filtros de aula/grado arriba
         $rutaActual = request()->route()->getName();
         $reportesMinidDocenteGuia = [
             'reportes.rendimiento-corte',
@@ -63,8 +62,6 @@ class ReporteController extends Controller
         ];
         
         if ($user->hasRole('Docente Guia') && in_array($rutaActual, $reportesMinidDocenteGuia)) {
-            // Verificar que tiene al menos el permiso base de mi_aula o mis_clases
-            // Los filtros de aula ya se inyectaron en el paso 3
             if (!$user->hasAnyPermission(['reportes.mi_aula.ver', 'reportes.mis_clases.ver'])) {
                 throw new \Illuminate\Auth\Access\AuthorizationException('No tiene permisos para acceder a este reporte MINED.');
             }
@@ -94,7 +91,6 @@ class ReporteController extends Controller
 
     /**
      * Extrae los catálogos necesarios. 
-     * El parámetro $cargarMasivos evita colapsar la memoria en vistas que no necesitan la lista completa de alumnos/docentes.
      */
     protected function pasarCatalogos(Request $request, bool $cargarMasivos = true): array
     {
@@ -108,7 +104,6 @@ class ReporteController extends Controller
             'cortes' => $cat['cortes'],
         ];
 
-        // Solo consultamos estas tablas gigantes si la vista realmente lo requiere
         if ($cargarMasivos) {
             $datos['docentes'] = Docente::with('usuario')->orderBy('id')->get();
             $datos['aulas'] = Aula::orderBy('grado_id')->get();
@@ -143,7 +138,6 @@ class ReporteController extends Controller
         $listaAsignaturas = collect();
 
         if ($anioId && $modalidadId && $corteId) {
-            // 1. Obtener las asignaturas de la modalidad, EXCLUYENDO TIC y BIBLIA
             $aulasModalidad = \App\Models\Aula::where('modalidad_id', $modalidadId)
                 ->where('anio_escolar_id', $anioId)
                 ->pluck('id');
@@ -157,14 +151,12 @@ class ReporteController extends Controller
                     ->get()
                     ->reject(function ($asig) {
                         $nombreUpper = mb_strtoupper(trim($asig->nombre));
-                        // Filtro institucional para el MINED
                         return str_contains($nombreUpper, 'TIC') || 
                                str_contains($nombreUpper, 'BIBLIA') || 
                                str_contains($nombreUpper, 'INFORMÁTICA');
                     });
             }
 
-            // 2. Obtener los grados de la modalidad
             $grados = \App\Models\Grado::where('modalidad_id', $modalidadId)->orderBy('id')->get();
 
             foreach ($grados as $grado) {
@@ -209,7 +201,6 @@ class ReporteController extends Controller
                     $materiasAprobadasAlumno = [];
 
                     foreach ($notasAlumno as $nota) {
-                        // Omitimos también calificar el promedio de aprobadas en todas si la materia es institucional
                         $asignaturaRelacionada = $listaAsignaturas->firstWhere('id', $nota->asignatura_id);
                         if (!$asignaturaRelacionada) continue; 
 
@@ -293,15 +284,14 @@ class ReporteController extends Controller
                 $ma_f = $matriculasActuales->filter(fn($m) => in_array(strtoupper($m->alumno->sexo ?? ''), ['F', 'FEMENINO', 'MUJER']))->count();
 
                 $aprob_as = 0; $aprob_f = 0;
-                $aa_as = 0; $aa_f = 0; // Avanzado (90-100)
-                $as_as = 0; $as_f = 0; // Satisfactorio (75-89)
-                $ae_as = 0; $ae_f = 0; // Elemental (60-74)
-                $ai_as = 0; $ai_f = 0; // Insuficiente (<60)
+                $aa_as = 0; $aa_f = 0; 
+                $as_as = 0; $as_f = 0; 
+                $ae_as = 0; $ae_f = 0; 
+                $ai_as = 0; $ai_f = 0; 
 
                 foreach ($matriculasActuales as $matricula) {
                     $esFemenino = in_array(strtoupper($matricula->alumno->sexo ?? ''), ['F', 'FEMENINO', 'MUJER']);
                     
-                    // Calcular promedio del alumno en el corte
                     $notas = \App\Models\Nota::where('matricula_id', $matricula->id)
                         ->where('corte_evaluativo_id', $corteId)
                         ->pluck('nota_cuantitativa');
@@ -344,9 +334,6 @@ class ReporteController extends Controller
         ));
     }
 
-    // =============================================================
-    // HUB
-    // =============================================================
     public function index(Request $request)
     {
         try {
@@ -358,7 +345,6 @@ class ReporteController extends Controller
                 'padres' => $this->reporteService->padres(),
             ];
             
-            // Pasamos "false" para que NO cargue miles de alumnos, docentes ni aulas en el Hub principal
             $catalogos = $this->pasarCatalogos($request, false);
 
             return view('academico.reportes.index', array_merge(compact('anio', 'resumen'), $catalogos));
@@ -369,22 +355,17 @@ class ReporteController extends Controller
             if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
                 throw $e;
             }
-            // CONTINGENCIA: Si el hub de reportes falla al cargar los resúmenes estadísticos
             return redirect()->route('dashboard')->with('error', 'Ocurrió un error al cargar el centro de reportes y estadísticas.');
         }
     }
 
-    // =============================================================
-    // CONTROL DE NOTAS Y AVANCE PROGRAMÁTICO (MINED)
-    // =============================================================
     public function controlNotas(Request $request)
     {
         try {
             $this->autorizarReportes();
             
-            // Tipo de auditoría en esta misma vista: 'notas' (por defecto) o 'avance'
             $tipoAuditoria = $request->query('tipo_auditoria', 'notas');
-            $perspectivaAvance = $request->query('perspectiva', 'docente'); // 'docente' o 'aula'
+            $perspectivaAvance = $request->query('perspectiva', 'docente'); 
 
             $filas = [];
             $estadisticasAvance = ['completados' => 0, 'proceso' => 0, 'atrasados' => 0, 'promedio' => 0];
@@ -392,7 +373,6 @@ class ReporteController extends Controller
             if ($tipoAuditoria === 'avance') {
                 $filas = $this->reporteService->auditoriaAvanceContenido($this->filtros($request), $perspectivaAvance);
                 
-                // Calcular estadísticas rápidas para los KPIs de avance
                 if (count($filas) > 0) {
                     $suma = array_sum(array_column($filas, 'porcentaje'));
                     $estadisticasAvance['promedio'] = round($suma / count($filas), 1);
@@ -428,13 +408,10 @@ class ReporteController extends Controller
             $datos = $this->reporteService->notasGlobalesPorAlumno($this->filtros($request));
             $catalogos = $this->pasarCatalogos($request);
 
-            // Diseño de la rama feauture/no: la vista consume 'asignaturas', 'filas' y 'aula'.
-            // El orden del merge importa: las columnas filtradas del servicio pisan al catálogo.
             return view('academico.reportes.notas-globales', array_merge(
                 $catalogos,
                 ['asignaturas' => $datos['asignaturas'], 'filas' => $datos['filas'], 'aula' => $datos['aula'] ?? null]
             ));
-
 
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
             return redirect()->route('dashboard')->with('error', $e->getMessage());
@@ -450,7 +427,6 @@ class ReporteController extends Controller
     {
         try {
             $this->autorizarReportes();
-            // Diseño de la rama feauture/no: la vista consume 'filas' (cup/estudiante/grado_aula/asignatura/docente).
             $filas = $this->reporteService->notasPendientes($this->filtros($request));
             $catalogos = $this->pasarCatalogos($request);
 
@@ -466,14 +442,10 @@ class ReporteController extends Controller
         }
     }
 
-    // =============================================================
-    // ASISTENCIA (segmentada)
-    // =============================================================
     public function asistenciaGlobal(Request $request)
     {
         try {
             $this->autorizarReportes();
-            // Servicio de la rama feauture/no: retorna ['fecha' => ..., 'filas' => ...].
             $datos = $this->reporteService->asistenciaGlobal($this->filtros($request));
             $catalogos = $this->pasarCatalogos($request);
 
@@ -493,7 +465,6 @@ class ReporteController extends Controller
     {
         try {
             $this->autorizarReportes();
-            // Servicio de la rama feauture/no: retorna anio/fecha_inicio/fecha_fin/promedio_rango/filas.
             $datos = $this->reporteService->estadisticasAsistencia($this->filtros($request));
             $catalogos = $this->pasarCatalogos($request);
 
@@ -509,8 +480,6 @@ class ReporteController extends Controller
         }
     }
 
-    // Diseño de la rama feauture/no: la ruta asistencia-seccion-dia despacha a este método
-    // (sábana de asistencia de un aula en un día, vista asistencia-por-seccion).
     public function asistenciaPorSeccion(Request $request)
     {
         try {
@@ -534,7 +503,6 @@ class ReporteController extends Controller
     {
         try {
             $this->autorizarReportes();
-            // Servicio de la rama feauture/no: anio/fecha_inicio/fecha_fin/aula/filas.
             $datos = $this->reporteService->asistenciaSeccionRango($this->filtros($request));
             $catalogos = $this->pasarCatalogos($request);
 
@@ -554,11 +522,9 @@ class ReporteController extends Controller
     {
         try {
             $this->autorizarReportes();
-            // Servicio de la rama feauture/no: ficha individual con búsqueda por nombre.
             $datos = $this->reporteService->asistenciaEstudiante($this->filtros($request));
             $catalogos = $this->pasarCatalogos($request);
 
-            // Nos aseguramos de fusionar y pasar las variables de fecha por seguridad
             return view('academico.reportes.asistencia-estudiante', array_merge([
                 'fecha_inicio' => $request->query('fecha_inicio') ?? now()->subMonth()->toDateString(),
                 'fecha_fin' => $request->query('fecha_fin') ?? now()->toDateString(),
@@ -573,9 +539,7 @@ class ReporteController extends Controller
             return redirect()->route('academico.reportes.index')->with('error', 'Ocurrió un error al procesar las estadísticas individuales de asistencia.');
         }
     }
-    // =============================================================
-    // ESTA ES LA FUNCIÓN CLAVE DEL REPORTE MINED QUE MODIFICAMOS
-    // =============================================================
+
     public function reporteMinedDetallado(\Illuminate\Http\Request $request)
     {
         $this->autorizarReportes();
@@ -585,22 +549,18 @@ class ReporteController extends Controller
         $aulaGuia = null;
         $user = auth()->user();
 
-        // 1. Verificamos si es EXCLUSIVAMENTE Docente Guía (y no alguien de Dirección)
         if ($user->hasRole('Docente Guia') && !$user->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios'])) {
             $esDocenteGuia = true;
             $docente = \App\Models\Docente::where('usuario_id', $user->id)->first();
             $anioActivo = \App\Models\AnioEscolar::where('estado', 'activo')->first();
 
             if ($docente && $anioActivo) {
-                // Buscamos cuál es su aula guía asignada
                 $aulaGuia = \App\Models\Aula::with('grado')
                     ->where('docente_guia_id', $docente->id)
                     ->where('anio_escolar_id', $anioActivo->id)
                     ->first();
 
                 if ($aulaGuia) {
-                    // BLOQUEO CRÍTICO: Sobrescribimos el filtro de grado_id a la fuerza por el de su aula
-                    // Así, aunque modifiquen la URL, solo verán los datos de su grado.
                     $filtros['grado_id'] = $aulaGuia->grado_id;
                 } else {
                     return redirect()->route('dashboard')->with('error', 'No tienes un aula asignada como tutor en este año escolar.');
@@ -611,13 +571,9 @@ class ReporteController extends Controller
         $datos = $this->reporteService->rendimientoMinedDetallado($filtros);
         $catalogos = $this->pasarCatalogos($request);
 
-        // Retornamos también esDocenteGuia y aulaGuia a la vista para ocultar el select
         return view('academico.reportes.mined-detallado', array_merge($datos, $catalogos, compact('esDocenteGuia', 'aulaGuia')));
     }
 
-    // =============================================================
-    // RENDIMIENTO ACADÉMICO
-    // =============================================================
     public function notasPorAsignatura(Request $request)
     {
         try {
@@ -651,8 +607,6 @@ class ReporteController extends Controller
         $corteId = $corte ? $corte->id : null;
 
         $infoCentro = ['cod_establecimiento' => '27974', 'cod_centro' => '27760'];
-        
-        // CORRECCIÓN: Adaptamos a la columna que tengas en BD (descripcion o nombre)
         $nombreCorte = $corte ? ($corte->descripcion ?? $corte->nombre ?? $corte->numero.' Corte') : 'SELECCIONE CORTE';
         $anioActual = $anioId ? \App\Models\AnioEscolar::find($anioId)->nombre : date('Y');
 
@@ -792,7 +746,6 @@ class ReporteController extends Controller
             $alumnoId = $request->query('alumno_id') ? (int) $request->query('alumno_id') : null;
             $matriculaId = $request->query('matricula_id') ? (int) $request->query('matricula_id') : null;
 
-            // PASO 1: Buscar y seleccionar el estudiante (texto por nombre o CUP)
             $alumnos = Alumno::query()
                 ->when($q !== '', function ($query) use ($q) {
                     $query->where(function ($q2) use ($q) {
@@ -809,8 +762,6 @@ class ReporteController extends Controller
             $matriculaSel = null;
 
             if ($alumno) {
-                // PASO 2: Elegir año y grado a partir de las matrículas reales del
-                // estudiante, de modo que solo se ofrezcan combinaciones válidas.
                 $matriculasAlumno = \App\Models\Matricula::with(['aula.grado.modalidad', 'anioEscolar'])
                     ->where('alumno_id', $alumno->id)
                     ->get()
@@ -823,8 +774,6 @@ class ReporteController extends Controller
                     : ($matriculasAlumno->firstWhere('anio_escolar_id', $anioActivo?->id) ?? $matriculasAlumno->first());
             }
 
-            // PASO 3: Certificado comparativo (grado elegido + grados anteriores,
-            // con límite configurable en ReporteService::CERTIFICADO_LIMITE_GRADOS)
             $resultado = $alumno
                 ? ($matriculaSel
                     ? $this->reporteService->certificadoNotas($alumno->id, $matriculaSel->anio_escolar_id, $matriculaSel->aula->grado_id)
@@ -853,7 +802,6 @@ class ReporteController extends Controller
                 $catalogos,
                 $resultado,
                 [
-                    // La cadena de grados del certificado pisa 'grados'; el filtro usa su propia colección
                     'gradosFiltro' => $catalogos['grados'],
                     'alumnos' => $alumnos,
                     'matriculasAlumno' => $matriculasAlumno,
@@ -873,15 +821,11 @@ class ReporteController extends Controller
         }
     }
 
-    // =============================================================
-    // OTROS REPORTES
-    // =============================================================
     public function mined(Request $request)
     {
         $anioId = $request->anio_escolar_id;
         $anios = \App\Models\AnioEscolar::orderBy('id', 'desc')->get();
         
-        // Si no hay año seleccionado, busca el activo, si no, el último
         $anio = $anioId ? \App\Models\AnioEscolar::find($anioId) : (\App\Models\AnioEscolar::where('estado', 'activo')->first() ?? $anios->first());
         $anioId = $anio ? $anio->id : null;
         $anioActual = $anio ? $anio->nombre : date('Y');
@@ -905,7 +849,6 @@ class ReporteController extends Controller
                     
                 if ($aulas->isEmpty()) continue;
 
-                // Matrícula Inicial (Todos)
                 $matriculasIniciales = \App\Models\Matricula::with('alumno')
                     ->whereIn('aula_id', $aulas)
                     ->withTrashed()
@@ -914,23 +857,18 @@ class ReporteController extends Controller
                 $mi_as = $matriculasIniciales->count();
                 $mi_f = $matriculasIniciales->filter(fn($m) => in_array(strtoupper($m->alumno->sexo ?? ''), ['F', 'FEMENINO', 'MUJER']))->count();
 
-                // Matrícula Actual (Activos)
                 $matriculasActuales = $matriculasIniciales->where('estado', 'activo');
                 $ma_as = $matriculasActuales->count();
                 $ma_f = $matriculasActuales->filter(fn($m) => in_array(strtoupper($m->alumno->sexo ?? ''), ['F', 'FEMENINO', 'MUJER']))->count();
 
-                // Retirados
                 $ret_as = $mi_as - $ma_as;
                 $ret_f = $mi_f - $ma_f;
 
-                // Retención
                 $retencion = $mi_as > 0 ? round(($ma_as / $mi_as) * 100, 1) : 0;
 
-                // Promedio Global de esta modalidad
                 $notas = \App\Models\Nota::whereIn('matricula_id', $matriculasActuales->pluck('id'))->get();
                 $promedio = $notas->count() > 0 ? round($notas->avg('nota_cuantitativa'), 2) : 0;
 
-                // Sumatorias para la fila final
                 $totales['mi_as'] += $mi_as; $totales['mi_f'] += $mi_f;
                 $totales['ma_as'] += $ma_as; $totales['ma_f'] += $ma_f;
                 $totales['ret_as'] += $ret_as; $totales['ret_f'] += $ret_f;
@@ -950,7 +888,6 @@ class ReporteController extends Controller
             }
         }
 
-        // Cálculos finales del total
         $totales['promedio'] = $totales['conteo_promedios'] > 0 ? number_format($totales['suma_promedios'] / $totales['conteo_promedios'], 2) : '0.00';
         $totales['retencion'] = $totales['mi_as'] > 0 ? round(($totales['ma_as'] / $totales['mi_as']) * 100, 1) : 0;
 
@@ -978,10 +915,9 @@ class ReporteController extends Controller
             foreach ($asignaciones as $asig) {
                 $nombreAsignatura = $asig->asignatura->nombre ?? '';
 
-                // FILTRO INSTITUCIONAL: Excluimos TIC, Biblia y variaciones similares
                 $nombreUpper = mb_strtoupper(trim($nombreAsignatura));
                 if (str_contains($nombreUpper, 'TIC') || str_contains($nombreUpper, 'BIBLIA') || str_contains($nombreUpper, 'INFORMÁTICA')) {
-                    continue; // Salta esta asignatura para que no aparezca en el reporte del MINED
+                    continue; 
                 }
 
                 $modalidadNombre = $asig->aula->modalidad->nombre ?? 'General';
@@ -1029,8 +965,6 @@ class ReporteController extends Controller
     {
         try {
             $this->autorizarReportes();
-            // Diseño de la rama feauture/no: la vista consume anio/aula/total/con_telefono/
-            // con_email/porcentaje_adopcion/filas directamente del servicio.
             $datos = $this->reporteService->padres($this->filtros($request));
             $catalogos = $this->pasarCatalogos($request);
 
@@ -1046,9 +980,6 @@ class ReporteController extends Controller
         }
     }
 
-    // =============================================================
-    // REPORTES EXCLUSIVOS DEL DOCENTE POR ASIGNATURA
-    // =============================================================
     public function misClases(Request $request)
     {
         try {
@@ -1064,7 +995,6 @@ class ReporteController extends Controller
                 return redirect()->route('dashboard')->with('error', 'No hay un año escolar activo para generar reportes.');
             }
 
-            // 1. Obtenemos las clases y las ORDENAMOS estrictamente por el ID numérico del grado (1ro, 2do, ... 11mo)
             $asignaciones = \App\Models\AulaAsignaturaDocente::with(['aula.grado', 'asignatura'])
                 ->where('docente_id', $docente->id)
                 ->where('anio_escolar_id', $anio->id)
@@ -1075,8 +1005,6 @@ class ReporteController extends Controller
                 });
 
             $cortes = \App\Models\CorteEvaluativo::orderBy('numero')->get();
-
-            // 2. Filtros de búsqueda
             $asignacionId = $request->query('asignacion_id');
             $corteId = $request->query('corte_id');
 
@@ -1084,13 +1012,11 @@ class ReporteController extends Controller
             $corteSeleccionado = null;
             $alumnosReporte = collect();
             
-            // Inicializamos estadísticas con los porcentajes en 0
             $estadisticas = [
                 'aprobados' => 0, 'reprobados' => 0, 'promedio_general' => 0, 
                 'porcentaje_aprobados' => 0, 'porcentaje_reprobados' => 0
             ];
 
-            // 3. Procesar tabla si hay selección
             if ($asignacionId) {
                 $asignacionSeleccionada = $asignaciones->where('id', $asignacionId)->first();
                 $corteSeleccionado = $cortes->where('id', $corteId)->first();
@@ -1102,7 +1028,7 @@ class ReporteController extends Controller
                         ->where('estado', 'activo')
                         ->get()
                         ->sortBy(function($matricula) {
-                            return $matricula->alumno->nombre_completo; // 1. CORREGIDO: Usar nombre_completo para ordenar
+                            return $matricula->alumno->nombre_completo; 
                         });
 
                     $notasQuery = \App\Models\Nota::whereIn('matricula_id', $matriculas->pluck('id'))
@@ -1136,7 +1062,7 @@ class ReporteController extends Controller
                         $alumnosReporte->push([
                             'matricula_id' => $matricula->id,
                             'cup' => $matricula->alumno->codigo_unico_persona,
-                            'nombre_completo' => $matricula->alumno->nombre_completo, // 2. CORREGIDO: Usar la columna correcta
+                            'nombre_completo' => $matricula->alumno->nombre_completo,
                             'nota' => $notaFinal
                         ]);
                     }
@@ -1162,9 +1088,6 @@ class ReporteController extends Controller
         }
     }
 
-    // =============================================================
-    // REPORTES EXCLUSIVOS DEL DOCENTE GUÍA (TUTOR)
-    // =============================================================
     public function miAula(Request $request)
     {
         try {
@@ -1180,7 +1103,6 @@ class ReporteController extends Controller
                 return redirect()->route('dashboard')->with('error', 'No hay un año escolar activo para generar reportes.');
             }
 
-            // 1. Obtener el aula asignada
             $aulaGuia = \App\Models\Aula::with('grado')
                 ->where('docente_guia_id', $docente->id)
                 ->where('anio_escolar_id', $anio->id)
@@ -1190,16 +1112,14 @@ class ReporteController extends Controller
                 return redirect()->route('dashboard')->with('error', 'No tienes un aula asignada como Docente Guía en el ciclo activo.');
             }
 
-            // 2. Filtros
             $cortes = \App\Models\CorteEvaluativo::orderBy('numero')->get();
             $corteId = $request->query('corte_id');
             $corteSeleccionado = $corteId ? $cortes->where('id', $corteId)->first() : null;
 
-            $tipoReporte = $request->query('tipo_reporte', 'general'); // general, riesgo, materia
-            $filtroRiesgo = $request->query('filtro_riesgo', 'todos'); // 1_2, 3_mas, todos
+            $tipoReporte = $request->query('tipo_reporte', 'general'); 
+            $filtroRiesgo = $request->query('filtro_riesgo', 'todos'); 
             $materiaId = $request->query('materia_id');
 
-            // 3. Asignaturas del Aula
             $asignaciones = \App\Models\AulaAsignaturaDocente::with('asignatura')
                 ->where('aula_id', $aulaGuia->id)
                 ->where('anio_escolar_id', $anio->id)
@@ -1209,12 +1129,10 @@ class ReporteController extends Controller
                     return $asig->asignatura->nombre;
                 });
 
-            // Si es reporte por materia, filtramos las asignaciones
             if ($tipoReporte === 'materia' && $materiaId) {
                 $asignaciones = $asignaciones->where('id', $materiaId);
             }
 
-            // 4. Obtener Alumnos y Notas
             $matriculas = \App\Models\Matricula::with('alumno')
                 ->where('aula_id', $aulaGuia->id)
                 ->where('anio_escolar_id', $anio->id)
@@ -1263,7 +1181,6 @@ class ReporteController extends Controller
 
                 $promedioGeneral = $materiasEvaluadas > 0 ? round($sumaNotas / $materiasEvaluadas, 1) : null;
 
-                // Filtrado Lógico según el tipo de reporte
                 $incluirAlumno = true;
 
                 if ($tipoReporte === 'riesgo') {
@@ -1289,14 +1206,12 @@ class ReporteController extends Controller
                 }
             }
 
-            // Datos para los filtros
             $todasLasAsignaciones = \App\Models\AulaAsignaturaDocente::with('asignatura')
                 ->where('aula_id', $aulaGuia->id)
                 ->where('anio_escolar_id', $anio->id)
                 ->where('activo', true)
                 ->get()
                 ->sortBy(function($asig) { return $asig->asignatura->nombre; });
-
 
             return view('academico.reportes.mi-aula', compact(
                 'anio', 'aulaGuia', 'cortes', 'corteId', 'corteSeleccionado', 

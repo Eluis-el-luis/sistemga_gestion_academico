@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BloqueHorario extends Model
 {
@@ -19,16 +21,21 @@ class BloqueHorario extends Model
         'nombre',
         'hora_inicio',
         'hora_fin',
-        'es_recreo'
+        'es_recreo',
     ];
 
-    // Agrega este bloque para castear los datos automáticamente
     protected $casts = [
+        'numero_bloque' => 'integer',
         'es_recreo' => 'boolean',
     ];
 
-    public function modalidad()
+    public function modalidad(): BelongsTo
     {
         return $this->belongsTo(Modalidad::class, 'modalidad_id');
+    }
+
+    public function horarios(): HasMany
+    {
+        return $this->hasMany(Horario::class, 'bloque_horario_id');
     }
 }

@@ -3,21 +3,22 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class IncidenciaDisciplinaria extends Model
 {
     protected $table = 'incidencia_disciplinaria';
-    
+
     protected $fillable = [
-        'matricula_id', 
-        'docente_reporta_id', 
+        'matricula_id',
+        'docente_reporta_id',
         'coordinador_atiende_id',
-        'nivel_falta', 
-        'descripcion', 
-        'estado', 
+        'nivel_falta',
+        'descripcion',
+        'estado',
         'fecha_incidencia',
-        'fecha_citacion_padres', 
-        'resolucion_final'
+        'fecha_citacion_padres',
+        'resolucion_final',
     ];
 
     protected $casts = [
@@ -25,17 +26,17 @@ class IncidenciaDisciplinaria extends Model
         'fecha_citacion_padres' => 'datetime',
     ];
 
-    public function matricula()
+    public function matricula(): BelongsTo
     {
         return $this->belongsTo(Matricula::class, 'matricula_id');
     }
 
-    public function docenteReporta()
+    public function docenteReporta(): BelongsTo
     {
         return $this->belongsTo(Docente::class, 'docente_reporta_id');
     }
 
-    public function coordinadorAtiende()
+    public function coordinadorAtiende(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'coordinador_atiende_id');
     }
