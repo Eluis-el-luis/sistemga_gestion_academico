@@ -2,67 +2,63 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Usuario;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class SetSupabaseRLSContext
 {
-    /**
-     * Handle an incoming request.
-     *
-     * Configura variables de sesión PostgreSQL para que las políticas RLS
-     * en Supabase tengan el contexto del usuario autenticado de Laravel.
-     *
-     * Estas variables son leídas por las funciones SQL:
-     * - current_user_id()
-     * - current_user_roles()
-     * - current_docente_id()
-     * - current_coordinador_modalidad_id()
-     */
     public function handle(Request $request, Closure $next): Response
     {
-        // Solo ejecutar si hay usuario autenticado y conexión es PostgreSQL/Supabase
-        if (Auth::check() && $this->isPostgreSQLConnection()) {
+        try {
             $user = Auth::user();
-            $userId = $user->id;
-            
-            // Obtener roles del usuario como array de strings
-            $roles = $user->getRoleNames()->toArray();
-            $rolesJson = json_encode($roles);
-            
-            // Ejecutar SET LOCAL para la transacción actual
-            // Usar DB::unprepared para evitar prepared statements con variables de sesión
-            // SET LOCAL solo afecta la transacción actual (ideal para request/response)
-            DB::unprepared("SET LOCAL app.current_user_id = '{$userId}'");
-            DB::unprepared("SET LOCAL app.current_user_roles = '{$rolesJson}'");
-            
-            // También setear docente_id si existe
-            if ($user->docente) {
-                DB::unprepared("SET LOCAL app.current_docente_id = '{$user->docente->id}'");
-                
-                // Si es coordinador, setear modalidad que coordina
-                if ($user->docente->es_coordinador && $user->docente->modalidad_coordina_id) {
-                    DB::unprepared("SET LOCAL app.current_coordinador_modalidad_id = '{$user->docente->modalidad_coordina_id}'");
+
+            if ($user instanceof Usuario && $this->isPostgreSQLConnection()) {
+                $userId = (int) $user->id;
+                $rolesJson = json_encode($user->getRoleNames()->values()->toArray(), JSON_THROW_ON_ERROR);
+                $escapedRolesJson = str_replace("'", "''", $rolesJson);
+
+                DB::unprepared("SET LOCAL app.current_user_id = '{$userId}'");
+                DB::unprepared("SET LOCAL app.current_user_roles = '{$escapedRolesJson}'");
+
+                if ($user->docente) {
+                    $docenteId = (int) $user->docente->id;
+                    DB::unprepared("SET LOCAL app.current_docente_id = '{$docenteId}'");
+
+                    if ($user->docente->es_coordinador && $user->docente->modalidad_coordina_id) {
+                        $modalidadId = (int) $user->docente->modalidad_coordina_id;
+                        DB::unprepared("SET LOCAL app.current_coordinador_modalidad_id = '{$modalidadId}'");
+                    }
                 }
             }
+
+            return $next($request);
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo aplicar contexto RLS PostgreSQL', [
+                'user_id' => Auth::id(),
+                'driver' => $this->safeDriverName(),
+                'exception' => $e->getMessage(),
+            ]);
+
+            return $next($request);
         }
-        
-        return $next($request);
     }
-    
-    /**
-     * Verificar si la conexión actual es PostgreSQL (Supabase)
-     */
+
     protected function isPostgreSQLConnection(): bool
     {
+        return $this->safeDriverName() === 'pgsql';
+    }
+
+    protected function safeDriverName(): string
+    {
         try {
-            $driver = DB::getDriverName();
-            return $driver === 'pgsql';
+            return (string) DB::getDriverName();
         } catch (\Throwable) {
-            return false;
+            return '';
         }
     }
 }

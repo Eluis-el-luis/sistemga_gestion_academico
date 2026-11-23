@@ -1,10 +1,15 @@
 <?php
 
+use App\Http\Middleware\EnsureAnioEscolarModificable;
+use App\Http\Middleware\EnsureRoleScope;
+use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\RateLimitAuth;
+use App\Http\Middleware\SetSupabaseRLSContext;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Log;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -15,14 +20,15 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'role' => \App\Http\Middleware\EnsureUserHasRole::class,
-            'rls.context' => \App\Http\Middleware\SetSupabaseRLSContext::class,
-            'auth.ratelimit' => \App\Http\Middleware\RateLimitAuth::class,
+            'role' => EnsureUserHasRole::class,
+            'rol.acceso' => EnsureRoleScope::class,
+            'anio.modificable' => EnsureAnioEscolarModificable::class,
+            'rls.context' => SetSupabaseRLSContext::class,
+            'auth.ratelimit' => RateLimitAuth::class,
         ]);
 
-        // Registrar middleware RLS en el grupo web DESPUÉS de la sesión y autenticación
         $middleware->web(append: [
-            \App\Http\Middleware\SetSupabaseRLSContext::class,
+            SetSupabaseRLSContext::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -30,18 +36,24 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/*'),
         );
 
-        // Logging de auditoría para AuthorizationException (SIEM-ready)
         $exceptions->report(function (AuthorizationException $e, Request $request) {
-            Log::warning('Authorization denied', [
-                'user_id' => auth()->id(),
-                'user_roles' => auth()->user()?->getRoleNames()->toArray() ?? [],
-                'ip' => $request->ip(),
-                'url' => $request->fullUrl(),
-                'method' => $request->method(),
-                'user_agent' => $request->userAgent(),
-                'ability' => $e->getMessage(),
-                'timestamp' => now()->toIso8601String(),
-                'trace_id' => $request->header('X-Request-ID') ?? uniqid('authz_', true),
-            ]);
+            try {
+                $user = auth()->user();
+                Log::warning('Authorization denied', [
+                    'user_id' => $user?->id,
+                    'user_roles' => method_exists($user, 'getRoleNames') ? $user->getRoleNames()->toArray() : [],
+                    'ip' => $request->ip(),
+                    'url' => $request->fullUrl(),
+                    'method' => $request->method(),
+                    'user_agent' => $request->userAgent(),
+                    'ability' => $e->getMessage(),
+                    'timestamp' => now()->toIso8601String(),
+                    'trace_id' => $request->header('X-Request-ID') ?? uniqid('authz_', true),
+                ]);
+            } catch (\Throwable $logError) {
+                Log::error('Error al registrar AuthorizationException', [
+                    'exception' => $logError->getMessage(),
+                ]);
+            }
         });
     })->create();

@@ -4,55 +4,69 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Symfony\Component\HttpFoundation\Response;
 
 class RateLimitAuth
 {
-    /**
-     * Handle an incoming request.
-     * Rate limiting para endpoints de autenticación sensibles.
-     */
     public function handle(Request $request, Closure $next): Response
     {
-        $ip = $request->ip();
-        
-        // Login: 5 intentos por minuto por IP
-        if ($request->is('login') && $request->isMethod('post')) {
-            $key = 'auth:login:' . $ip;
-            
-            if (RateLimiter::tooManyAttempts($key, 5)) {
-                $seconds = RateLimiter::availableIn($key);
-                return response()->json([
-                    'message' => "Demasiados intentos de inicio de sesión. Intente en {$seconds} segundos."
-                ], 429);
-            }
-            
-            RateLimiter::hit($key, 60);
-        }
+        try {
+            $ip = (string) $request->ip();
 
-        // Password reset request: 3 intentos por hora por IP
-        if ($request->is('forgot-password') && $request->isMethod('post')) {
-            $key = 'auth:password_reset:' . $ip;
-            
-            if (RateLimiter::tooManyAttempts($key, 3)) {
-                return back()->with('error', 'Demasiadas solicitudes de restablecimiento. Intente más tarde.');
-            }
-            
-            RateLimiter::hit($key, 3600);
-        }
+            if ($request->is('login') && $request->isMethod('post')) {
+                $emailKey = strtolower(trim((string) $request->input('email', '')));
+                $key = 'auth:login:' . sha1($ip . '|' . $emailKey);
 
-        // Email verification: 6 intentos por minuto (ya existe en routes)
-        if ($request->is('email/verification-notification') && $request->isMethod('post')) {
-            $key = 'auth:verify_email:' . $ip;
-            
-            if (RateLimiter::tooManyAttempts($key, 6)) {
-                return back()->with('error', 'Demasiadas solicitudes. Intente en un minuto.');
-            }
-            
-            RateLimiter::hit($key, 60);
-        }
+                if (RateLimiter::tooManyAttempts($key, 5)) {
+                    $seconds = RateLimiter::availableIn($key);
 
-        return $next($request);
+                    if ($request->expectsJson()) {
+                        return response()->json([
+                            'message' => "Demasiados intentos de inicio de sesión. Intente en {$seconds} segundos.",
+                        ], 429);
+                    }
+
+                    return back()
+                        ->withInput($request->except('password'))
+                        ->withErrors([
+                            'email' => "Demasiados intentos de inicio de sesión. Intente en {$seconds} segundos.",
+                        ]);
+                }
+
+                RateLimiter::hit($key, 60);
+            }
+
+            if ($request->is('forgot-password') && $request->isMethod('post')) {
+                $key = 'auth:password_reset:' . sha1($ip);
+
+                if (RateLimiter::tooManyAttempts($key, 3)) {
+                    return back()->with('error', 'Demasiadas solicitudes de restablecimiento. Intente más tarde.');
+                }
+
+                RateLimiter::hit($key, 3600);
+            }
+
+            if ($request->is('email/verification-notification') && $request->isMethod('post')) {
+                $key = 'auth:verify_email:' . sha1($ip);
+
+                if (RateLimiter::tooManyAttempts($key, 6)) {
+                    return back()->with('error', 'Demasiadas solicitudes. Intente en un minuto.');
+                }
+
+                RateLimiter::hit($key, 60);
+            }
+
+            return $next($request);
+        } catch (\Throwable $e) {
+            Log::error('Error en RateLimitAuth middleware', [
+                'ip' => $request->ip(),
+                'path' => $request->path(),
+                'exception' => $e->getMessage(),
+            ]);
+
+            return $next($request);
+        }
     }
 }

@@ -2,61 +2,87 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Usuario;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureUserHasRole
 {
-    /**
-     * Roles que tienen acceso al dashboard y módulos del sistema.
-     * El rol 'Alumno' se maneja por separado (no tiene dashboard administrativo).
-     */
-    protected const DASHBOARD_ROLES = [
+    private const ALLOWED_ROLES = [
+        'directora',
+        'subdirectora',
+        'secretaria',
+        'coordinador',
+        'docente_guia',
+        'docente_asignatura',
+        'docente_auxiliar',
+        'docente_suplente',
+        'psicologa',
+        'gestor_it',
         'Director',
         'Subdirector',
         'Gestor de Usuarios',
         'Coordinador',
         'Secretaria',
         'Docente Guia',
+        'Docente Guía',
         'Docente por Asignatura',
+        'Docente Auxiliar',
+        'Docente Suplente',
+        'Psicologa',
+        'Psicóloga',
     ];
 
-    /**
-     * Handle an incoming request.
-     */
+    private const BYPASS_ROUTES = [
+        'profile.edit',
+        'profile.update',
+        'profile.destroy',
+        'logout',
+        'sin-rol',
+    ];
+
     public function handle(Request $request, Closure $next): Response
     {
-        $user = Auth::user();
+        try {
+            $user = Auth::user();
 
-        // Si no hay usuario autenticado, dejar que el middleware 'auth' maneje
-        if (!$user) {
-            return $next($request);
-        }
-
-        // Verificar si el usuario tiene al menos uno de los roles válidos para el dashboard
-        $tieneRolValido = $user->roles->pluck('name')->intersect(self::DASHBOARD_ROLES)->isNotEmpty();
-
-        // Si no tiene roles válidos, redirigir a página de "sin rol asignado"
-        if (!$tieneRolValido) {
-            // Permitir acceso a rutas de perfil y logout para que pueda cerrar sesión
-            $rutasPermitidasSinRol = [
-                'profile.edit',
-                'profile.update',
-                'profile.destroy',
-                'logout',
-                'sin-rol', // la propia ruta de sin-rol
-            ];
-
-            $rutaActual = $request->route()?->getName();
-
-            if (!in_array($rutaActual, $rutasPermitidasSinRol)) {
-                return redirect()->route('sin-rol')
-                    ->with('warning', 'Tu cuenta no tiene ningún rol asignado. Contacta al administrador para que te asigne los permisos correspondientes.');
+            if (!$user instanceof Usuario) {
+                return $next($request);
             }
-        }
 
-        return $next($request);
+            if (isset($user->activo) && !(bool) $user->activo) {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return redirect()->route('login')
+                    ->withErrors(['email' => 'Tu cuenta se encuentra desactivada. Contacta a la administración.']);
+            }
+
+            $currentRoute = $request->route()?->getName();
+            if ($currentRoute && in_array($currentRoute, self::BYPASS_ROUTES, true)) {
+                return $next($request);
+            }
+
+            $hasAllowedRole = $user->roles()->pluck('name')->intersect(self::ALLOWED_ROLES)->isNotEmpty();
+
+            if (!$hasAllowedRole) {
+                return redirect()->route('sin-rol')
+                    ->with('warning', 'Tu cuenta no tiene un rol operativo asignado. Contacta al administrador.');
+            }
+
+            return $next($request);
+        } catch (\Throwable $e) {
+            Log::error('Error en EnsureUserHasRole middleware', [
+                'user_id' => Auth::id(),
+                'route' => $request->route()?->getName(),
+                'exception' => $e->getMessage(),
+            ]);
+
+            abort(500, 'No fue posible verificar los permisos de acceso.');
+        }
     }
 }
