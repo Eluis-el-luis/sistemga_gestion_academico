@@ -1,108 +1,61 @@
+{{-- resources/views/academico/boletin/bandeja.blade.php --}}
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center gap-4">
-            <a href="{{ route('dashboard') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+        <div class="flex items-center gap-3 bg-white dark:bg-neutral-900 border border-stone-200/80 dark:border-neutral-800 rounded-2xl px-5 py-3.5 shadow-xs">
+            <a href="{{ route('dashboard') }}" class="text-neutral-400 hover:text-[#d49b1a] transition-colors cursor-pointer">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </a>
             <div>
-                <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">Bandeja de Impresión</h2>
-                <p class="text-sm font-medium text-slate-500 mt-1">Recepción de boletines autorizados por docentes guías.</p>
+                <h2 class="font-bold text-xl text-neutral-900 dark:text-white">Bandeja de Impresión</h2>
+                <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Boletines autorizados por docentes guías.</p>
             </div>
         </div>
     </x-slot>
 
-    <div class="py-10 bg-[#FFFDF5] min-h-screen">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-
-            <!-- Bloque 1: Filtro de Parcial -->
-            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden p-6 flex justify-between items-center">
-                <h3 class="font-black text-[#3d2c1d]">Seleccionar Corte Evaluativo</h3>
-                <form method="GET" action="{{ route('academico.boletin.bandeja') }}" class="w-64">
-                    <select name="corte_id" onchange="this.form.submit()" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm font-black text-[#3d2c1d]">
-                        @foreach($cortes as $corte)
-                            <option value="{{ $corte->id }}" @selected($corte->id == $corteActivo)>
-                                {{ $corte->numero }}° Parcial - {{ $anioActivo->nombre }}
-                            </option>
+    <div class="py-8 bg-stone-50 dark:bg-neutral-950 min-h-screen transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            <div class="bg-white dark:bg-neutral-900 rounded-3xl shadow-xs border border-stone-200 dark:border-neutral-800 p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h3 class="font-bold text-neutral-900 dark:text-white text-base">Seleccionar Corte Evaluativo</h3>
+                <form method="GET" action="{{ route('academico.boletin.bandeja') }}" class="w-full sm:w-64">
+                    <select name="corte_id" onchange="this.form.submit()" class="w-full border-stone-300 dark:border-neutral-700 bg-stone-50 dark:bg-neutral-800 rounded-xl text-sm font-semibold cursor-pointer">
+                        @foreach ($cortes as $corte)
+                            <option value="{{ $corte->id }}" @selected($corte->id == $corteActivo)>{{ $corte->numero }}° Parcial - {{ $anioActivo?->nombre }}</option>
                         @endforeach
                     </select>
                 </form>
             </div>
 
-            <!-- Bloque 2: Bandeja de Recepción -->
-            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="bg-white dark:bg-neutral-900 rounded-3xl shadow-xs border border-stone-200 dark:border-neutral-800 overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full text-left border-collapse">
-                        <thead class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-widest font-black text-slate-400">
+                    <table class="min-w-full text-left border-collapse text-sm">
+                        <thead class="bg-[#FFFDF8] dark:bg-neutral-800/70 text-neutral-500 uppercase text-xs font-semibold">
                             <tr>
-                                <th class="p-5">Aula y Grado</th>
-                                <th class="p-5">Docente Guía</th>
-                                <th class="p-5 text-center">Estado del Paquete</th>
-                                <th class="p-5 text-right">Acciones de Impresión</th>
+                                <th class="p-4">Aula y Grado</th>
+                                <th class="p-4">Docente Guía</th>
+                                <th class="p-4 text-center">Estado</th>
+                                <th class="p-4 text-right">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            @forelse($aulas as $aula)
-                                <tr class="hover:bg-slate-50 transition-colors">
-                                    <td class="p-5">
-                                        <span class="block font-black text-[#3d2c1d]">{{ $aula->grado->nombre ?? 'Grado' }} - "{{ $aula->nombre }}"</span>
-                                        <span class="block text-xs font-bold text-slate-400 mt-0.5">{{ $aula->turno }}</span>
-                                    </td>
-                                    <td class="p-5 font-medium text-slate-600">
-                                        {{ $aula->docenteGuia->usuario->nombre_completo ?? 'Sin asignar' }}
-                                    </td>
-                                    <td class="p-5 text-center">
-                                        @if($aula->estado_impresion === 'Autorizado')
-                                            <span class="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-black uppercase tracking-widest block w-max mx-auto">
-                                                ✔ Listo para Imprimir
-                                            </span>
-                                            <span class="block text-[9px] font-bold text-slate-400 mt-1">Autorizado: {{ \Carbon\Carbon::parse($aula->fecha_autorizacion)->format('d/m Y H:i') }}</span>
-                                        @elseif($aula->estado_impresion === 'Impreso')
-                                            <span class="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-[10px] font-black uppercase tracking-widest block w-max mx-auto">
-                                                🖨️ Ya Impreso
-                                            </span>
-                                        @elseif($aula->estado_impresion === 'Devuelto')
-                                            <span class="px-3 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-black uppercase tracking-widest block w-max mx-auto">
-                                                ⚠️ Devuelto al Docente
-                                            </span>
-                                        @else
-                                            <span class="px-3 py-1 bg-slate-100 text-slate-500 border border-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest block w-max mx-auto">
-                                                ⏳ Esperando Envío
-                                            </span>
-                                        @endif
-                                    </td>
-                                    <td class="p-5 text-right">
-                                        @if($aula->estado_impresion === 'Autorizado' || $aula->estado_impresion === 'Impreso')
-                                            <div class="flex justify-end gap-2">
-                                                <a href="{{ route('academico.boletines.pdf.masivo') }}?aula_id={{ $aula->id }}&corte_evaluativo_id={{ $corteActivo->id }}&tipo=boletin" class="px-4 py-2 bg-[#1a3c5e] hover:bg-[#2c5f8a] text-white rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-2">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                                    PDF Boletines
-                                                </a>
-
-                                                <a href="{{ route('academico.boletines.pdf.masivo') }}?aula_id={{ $aula->id }}&corte_evaluativo_id={{ $corteActivo->id }}&tipo=constancia" class="px-4 py-2 bg-[#2c5f8a] hover:bg-[#1a3c5e] text-white rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-2">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                                    PDF Constancias
-                                                </a>
-
-                                                <a href="{{ route('academico.boletines.pdf.masivo') }}?aula_id={{ $aula->id }}&corte_evaluativo_id={{ $corteActivo->id }}&tipo=certificado" class="px-4 py-2 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-2">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                                    PDF Certificados
-                                                </a>
-
-                                                @if($aula->estado_impresion === 'Autorizado')
-                                                    <button class="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-black transition-all" title="Devolver al Maestro">
-                                                        Devolver
-                                                    </button>
-                                                @endif
+                        <tbody class="divide-y divide-stone-100 dark:divide-neutral-800 text-neutral-800 dark:text-neutral-200">
+                            @forelse ($aulas as $aula)
+                                <tr>
+                                    <td class="p-4 font-semibold">{{ $aula->grado?->nombre ?? 'Grado' }} - "{{ $aula->nombre }}"</td>
+                                    <td class="p-4 text-neutral-600 dark:text-neutral-300">{{ $aula->docenteGuia?->usuario?->nombre_completo ?? 'Sin asignar' }}</td>
+                                    <td class="p-4 text-center"><span class="px-3 py-1 rounded-lg text-xs font-semibold bg-stone-100 dark:bg-neutral-800">{{ $aula->estado_impresion }}</span></td>
+                                    <td class="p-4 text-right">
+                                        @if (in_array($aula->estado_impresion, ['Autorizado', 'Impreso'], true))
+                                            <div class="flex flex-wrap justify-end gap-2">
+                                                <a href="{{ route('academico.boletines.pdf.masivo', ['aula_id' => $aula->id, 'corte_evaluativo_id' => $corteActivo, 'tipo' => 'boletin']) }}" class="px-3 py-1.5 bg-neutral-900 dark:bg-[#e6ac27] text-white dark:text-neutral-950 rounded-xl text-xs font-bold cursor-pointer">PDF Boletines</a>
+                                                <a href="{{ route('academico.boletines.pdf.masivo', ['aula_id' => $aula->id, 'corte_evaluativo_id' => $corteActivo, 'tipo' => 'constancia']) }}" class="px-3 py-1.5 bg-stone-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 rounded-xl text-xs font-bold cursor-pointer">PDF Constancias</a>
+                                                <a href="{{ route('academico.boletines.pdf.masivo', ['aula_id' => $aula->id, 'corte_evaluativo_id' => $corteActivo, 'tipo' => 'certificado']) }}" class="px-3 py-1.5 bg-[#e6ac27] text-neutral-950 rounded-xl text-xs font-bold cursor-pointer">PDF Certificados</a>
                                             </div>
                                         @else
-                                            <span class="text-xs font-bold text-slate-300">Acción Bloqueada</span>
+                                            <span class="text-xs text-neutral-400">Pendiente</span>
                                         @endif
                                     </td>
                                 </tr>
                             @empty
-                                <tr>
-                                    <td colspan="4" class="p-12 text-center text-slate-400 font-bold">No hay aulas registradas en el ciclo activo.</td>
-                                </tr>
+                                <tr><td colspan="4" class="p-10 text-center text-neutral-500">No hay aulas registradas en el ciclo activo.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

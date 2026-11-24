@@ -1,3 +1,69 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+    }
+
+    button,
+    a[href],
+    [role="button"] {
+        cursor: pointer;
+    }
+}
+
+@media print {
+    @page {
+        margin: 14mm 16mm;
+    }
+
+    nav,
+    aside,
+    header,
+    .no-print,
+    .print\:hidden,
+    form[method="GET"],
+    button {
+        display: none !important;
+    }
+
+    html,
+    body,
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+    }
+
+    body,
+    main,
+    .min-h-screen {
+        background-color: #ffffff !important;
+        color: #3d2c1d !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .contenedor-principal-layout {
+        padding-left: 0 !important;
+        width: 100% !important;
+    }
+
+    main > div {
+        padding: 4mm 2mm !important;
+        max-width: 100% !important;
+        background-color: #ffffff !important;
+    }
+
+    tr,
+    td,
+    th {
+        page-break-inside: avoid !important;
+    }
+
+    .overflow-x-auto {
+        overflow: visible !important;
+    }
+}

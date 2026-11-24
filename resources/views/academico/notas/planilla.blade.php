@@ -1,203 +1,79 @@
+{{-- resources/views/academico/notas/planilla.blade.php --}}
 <x-app-layout>
+    @php $totalCorte = ($pesoAcumulado + $pesoExamen) > 0 ? ($pesoAcumulado + $pesoExamen) : max(1, $sumaAcumulado + $sumaExamen); @endphp
     <x-slot name="header">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 z-50 relative">
-            <div>
-                <h2 class="text-xl font-black text-[#3d2c1d] tracking-tight flex items-center gap-2">
-                    <a href="{{ route('academico.notas.index') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-                    </a>
-                    Planilla de Calificaciones
-                </h2>
-                <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1 ml-8">
-                    {{ $asignacion->asignatura->nombre }} | {{ $asignacion->aula->grado->nombre }} - {{ $asignacion->aula->nombre }}
-                </p>
-            </div>
-            
-            <!-- Selector de Corte Evaluativo (Recarga la página al cambiar) -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-neutral-900 border border-stone-200/80 dark:border-neutral-800 rounded-2xl px-5 py-3.5 shadow-xs">
             <div class="flex items-center gap-3">
-                <form action="{{ route('academico.notas.create', $asignacion->id) }}" method="GET" class="flex items-center gap-3">
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Parcial:</label>
-                    <select name="corte_evaluativo_id" onchange="this.form.submit()" class="border-slate-200 bg-white rounded-xl focus:ring-[#e6ac27] focus:border-[#e6ac27] text-sm text-[#3d2c1d] font-bold shadow-sm cursor-pointer">
-                        @foreach($cortes as $corte)
-                            <option value="{{ $corte->id }}" {{ $corteSeleccionado == $corte->id ? 'selected' : '' }}>
-                                Corte {{ $corte->numero }} ({{ $corte->anioEscolar->nombre }})
-                            </option>
+                <a href="{{ route('academico.notas.index') }}" class="text-neutral-400 hover:text-[#d49b1a] transition-colors cursor-pointer">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                </a>
+                <div>
+                    <h2 class="text-xl font-bold text-neutral-900 dark:text-white">Planilla de Calificaciones</h2>
+                    <p class="text-xs text-neutral-500 dark:text-neutral-400">{{ $asignacion->asignatura?->nombre }} · {{ $asignacion->aula?->grado?->nombre }} - {{ $asignacion->aula?->nombre }}</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2.5">
+                <form action="{{ route('academico.notas.create', $asignacion->id) }}" method="GET">
+                    <select name="corte_evaluativo_id" onchange="this.form.submit()" class="border-stone-300 dark:border-neutral-700 bg-stone-50 dark:bg-neutral-800 rounded-xl text-xs font-semibold cursor-pointer">
+                        @foreach ($cortes as $corte)
+                            <option value="{{ $corte->id }}" {{ $corteSeleccionado == $corte->id ? 'selected' : '' }}>Corte {{ $corte->numero }} ({{ $corte->anioEscolar?->nombre }})</option>
                         @endforeach
                     </select>
                 </form>
-                <button onclick="window.print()" class="px-4 py-2 bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-md transition-all flex items-center gap-2 print:hidden">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H8v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                    Imprimir / PDF
-                </button>
+                <button type="button" onclick="window.print()" class="px-4 py-2 bg-[#e6ac27] hover:bg-[#cf9719] text-neutral-950 font-bold text-xs uppercase rounded-xl print:hidden cursor-pointer">Imprimir / PDF</button>
             </div>
         </div>
     </x-slot>
 
-    <div class="py-6 min-h-screen bg-slate-50 relative">
+    <div class="py-8 bg-stone-50 dark:bg-neutral-950 min-h-screen transition-colors">
         <div class="max-w-[95%] mx-auto sm:px-6 lg:px-8 space-y-6">
-
-            <!-- GUÍA DE PESOS (Acumulado vs Examen) -->
-            @if($corteActivo)
-            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden">
+            <div class="bg-white dark:bg-neutral-900 p-5 rounded-3xl border {{ $estaBloqueado ? 'border-rose-200 dark:border-rose-900' : 'border-stone-200 dark:border-neutral-800' }} shadow-xs flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Peso Acumulado</p>
-                    <p class="text-xl font-black text-[#3d2c1d]">{{ $sumaAcumulado }} / {{ $pesoAcumulado }} pts</p>
+                    <h3 class="font-bold text-neutral-900 dark:text-white text-base">{{ $estaBloqueado ? 'Calificaciones Bloqueadas' : 'Edición Abierta' }}</h3>
+                    <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{{ $estaBloqueado ? 'El parcial fue cerrado.' : 'Puedes ingresar y guardar calificaciones.' }}</p>
                 </div>
-                <div>
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Peso Examen</p>
-                    <p class="text-xl font-black text-[#3d2c1d]">{{ $sumaExamen }} / {{ $pesoExamen }} pts</p>
-                </div>
-                <div>
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Parcial</p>
-                    <p class="text-xl font-black {{ ($sumaAcumulado + $sumaExamen) === ($pesoAcumulado + $pesoExamen) ? 'text-emerald-600' : 'text-rose-600' }}">
-                        {{ $sumaAcumulado + $sumaExamen }} / {{ $pesoAcumulado + $pesoExamen }} pts
-                    </p>
-                </div>
-            </div>
-            @endif
-
-            <!-- BARRA DE ESTADO Y ACCIONES -->
-            <div class="bg-white p-5 rounded-3xl border {{ $estaBloqueado ? 'border-rose-200 bg-rose-50/30' : 'border-[#e6ac27]/30' }} shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
-                <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-xl flex items-center justify-center {{ $estaBloqueado ? 'bg-rose-100 text-rose-500' : 'bg-emerald-100 text-emerald-500' }}">
-                        @if($estaBloqueado)
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                        @else
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path></svg>
-                        @endif
-                    </div>
-                    <div>
-                        <h3 class="font-black text-[#3d2c1d] text-base leading-tight">
-                            {{ $estaBloqueado ? 'Calificaciones Bloqueadas' : 'Edición Abierta' }}
-                        </h3>
-                        <p class="text-[11px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
-                            {{ $estaBloqueado ? 'El parcial fue cerrado. Solo lectura.' : 'Puedes ingresar y modificar notas.' }}
-                        </p>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-3">
-                    <a href="{{ route('academico.notas.actividades.index', $asignacion->id) }}" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black rounded-xl transition-colors flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-                        Gestionar Actividades
-                    </a>
-                    
-                    @if($estaBloqueado)
-                        <button @click="$dispatch('abrir-modal-desbloqueo')" class="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-black rounded-xl shadow-md transition-colors flex items-center gap-2">
-                            Solicitar Desbloqueo
-                        </button>
-                    @else
-                        @if($actividades->count() > 0)
-                            <button form="form-planilla" type="submit" class="px-6 py-2.5 bg-[#3d2c1d] hover:bg-slate-800 text-white text-xs font-black rounded-xl shadow-md transition-all flex items-center gap-2">
-                                Guardar Avance
-                            </button>
-                            <button @click="$dispatch('abrir-modal-cierre')" class="px-5 py-2.5 border-2 border-rose-500 text-rose-500 hover:bg-rose-500 hover:text-white text-xs font-black rounded-xl transition-colors">
-                                Cerrar Parcial
-                            </button>
-                        @endif
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <a href="{{ route('academico.notas.actividades.index', $asignacion->id) }}" class="px-4 py-2 bg-stone-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-xs font-bold uppercase rounded-xl cursor-pointer">Actividades</a>
+                    @if ($estaBloqueado)
+                        <button type="button" @click="$dispatch('abrir-modal-desbloqueo')" class="px-4 py-2 bg-rose-600 text-white text-xs font-bold uppercase rounded-xl cursor-pointer">Solicitar Desbloqueo</button>
+                    @elseif ($actividades->isNotEmpty())
+                        <button form="form-planilla" type="submit" class="px-5 py-2 bg-[#e6ac27] hover:bg-[#cf9719] text-neutral-950 text-xs font-bold uppercase rounded-xl cursor-pointer">Guardar Avance</button>
+                        <button type="button" @click="$dispatch('abrir-modal-cierre')" class="px-4 py-2 border border-rose-500 text-rose-600 dark:text-rose-400 text-xs font-bold uppercase rounded-xl cursor-pointer">Cerrar Parcial</button>
                     @endif
                 </div>
             </div>
 
-            <!-- CONTENEDOR DE LA PLANILLA -->
-            @if($actividades->isEmpty())
-                <div class="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm text-center">
-                    <div class="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto text-amber-500 mb-4">
-                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                    </div>
-                    <h3 class="text-xl font-black text-[#3d2c1d] mb-2">No hay actividades configuradas</h3>
-                    <p class="text-sm text-slate-500 max-w-md mx-auto mb-6">Debes crear la distribución de puntos (tareas, exposiciones, examen) antes de poder ingresar calificaciones.</p>
-                    <a href="{{ route('academico.notas.actividades.index', $asignacion->id) }}" class="inline-block px-8 py-3 bg-[#e6ac27] hover:bg-amber-500 text-[#3d2c1d] font-black rounded-xl shadow-md transition-all transform hover:-translate-y-0.5">
-                        Ir a Configurar Acumulado
-                    </a>
-                </div>
-            @else
-                <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            @if ($actividades->isNotEmpty())
+                <div class="bg-white dark:bg-neutral-900 rounded-3xl border border-stone-200 dark:border-neutral-800 shadow-xs overflow-hidden">
                     <form id="form-planilla" action="{{ route('academico.notas.store', $asignacion->id) }}" method="POST">
                         @csrf
                         <input type="hidden" name="corte_evaluativo_id" value="{{ $corteSeleccionado }}">
-                        @php
-                            // Mismo denominador que NotaController@store: pesos oficiales del corte
-                            $totalCorte = ($pesoAcumulado + $pesoExamen) > 0
-                                ? ($pesoAcumulado + $pesoExamen)
-                                : max(1, $sumaAcumulado + $sumaExamen);
-                        @endphp
-                        
-                        <div class="overflow-x-auto custom-scrollbar">
-                            <table class="w-full text-left border-collapse whitespace-nowrap">
-                                <thead>
-                                    <tr class="bg-slate-50 border-b border-slate-200">
-                                        <th class="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50 z-20 shadow-[1px_0_0_0_#e2e8f0]"># Estudiante</th>
-                                        
-                                        @foreach($actividades as $actividad)
-                                            <th class="px-4 py-4 text-center">
-                                                <span class="block text-xs font-bold text-[#3d2c1d] truncate max-w-[120px]" title="{{ $actividad->nombre }}">{{ $actividad->nombre }}</span>
-                                                <span class="block text-[10px] font-black text-[#e6ac27] uppercase tracking-widest mt-1">Máx: {{ $actividad->puntaje_maximo }} pts</span>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse whitespace-nowrap text-sm">
+                                <thead class="bg-[#FFFDF8] dark:bg-neutral-800/70 border-b border-stone-200 dark:border-neutral-800">
+                                    <tr>
+                                        <th class="px-5 py-3.5 text-xs font-semibold text-neutral-500 uppercase sticky left-0 bg-[#FFFDF8] dark:bg-neutral-900"># Estudiante</th>
+                                        @foreach ($actividades as $actividad)
+                                            <th class="px-3 py-3.5 text-center text-xs font-semibold">
+                                                <span class="block text-neutral-900 dark:text-white">{{ $actividad->nombre }}</span>
+                                                <span class="block text-[10px] text-[#c99116]">Máx: {{ $actividad->puntaje_maximo }}</span>
                                             </th>
                                         @endforeach
-                                        
-                                        <th class="px-6 py-4 text-center bg-[#FFFDF5] border-l border-amber-100">
-                                            <span class="block text-xs font-black text-[#3d2c1d]">Nota Final del Corte {{ $corteActivo?->numero }}</span>
-                                            <span class="block text-[10px] font-black text-amber-500 uppercase tracking-widest mt-1">(escala 0-100 · sobre {{ $totalCorte }} pts)</span>
-                                        </th>
+                                        <th class="px-5 py-3.5 text-center text-xs font-semibold bg-stone-50 dark:bg-neutral-800/40">Nota Final (0-100)</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-slate-100">
-                                    @foreach($matriculas as $index => $matricula)
-                                        @php
-                                            $notaCorte = $matricula->notas->firstWhere('corte_evaluativo_id', $corteSeleccionado);
-                                            $totalInicial = $notaCorte ? ($notaCorte->nota_cuantitativa ?? 0) : 0;
-                                        @endphp
-                                        
-                                        <!-- ALPINE.JS: Cada fila maneja su propia auto-suma en tiempo real -->
-                                        <tr class="hover:bg-slate-50/50 transition-colors" 
-                                            x-data="{ 
-                                                totalFila: {{ $totalInicial }},
-                                                recalcular() {
-                                                    let suma = 0;
-                                                    this.$el.querySelectorAll('.input-nota').forEach(input => {
-                                                        let valor = parseFloat(input.value) || 0;
-                                                        let max = parseFloat(input.getAttribute('max')) || 0;
-                                                        if(valor > max) { input.value = max; valor = max; } // Bloqueo visual
-                                                        suma += valor;
-                                                    });
-                                                    // Mismo cálculo que el backend: puntos obtenidos escalados
-                                                    // al total oficial del corte (escala 0-100)
-                                                    let nota = (suma / {{ $totalCorte }}) * 100;
-                                                    this.totalFila = Math.min(100, Math.max(0, nota)).toFixed(2).replace(/\.00$/, '');
-                                                }
-                                            }">
-                                            
-                                            <td class="px-6 py-3 sticky left-0 bg-white z-10 shadow-[1px_0_0_0_#f1f5f9]">
-                                                <div class="flex items-center gap-3">
-                                                    <span class="text-xs font-bold text-slate-400">{{ $index + 1 }}</span>
-                                                    <span class="text-sm font-black text-[#3d2c1d]">{{ $matricula->alumno->nombre_completo }}</span>
-                                                </div>
-                                            </td>
-                                            
-                                            @foreach($actividades as $actividad)
-                                                @php
-                                                    $na = isset($notasActividades[$matricula->id])
-                                                        ? $notasActividades[$matricula->id]->firstWhere('actividad_evaluativa_id', $actividad->id)
-                                                        : null;
-                                                    $notaExistente = $na ? ($na->nota_obtenida ?? '') : '';
-                                                @endphp
+                                <tbody class="divide-y divide-stone-100 dark:divide-neutral-800 text-neutral-800 dark:text-neutral-200">
+                                    @foreach ($matriculas as $index => $matricula)
+                                        @php $notaCorte = $matricula->notas->firstWhere('corte_evaluativo_id', $corteSeleccionado); $totalInicial = $notaCorte ? ($notaCorte->nota_cuantitativa ?? 0) : 0; @endphp
+                                        <tr x-data="{ totalFila: {{ $totalInicial }}, recalcular() { let suma = 0; this.$el.querySelectorAll('.input-nota').forEach(i => { const max = parseFloat(i.getAttribute('max')) || 0; let v = parseFloat(i.value) || 0; if (v > max) { i.value = max; v = max; } suma += v; }); this.totalFila = Math.min(100, Math.max(0, (suma / {{ $totalCorte }}) * 100)).toFixed(2).replace(/\.00$/, ''); } }">
+                                            <td class="px-5 py-3 sticky left-0 bg-white dark:bg-neutral-900 font-semibold">{{ $index + 1 }}. {{ $matricula->alumno?->nombre_completo }}</td>
+                                            @foreach ($actividades as $actividad)
+                                                @php $na = isset($notasActividades[$matricula->id]) ? $notasActividades[$matricula->id]->firstWhere('actividad_evaluativa_id', $actividad->id) : null; @endphp
                                                 <td class="px-2 py-3 text-center">
-                                                    <input type="number" 
-                                                           name="notas[{{ $matricula->id }}][{{ $actividad->id }}]" 
-                                                           value="{{ $notaExistente }}"
-                                                           max="{{ $actividad->puntaje_maximo }}" 
-                                                           min="0" step="0.01"
-                                                           @input="recalcular"
-                                                           {{ $estaBloqueado ? 'readonly' : '' }}
-                                                           class="input-nota w-20 text-center text-sm font-bold rounded-lg border-slate-200 focus:ring-[#e6ac27] focus:border-[#e6ac27] 
-                                                                  {{ $estaBloqueado ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-transparent' : 'text-[#3d2c1d]' }}">
+                                                    <input type="number" name="notas[{{ $matricula->id }}][{{ $actividad->id }}]" value="{{ $na?->nota_obtenida ?? '' }}" max="{{ $actividad->puntaje_maximo }}" min="0" step="0.01" @input="recalcular" {{ $estaBloqueado ? 'readonly' : '' }} class="input-nota w-20 text-center text-xs font-semibold rounded-xl border-stone-300 dark:border-neutral-700 bg-stone-50 dark:bg-neutral-800 py-1.5">
                                                 </td>
                                             @endforeach
-                                            
-                                            <td class="px-6 py-3 text-center bg-[#FFFDF5] border-l border-amber-100">
-                                                <span class="text-base font-black text-[#3d2c1d]" x-text="totalFila"></span>
-                                            </td>
+                                            <td class="px-5 py-3 text-center font-bold bg-stone-50 dark:bg-neutral-800/40" x-text="totalFila"></td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -209,75 +85,31 @@
         </div>
     </div>
 
-    <!-- MODAL: CERRAR PARCIAL -->
-    <div x-data="{ open: false }" @abrir-modal-cierre.window="open = true" x-show="open" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div x-show="open" x-transition.opacity class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="open = false"></div>
-        <div x-show="open" x-transition.scale class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div class="px-6 py-5 border-b border-rose-100 bg-rose-50 flex justify-between items-center">
-                <h3 class="text-lg font-black text-rose-600 flex items-center gap-2">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                    ¿Cerrar Calificaciones?
-                </h3>
-            </div>
-            <div class="p-6">
-                <p class="text-sm text-slate-600 mb-6 leading-relaxed">
-                    Al cerrar el parcial, <strong>las notas quedarán bloqueadas y no podrán ser editadas</strong>. Esta acción genera el reporte oficial para la Directiva. <br><br>¿Estás seguro de que todas las calificaciones son correctas?
-                </p>
-                <form action="{{ route('academico.notas.cerrar', $asignacion->id) }}" method="POST" class="flex justify-end gap-3">
-                    @csrf
-                    <input type="hidden" name="corte_evaluativo_id" value="{{ $corteSeleccionado }}">
-                    <button type="button" @click="open = false" class="px-5 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">Revisar de nuevo</button>
-                    <button type="submit" class="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white text-sm font-black rounded-xl shadow-md transition-transform transform hover:-translate-y-0.5">Sí, Cerrar Parcial</button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL: SOLICITAR DESBLOQUEO -->
-    <div x-data="{ open: false }" @abrir-modal-desbloqueo.window="open = true" x-show="open" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div x-show="open" x-transition.opacity class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="open = false"></div>
-        <div x-show="open" x-transition.scale class="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div class="px-6 py-5 border-b border-amber-100 bg-amber-50 flex justify-between items-center">
-                <h3 class="text-lg font-black text-amber-600 flex items-center gap-2">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                    Solicitud de Desbloqueo
-                </h3>
-            </div>
-            <form action="{{ route('academico.notas.solicitar-desbloqueo', $asignacion->id) }}" method="POST">
+    <div x-data="{ open: false }" @abrir-modal-cierre.window="open = true" x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+        <div class="bg-white dark:bg-neutral-900 rounded-3xl w-full max-w-md overflow-hidden border border-stone-200 dark:border-neutral-800 p-6 space-y-4">
+            <h3 class="text-base font-bold text-rose-600 dark:text-rose-400">¿Cerrar Calificaciones?</h3>
+            <p class="text-sm text-neutral-600 dark:text-neutral-300">Al cerrar el parcial, las notas quedarán bloqueadas y requerirán autorización para editarse.</p>
+            <form action="{{ route('academico.notas.cerrar', $asignacion->id) }}" method="POST" class="flex justify-end gap-3">
                 @csrf
                 <input type="hidden" name="corte_evaluativo_id" value="{{ $corteSeleccionado }}">
-                <div class="p-6">
-                    <p class="text-xs font-bold text-slate-500 mb-4">Esta solicitud será enviada a Subdirección. Detalla claramente qué nota necesitas cambiar y por qué.</p>
-                    
-                    <label class="block text-[11px] font-black text-[#3d2c1d] uppercase tracking-widest mb-2">Motivo de la corrección</label>
-                    <textarea name="motivo" rows="4" required placeholder="Ej: Hubo un error de digitación en la tarea X del estudiante Y..." class="w-full border-slate-200 bg-slate-50 rounded-xl focus:ring-amber-400 focus:border-amber-400 text-sm text-[#3d2c1d]"></textarea>
-                </div>
-                <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                    <button type="button" @click="open = false" class="px-5 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
-                    <button type="submit" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-black rounded-xl shadow-md transition-transform transform hover:-translate-y-0.5">Enviar Solicitud</button>
-                </div>
+                <button type="button" @click="open = false" class="px-4 py-2 text-xs font-semibold text-neutral-500 cursor-pointer">Cancelar</button>
+                <button type="submit" class="px-5 py-2 bg-rose-600 text-white text-xs font-bold uppercase rounded-xl cursor-pointer">Sí, Cerrar Parcial</button>
             </form>
         </div>
     </div>
 
-    <!-- Script de SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            @if(session('success'))
-                Swal.fire({
-                    toast: true, position: 'top', showConfirmButton: false, timer: 3500,
-                    icon: 'success', title: '{{ session("success") }}',
-                    customClass: { popup: 'rounded-2xl shadow-lg border border-slate-100' }
-                });
-            @endif
-
-            @if(session('error'))
-                Swal.fire({
-                    title: 'Acción Denegada', text: '{{ session("error") }}', icon: 'error',
-                    confirmButtonColor: '#e53e3e', customClass: { popup: 'rounded-3xl border border-stone-200 shadow-xl' }
-                });
-            @endif
-        });
-    </script>
+    <div x-data="{ open: false }" @abrir-modal-desbloqueo.window="open = true" x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+        <div class="bg-white dark:bg-neutral-900 rounded-3xl w-full max-w-lg overflow-hidden border border-stone-200 dark:border-neutral-800">
+            <form action="{{ route('academico.notas.solicitar-desbloqueo', $asignacion->id) }}" method="POST" class="p-6 space-y-4 text-sm">
+                @csrf
+                <input type="hidden" name="corte_evaluativo_id" value="{{ $corteSeleccionado }}">
+                <h3 class="text-base font-bold text-neutral-900 dark:text-white">Solicitud de Desbloqueo</h3>
+                <textarea name="motivo" rows="4" required placeholder="Indica el motivo de la corrección..." class="w-full border-stone-300 dark:border-neutral-700 bg-stone-50 dark:bg-neutral-800 rounded-xl text-sm"></textarea>
+                <div class="flex justify-end gap-3">
+                    <button type="button" @click="open = false" class="px-4 py-2 text-xs font-semibold text-neutral-500 cursor-pointer">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-[#e6ac27] text-neutral-950 text-xs font-bold uppercase rounded-xl cursor-pointer">Enviar Solicitud</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </x-app-layout>

@@ -1,182 +1,158 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" 
-      x-data="{ darkMode: localStorage.getItem('darkMode') === 'true' }" 
-      x-init="$watch('darkMode', val => localStorage.setItem('darkMode', val))" 
-      x-bind:class="{ 'dark': darkMode }">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'SGA Institucional') }}</title>
+    <title>{{ config('app.name', 'SGA Institucional') }}</title>
 
-        <!-- Fonts & Scripts -->
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-        <!-- ESTILOS GLOBALES DE IMPRESIÓN PARA TODO EL SISTEMA -->
-        <style>
-            @media print {
-                @page {
-                    margin: 14mm 16mm;
-                }
-                /* Ocultar navegación, sidebar, encabezados web, filtros, paginación y botones en TODAS las vistas */
-                nav, aside, header, .no-print, .print\:hidden, form[method="GET"], button {
-                    display: none !important;
-                }
-                /* Forzar impresión de colores exactos institucionales */
-                html, body, * {
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                    color-adjust: exact !important;
-                }
-                body, main, .min-h-screen {
-                    background-color: #ffffff !important;
-                    color: #3d2c1d !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                }
-                /* Quitar cualquier padding lateral del sidebar en impresión */
-                .contenedor-principal-layout {
-                    padding-left: 0 !important;
-                    width: 100% !important;
-                }
-                /* Dar respiro automático al contenedor principal impreso */
-                main > div {
-                    padding: 4mm 2mm !important;
-                    max-width: 100% !important;
-                    background-color: #ffffff !important;
-                }
-                /* Evitar que las tablas o tarjetas se corten feo entre páginas */
-                tr, td, th {
-                    page-break-inside: avoid !important;
-                }
-                .overflow-x-auto {
-                    overflow: visible !important;
-                }
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
             }
-        </style>
-    </head>
-    
-    @php
-        // Si el usuario no es Director o Subdirector, el menú lateral y su espacio desaparecen por completo.
-        $mostrarSidebar = auth()->check() && auth()->user()->hasAnyRole(['Director', 'Subdirector']);
-    @endphp
+        })();
+    </script>
 
-    <body class="font-sans antialiased text-[#3d2c1d] bg-slate-50 dark:bg-slate-900 dark:text-slate-200 transition-colors duration-300" 
-          x-data="{ 
-              sidebarOpen: false,
-              showTopBtnGlobal: false 
-          }" 
-          @resize.window="if(window.innerWidth < 1024) sidebarOpen = false" 
-          @scroll.window="showTopBtnGlobal = (window.pageYOffset > 150)">
-        
-        <!-- SIDEBAR -->
-        @if($mostrarSidebar)
-            @include('layouts.navigation')
-        @endif
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-        <!-- CONTENEDOR DINÁMICO (Con print:!pl-0 para que el sidebar no empuje el PDF) -->
-        <div class="contenedor-principal-layout flex flex-col min-h-screen transition-all duration-300 print:!pl-0 {{ !$mostrarSidebar ? 'w-full' : '' }}" 
-             @if($mostrarSidebar) :class="sidebarOpen ? 'lg:pl-64' : 'lg:pl-20'" @endif>
-            
-            <!-- TOPBAR GLOBAL -->
-            <nav class="sticky top-0 z-50 bg-white dark:bg-slate-800 border-b border-slate-200/60 dark:border-slate-700 shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 transition-colors duration-300 print:hidden">
-                <div class="flex items-center gap-4 lg:gap-6">
-                    <!-- Botón Hamburguesa -->
-                    @if($mostrarSidebar)
-                        <button @click="sidebarOpen = !sidebarOpen" class="text-slate-500 hover:text-[#e6ac27] bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-700 hover:bg-amber-50 p-2 rounded-lg transition-colors focus:outline-none">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                        </button>
-                    @else
-                        <div class="w-6"></div>
-                    @endif
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-                    <!-- LOGO INSTITUCIONAL -->
-                    <a href="{{ route('dashboard') }}" class="flex items-center gap-3 group">
-                        <x-application-logo class="block h-10 w-auto object-contain shrink-0 group-hover:scale-105 transition-transform drop-shadow-sm" />
-                        <span class="font-black text-[#3d2c1d] dark:text-white text-xl tracking-tight group-hover:text-[#e6ac27] transition-colors hidden sm:block">
-                            Colegio Cristiano En Nicaragua 
-                        </span>
-                    </a>
-                </div>
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+@php
+    $usuarioLayout = Auth::user();
+    $mostrarSidebar = Auth::check() &&$usuarioLayout && $usuarioLayout->hasAnyRole([ 'directora', 'subdirectora', 'gestor_it', 'coordinador', 'Director', 'Subdirector', 'Gestor de Usuarios', 'Coordinador', ]);$nombreCortoLayout = explode(' ', trim((string) ($usuarioLayout?->nombre_completo ?? $usuarioLayout?->name ?? 'Usuario')))[0] ?: 'Usuario';
+    $inicialLayout = mb_substr($nombreCortoLayout, 0, 1, 'UTF-8');
+    $avatarNav = ($usuarioLayout && !empty($usuarioLayout->avatar)) ? asset('storage/' . $usuarioLayout->avatar) : null;
+@endphp
+<body
+    class="antialiased text-neutral-800 dark:text-neutral-100 bg-stone-50 dark:bg-neutral-950 transition-colors duration-200"
+    x-data="{
+        sidebarOpen: false,
+        showTopBtnGlobal: false
+    }"
+    @resize.window="if (window.innerWidth < 1024) sidebarOpen = false"
+    @scroll.window="showTopBtnGlobal = (window.pageYOffset > 150)"
+>
+    @if ($mostrarSidebar)
+        @include('layouts.navigation')
+    @endif
 
-                <!-- Menú de Usuario y Modo Oscuro -->
-                <div class="flex items-center">
-                    
-                    <!-- Dropdown Perfil -->
+    <div
+        class="contenedor-principal-layout flex flex-col min-h-screen bg-stone-50 dark:bg-neutral-950 transition-all duration-200 {{ !$mostrarSidebar ? 'w-full' : '' }}"
+        @if ($mostrarSidebar) :class="sidebarOpen ? 'lg:pl-64' : 'lg:pl-20'" @endif
+    >
+        <nav class="sticky top-0 z-40 bg-white/95 dark:bg-neutral-900/95 backdrop-blur border-b border-stone-200/80 dark:border-neutral-800 h-16 flex items-center justify-between px-4 sm:px-6 transition-colors duration-200 print:hidden">
+            <div class="flex items-center gap-3 sm:gap-5">
+                @if ($mostrarSidebar)
+                    <button
+                        type="button"
+                        @click="sidebarOpen = !sidebarOpen"
+                        aria-label="Alternar menú lateral"
+                        class="text-neutral-600 dark:text-neutral-300 hover:text-[#d49b1a] bg-stone-100 dark:bg-neutral-800 hover:bg-amber-50 dark:hover:bg-neutral-700 p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-[#e6ac27] cursor-pointer"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
+                @endif
+
+                <a href="{{ route('dashboard') }}" class="flex items-center gap-3 group">
+                    <x-application-logo class="block h-9 w-auto object-contain shrink-0 group-hover:scale-105 transition-transform" />
+                    <span class="font-bold text-neutral-900 dark:text-neutral-100 text-base sm:text-lg tracking-tight group-hover:text-[#d49b1a] transition-colors hidden sm:block">
+                        Colegio Cristiano En Nicaragua
+                    </span>
+                </a>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <x-ui.theme-toggle />
+
+                @auth
                     <x-dropdown align="right" width="48">
                         <x-slot name="trigger">
-                            @php
-                                $nombreCorto = explode(' ', Auth::user()->nombre_completo ?? Auth::user()->name ?? 'Usuario')[0];
-                                $inicial = substr($nombreCorto, 0, 1);
-                                $avatarNav = Auth::user()->avatar ? asset('storage/' . Auth::user()->avatar) : null;
-                            @endphp
-                            <button class="inline-flex items-center p-1.5 pr-3 border border-[#e6ac27]/30 text-sm font-bold rounded-full text-amber-900 dark:text-amber-100 bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition shadow-sm gap-2">
-                                @if($avatarNav)
+                            <button type="button" class="inline-flex items-center p-1.5 pr-3 border border-neutral-200 dark:border-neutral-700 text-sm font-medium rounded-full text-neutral-800 dark:text-neutral-100 bg-white dark:bg-neutral-800 hover:bg-stone-100 dark:hover:bg-neutral-700 transition gap-2 cursor-pointer">
+                                @if ($avatarNav)
                                     <img src="{{ $avatarNav }}" class="w-7 h-7 rounded-full object-cover border border-[#e6ac27]/50" alt="Avatar">
                                 @else
-                                    <div class="w-7 h-7 rounded-full bg-[#e6ac27] text-white flex items-center justify-center text-xs">
-                                        {{ $inicial }}
+                                    <div class="w-7 h-7 rounded-full bg-[#e6ac27] text-neutral-950 flex items-center justify-center text-xs font-bold">
+                                        {{ $inicialLayout }}
                                     </div>
                                 @endif
-                                <span class="hidden sm:block">{{ $nombreCorto }}</span>
-                                <svg class="fill-current h-4 w-4 text-[#e6ac27]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                                <span class="hidden sm:block">{{ $nombreCortoLayout }}</span>
+                                <svg class="fill-current h-4 w-4 text-neutral-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
                             </button>
                         </x-slot>
                         <x-slot name="content">
-                            <div class="px-4 py-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800">
-                                <p class="text-sm font-black text-slate-800 dark:text-slate-200">{{ Auth::user()->nombre_completo ?? Auth::user()->name }}</p>
-                                <p class="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{{ Auth::user()->email }}</p>
+                            <div class="px-4 py-3 border-b border-stone-100 dark:border-neutral-800 bg-stone-50 dark:bg-neutral-900">
+                                <p class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ $usuarioLayout?->nombre_completo ?? $usuarioLayout?->name }}</p>
+                                <p class="text-xs text-neutral-500 dark:text-neutral-400 truncate">{{ $usuarioLayout?->email }}</p>
                             </div>
-                            <x-dropdown-link :href="route('profile.edit')" class="hover:bg-amber-50 dark:hover:bg-slate-700 hover:text-amber-900 font-bold flex items-center gap-2 mt-1">
-                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                            <x-dropdown-link :href="route('profile.edit')" class="hover:bg-stone-100 dark:hover:bg-neutral-800 font-medium flex items-center gap-2 mt-1">
                                 {{ __('Mi Perfil') }}
                             </x-dropdown-link>
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
-                                <x-dropdown-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();" class="text-red-600 font-bold hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 mt-1 border-t border-slate-100 dark:border-slate-700 pt-2">
-                                    <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
+                                <x-dropdown-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();" class="text-rose-600 dark:text-rose-400 font-medium hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 mt-1 border-t border-stone-100 dark:border-neutral-800 pt-2">
                                     {{ __('Cerrar Sesión') }}
                                 </x-dropdown-link>
                             </form>
                         </x-slot>
                     </x-dropdown>
-                </div>
-            </nav>
+                @endauth
+            </div>
+        </nav>
 
-            <!-- ENCABEZADO DE PÁGINA -->
-            @isset($header)
-                <header class="bg-transparent pt-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full print:hidden">
-                    {{ $header }}
-                </header>
+        @isset($header)
+            <header class="bg-transparent pt-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full print:hidden">
+                {{ $header }}
+            </header>
+        @endisset
+
+        <main class="flex-1 w-full bg-stone-50 dark:bg-neutral-950 transition-colors duration-200">
+            @isset($slot)
+                {{ $slot }}
+            @else
+                @yield('content')
             @endisset
 
-            <!-- CONTENIDO PRINCIPAL -->
-            <main class="flex-1 w-full">
-                @isset($slot)
-                    {{ $slot }}
-                @else
-                    @yield('content')
-                @endisset
-                <!-- Pie de página automático para cualquier impresión del sistema -->
-                <div class="hidden print:flex justify-between items-center mt-4 px-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                    <span>Documento generado el {{ now()->timezone('America/Managua')->format('d/m/Y h:i A') }}</span>
-                    <span class="text-[#3d2c1d]">Colegio Cristiano En Nicaragua • Sistema de Gestión Académica</span>
-                </div>
-            </main>
+            <div class="hidden print:flex justify-between items-center mt-4 px-2 text-[10px] text-neutral-500 font-medium uppercase tracking-wider">
+                <span>Documento generado el {{ now()->timezone('America/Managua')->format('d/m/Y h:i A') }}</span>
+                <span>Colegio Cristiano En Nicaragua · Sistema de Gestión Académica</span>
+            </div>
+        </main>
 
-            <!-- Botón flotante -->
-            <button x-show="showTopBtnGlobal" x-transition @click="window.scrollTo({top: 0, behavior: 'smooth'})" class="fixed bottom-8 right-8 z-50 p-3.5 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-full shadow-lg transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[#e6ac27] print:hidden" title="Volver arriba">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
-            </button>
-        </div>
+        <button
+            type="button"
+            x-show="showTopBtnGlobal"
+            x-cloak
+            x-transition
+            @click="window.scrollTo({ top: 0, behavior: 'smooth' })"
+            aria-label="Volver arriba"
+            title="Volver arriba"
+            class="fixed bottom-8 right-8 z-50 p-3 bg-[#e6ac27] hover:bg-[#cf9719] text-neutral-950 rounded-full shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-[#e6ac27] print:hidden cursor-pointer"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+            </svg>
+        </button>
+    </div>
 
-        <!-- Inyección del Motor Universal de Alertas -->
-        <x-ui.alerts />
-        
-    </body>
+    <x-ui.alerts />
+</body>
 </html>

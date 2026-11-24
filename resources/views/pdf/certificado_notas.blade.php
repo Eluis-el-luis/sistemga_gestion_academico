@@ -47,9 +47,8 @@
 </head>
 <body>
     <div class="page">
-        <!-- DATOS DEL CENTRO -->
         <div class="header">
-            @if(!empty($logo))
+            @if (!empty($logo))
                 <div class="logo"><img src="{{ $logo }}" alt="Logo"></div>
             @endif
             <div class="titles">
@@ -57,14 +56,13 @@
                 <h2>Colegio Cristiano en Nicaragua</h2>
                 <div class="subtitle">
                     {{ $matricula?->aula?->modalidad?->nombre ?? 'Educación Regular' }}
-                    @if($matricula?->anioEscolar) &middot; Ciclo Escolar {{ $matricula->anioEscolar->nombre }}@endif
+                    @if ($matricula?->anioEscolar) &middot; Ciclo Escolar {{ $matricula->anioEscolar->nombre }}@endif
                 </div>
             </div>
         </div>
 
         <div class="certificado-title">Certificado de Notas</div>
 
-        <!-- DATOS DEL ESTUDIANTE -->
         <div class="info-grid">
             <div class="info-item">
                 <div class="info-label">Nombre Completo</div>
@@ -84,8 +82,7 @@
             </div>
         </div>
 
-        <!-- TABLA COMPARATIVA POR ASIGNATURAS -->
-        @if(empty($grados))
+        @if (empty($grados))
             <table>
                 <tbody>
                     <tr class="sin-matricula">
@@ -98,24 +95,24 @@
                 <thead>
                     <tr class="thead-main">
                         <th rowspan="2" style="width: 34%; text-align: left; padding-left: 6px;">Asignatura</th>
-                        @foreach($grados as $g)
+                        @foreach ($grados as $g)
                             <th colspan="2">
-                                {{ $g['grado']->nombre }}@if($g['anioEscolar'])<br><span style="font-weight: normal; text-transform: none;">Ciclo {{ $g['anioEscolar']->nombre }}&middot; Sec. "{{ $g['matricula']?->aula?->nombre ?? '—' }}"</span>@endif
+                                {{ $g['grado']->nombre }}@if ($g['anioEscolar'])<br><span style="font-weight: normal; text-transform: none;">Ciclo {{ $g['anioEscolar']->nombre }} &middot; Sec. "{{ $g['matricula']?->aula?->nombre ?? '—' }}"</span>@endif
                             </th>
                         @endforeach
                     </tr>
                     <tr class="thead-sub">
-                        @foreach($grados as $g)
+                        @foreach ($grados as $g)
                             <th style="width: {{ count($grados) ? 33 / count($grados) : 33 }}%;">Cuantitativa</th>
                             <th style="width: {{ count($grados) ? 33 / count($grados) : 33 }}%;">Cualitativa</th>
                         @endforeach
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($asignaturas as $fila)
+                    @forelse ($asignaturas as $fila)
                         <tr>
                             <td class="subject-name">{{ $fila['nombre'] }}</td>
-                            @foreach($grados as $g)
+                            @foreach ($grados as $g)
                                 @php $n = $g['notas'][$fila['nombre']] ?? null; @endphp
                                 <td><strong>{{ $n && $n['cuan'] !== null ? $n['cuan'] : '—' }}</strong></td>
                                 <td>{{ $n['cua'] ?? '—' }}{{ $n && $n['cua_nombre'] ? ' — ' . $n['cua_nombre'] : '' }}</td>
@@ -128,7 +125,7 @@
                     @endforelse
                     <tr class="promedio-row">
                         <td class="subject-name">Promedio del grado</td>
-                        @foreach($grados as $g)
+                        @foreach ($grados as $g)
                             <td>{{ $g['promedio'] !== null ? number_format($g['promedio'], 2) : '—' }}</td>
                             <td>{{ $g['promedio_cua'] ?? '—' }}{{ $g['promedio_cua_nombre'] ? ' — ' . $g['promedio_cua_nombre'] : '' }}</td>
                         @endforeach
@@ -137,18 +134,15 @@
             </table>
         @endif
 
-        <!-- ESCALA CUALITATIVA MINED -->
         <p class="legend">
             Escala de logro: AA = Aprendizaje Avanzado (90-100) &middot; AS = Aprendizaje Satisfactorio (76-89) &middot; AE = Aprendizaje Esperado (60-75) &middot; AI = Aprendizaje Inicial (0-59)
         </p>
 
-        <!-- SELLO OFICIAL -->
         <div class="official-seal">
             <div class="seal-text">SELLO Y FIRMA DE LA DIRECCIÓN</div>
             <div class="seal-sub">Válido solo con firma y sello oficial de la institución</div>
         </div>
 
-        <!-- FIRMAS -->
         <div class="footer">
             <div class="signature-block">
                 <div class="signature-line">Director(a) del Centro</div>

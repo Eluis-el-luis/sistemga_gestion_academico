@@ -1,60 +1,66 @@
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        
-        // Configuración base de la notificación Toast (Estilo Teléfono)
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof Swal === 'undefined') {
+            return;
+        }
+
+        const isDark = document.documentElement.classList.contains('dark');
         const Toast = Swal.mixin({
             toast: true,
             position: 'top-end',
             showConfirmButton: false,
-            timer: 3500,
+            timer: 3800,
             timerProgressBar: true,
-            customClass: { 
-                popup: 'rounded-2xl shadow-lg border border-slate-100 dark:bg-slate-900 dark:border-slate-800 dark:text-white transition-colors' 
+            background: isDark ? '#0f172a' : '#ffffff',
+            color: isDark ? '#f1f5f9' : '#3d2c1d',
+            customClass: {
+                popup: 'rounded-2xl shadow-lg border border-slate-100 dark:border-slate-800 transition-colors'
             },
             didOpen: (toast) => {
-                toast.addEventListener('mouseenter', Swal.stopTimer)
-                toast.addEventListener('mouseleave', Swal.resumeTimer)
+                toast.addEventListener('mouseenter', Swal.stopTimer);
+                toast.addEventListener('mouseleave', Swal.resumeTimer);
             }
         });
 
-        // 1. Alertas de Éxito Flotantes
-        @if(session('success'))
+        @if (session('success'))
             Toast.fire({
                 icon: 'success',
-                title: '{{ session("success") }}'
+                title: @json(session('success'))
             });
         @endif
 
-        // 2. Alertas de Inconsistencia (Bloqueantes por seguridad)
-        @if(session('error'))
+        @if (session('error'))
             Swal.fire({
                 title: 'Verificación del Sistema',
-                text: '{{ session("error") }}',
+                text: @json(session('error')),
                 icon: 'warning',
                 confirmButtonColor: '#e6ac27',
-                customClass: { 
-                    popup: 'rounded-3xl border border-stone-200 shadow-xl dark:bg-slate-900 dark:border-slate-800 dark:text-white transition-colors' 
+                background: isDark ? '#0f172a' : '#ffffff',
+                color: isDark ? '#f1f5f9' : '#3d2c1d',
+                customClass: {
+                    popup: 'rounded-3xl border border-stone-200 dark:border-slate-800 shadow-xl transition-colors'
                 }
             });
         @endif
 
-        // 3. Interceptor Universal para Botones de Borrado
-        // Uso: Agrega la clase "form-eliminar" a tu formulario y listo.
-        document.querySelectorAll('.form-eliminar').forEach(form => {
-            form.addEventListener('submit', function(e) {
-                e.preventDefault(); 
-                
+        document.querySelectorAll('.form-eliminar').forEach((form) => {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const darkNow = document.documentElement.classList.contains('dark');
+
                 Swal.fire({
                     title: '¿Acción irreversible?',
-                    text: "Esta información será borrada del sistema.",
+                    text: 'Esta información será borrada del sistema.',
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonColor: '#ef4444',
                     cancelButtonColor: '#94a3b8',
                     confirmButtonText: 'Sí, eliminar',
                     cancelButtonText: 'Cancelar',
-                    customClass: { 
-                        popup: 'rounded-3xl border border-slate-200 shadow-xl dark:bg-slate-900 dark:border-slate-800 dark:text-white transition-colors' 
+                    background: darkNow ? '#0f172a' : '#ffffff',
+                    color: darkNow ? '#f1f5f9' : '#3d2c1d',
+                    customClass: {
+                        popup: 'rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl transition-colors'
                     }
                 }).then((result) => {
                     if (result.isConfirmed) {
@@ -63,6 +69,5 @@
                 });
             });
         });
-        
     });
 </script>

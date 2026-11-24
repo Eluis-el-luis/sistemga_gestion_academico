@@ -1,110 +1,81 @@
+{{-- resources/views/academico/visor/horario_aula.blade.php --}}
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-neutral-900 border border-stone-200/80 dark:border-neutral-800 rounded-2xl px-5 py-3.5 shadow-xs print:hidden">
             <div class="flex items-center gap-3">
                 @php
-                    $rutaVolver = ($desdeGuia ?? false)
-                        ? route('dashboard', ['tab' => 'Docente Guia'])
-                        : route('academico.visor.aulas');
-                    $tituloVolver = ($desdeGuia ?? false)
-                        ? 'Volver al Módulo Docente Guía'
-                        : 'Volver al Directorio';
+                    $rutaVolver = ($desdeGuia ?? false) ? route('dashboard', ['tab' => 'Docente Guia']) : route('academico.visor.aulas');
                 @endphp
-                <a href="{{ $rutaVolver }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors" title="{{ $tituloVolver }}">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z"></path></svg>
+                <a href="{{ $rutaVolver }}" class="text-neutral-400 hover:text-[#d49b1a] transition-colors cursor-pointer">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z"></path></svg>
                 </a>
                 <div>
-                    <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">
-                        Horario: <span class="text-[#e6ac27]">{{ $aula->grado->nombre }} - Sección "{{ $aula->nombre }}"</span>
+                    <h2 class="font-bold text-xl text-neutral-900 dark:text-white">
+                        Horario: <span class="text-[#c99116] dark:text-[#e6ac27]">{{ $aula->grado?->nombre }} - Sección "{{ $aula->nombre }}"</span>
                     </h2>
-                    @if($aula->docenteGuia && $aula->docenteGuia->usuario)
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                            Docente Guía: {{ $aula->docenteGuia->usuario->nombre_completo }}
-                        </p>
+                    @if ($aula->docenteGuia?->usuario)
+                        <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Guía: {{ $aula->docenteGuia->usuario->nombre_completo }}</p>
                     @endif
                 </div>
             </div>
-            <div class="flex items-center gap-3">
-                <span class="inline-flex items-center px-4 py-2 bg-slate-100 border border-slate-200 rounded-xl font-black text-xs uppercase tracking-widest text-slate-600 shadow-sm">
-                    Turno: {{ ucfirst($aula->turno) }}
-                </span>
-                <button onclick="window.print()" class="inline-flex items-center gap-2 px-4 py-2 bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-md transition-all">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H8v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                    Imprimir / PDF
-                </button>
+            <div class="flex items-center gap-2.5">
+                <span class="px-3.5 py-2 bg-stone-100 dark:bg-neutral-800 rounded-xl font-semibold text-xs uppercase text-neutral-700 dark:text-neutral-200">Turno: {{ ucfirst((string) $aula->turno) }}</span>
+                <button type="button" onclick="window.print()" class="px-4 py-2 bg-[#e6ac27] hover:bg-[#cf9719] text-neutral-950 font-bold text-xs uppercase rounded-xl cursor-pointer">Imprimir / PDF</button>
             </div>
         </div>
     </x-slot>
 
-    <div class="pb-12 pt-6 max-w-7xl mx-auto sm:px-6 lg:px-8 print:max-w-none">
+    <div class="py-8 bg-stone-50 dark:bg-neutral-950 min-h-screen transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            @php
+                $detalleImpresion = 'Turno: ' . ucfirst((string) $aula->turno);
+                if ($aula->docenteGuia?->usuario) {
+                    $detalleImpresion .= ' · Guía: ' . e($aula->docenteGuia->usuario->nombre_completo);
+                }
+            @endphp
+            <x-membrete-impresion titulo="Horario Oficial de Clases" subtitulo="Ciclo Escolar {{ $aula->anioEscolar?->nombre ?? date('Y') }}" badge="{{ $aula->grado?->nombre }} - Sección \"{{ $aula->nombre }}\"" :detalle="$detalleImpresion" orientacion="landscape" />
 
-        <!-- COMPONENTE CENTRALIZADO DE IMPRESIÓN -->
-        @php
-            $detalleImpresion = 'Turno: <span class="text-[#3d2c1d]">' . ucfirst($aula->turno) . '</span>';
-            if ($aula->docenteGuia && $aula->docenteGuia->usuario) {
-                $detalleImpresion .= ' <span class="mx-1 text-slate-300">|</span> Guía: <span class="text-[#3d2c1d]">' . e($aula->docenteGuia->usuario->nombre_completo) . '</span>';
-            }
-        @endphp
-        <x-membrete-impresion 
-            titulo="Horario Oficial de Clases"
-            subtitulo="Ciclo Escolar {{ $aula->anioEscolar->nombre ?? date('Y') }}"
-            badge="{{ $aula->grado->nombre }} - Sección &quot;{{ $aula->nombre }}&quot;"
-            :detalle="$detalleImpresion"
-            orientacion="landscape"
-        />
-
-        <!-- TABLA DE HORARIO CON COLORES INSTITUCIONALES -->
-        <div class="bg-white shadow-sm print:shadow-none rounded-3xl print:rounded-2xl border border-slate-200 print:border-2 print:border-[#3d2c1d]/20 overflow-hidden">
-            <div class="overflow-x-auto print:overflow-visible">
-                <table class="w-full border-collapse text-sm print:text-xs table-fixed">
-                    <thead>
-                        <tr class="bg-[#3d2c1d] text-white">
-                            <th class="border border-[#3d2c1d] px-4 py-3 print:py-2.5 text-left text-[11px] font-black uppercase tracking-widest text-[#e6ac27] w-36">Hora</th>
-                            @foreach($dias as $dia)
-                                <th class="border border-[#3d2c1d] px-3 py-3 print:py-2.5 text-center text-[11px] font-black uppercase tracking-widest text-white">{{ $dia }}</th>
-                            @endforeach
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($matriz as $fila)
-                            @php $bloque = $fila['bloque']; @endphp
-                            <tr class="{{ $bloque->es_recreo ? 'bg-[#FFFDF5]' : 'bg-white' }}">
-                                <td class="border border-slate-200 px-3 py-3 print:py-2 whitespace-nowrap {{ $bloque->es_recreo ? 'bg-amber-50/80' : 'bg-slate-50/60' }}">
-                                    <span class="block font-black text-xs {{ $bloque->es_recreo ? 'text-amber-700' : 'text-[#3d2c1d]' }}">{{ $bloque->nombre }}</span>
-                                    <span class="block text-[10px] font-bold text-slate-500 mt-0.5">
-                                        {{ \Carbon\Carbon::parse($bloque->hora_inicio)->format('h:i A') }} - {{ \Carbon\Carbon::parse($bloque->hora_fin)->format('h:i A') }}
-                                    </span>
-                                </td>
-
-                                @if($bloque->es_recreo)
-                                    <td colspan="{{ count($dias) }}" class="border border-slate-200 px-4 py-2 text-center bg-amber-50/70">
-                                        <span class="text-[10px] font-black uppercase tracking-[0.25em] text-amber-700">— {{ $bloque->nombre }} —</span>
+            <div class="bg-white dark:bg-neutral-900 shadow-xs rounded-3xl border border-stone-200 dark:border-neutral-800 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse text-xs sm:text-sm">
+                        <thead>
+                            <tr class="bg-[#FFFDF8] dark:bg-neutral-800/70">
+                                <th class="border border-stone-200 dark:border-neutral-800 px-3.5 py-3 text-left text-xs font-semibold uppercase text-neutral-600 dark:text-neutral-300 w-36">Hora</th>
+                                @foreach ($dias as $dia)
+                                    <th class="border border-stone-200 dark:border-neutral-800 px-3 py-3 text-center text-xs font-semibold uppercase text-neutral-900 dark:text-white">{{ $dia }}</th>
+                                @endforeach
+                            </tr>
+                        </thead>
+                        <tbody class="text-neutral-800 dark:text-neutral-200">
+                            @forelse ($matriz as $fila)
+                                @php $bloque = $fila['bloque']; @endphp
+                                <tr class="{{ $bloque->es_recreo ? 'bg-stone-50/80 dark:bg-neutral-800/40' : '' }}">
+                                    <td class="border border-stone-200 dark:border-neutral-800 px-3.5 py-2.5 whitespace-nowrap">
+                                        <span class="block font-semibold text-xs text-neutral-900 dark:text-white">{{ $bloque->nombre }}</span>
+                                        <span class="block text-[11px] text-neutral-500 dark:text-neutral-400">{{ \Carbon\Carbon::parse($bloque->hora_inicio)->format('h:i A') }} - {{ \Carbon\Carbon::parse($bloque->hora_fin)->format('h:i A') }}</span>
                                     </td>
-                                @else
-                                    @foreach($dias as $dia)
-                                        @php $horario = $fila['dias'][$dia] ?? null; @endphp
-                                        @if($horario)
-                                            <td class="border border-slate-200 px-2 py-2.5 print:py-2 text-center align-middle">
-                                                <span class="block font-black text-[#3d2c1d] text-xs leading-tight">{{ $horario->aulaAsignaturaDocente->asignatura->nombre ?? '—' }}</span>
-                                                <span class="inline-block text-[10px] font-bold text-amber-700 bg-amber-50/80 px-2 py-0.5 rounded-md mt-1">
-                                                    Prof. {{ $horario->aulaAsignaturaDocente->docente ? \Str::words($horario->aulaAsignaturaDocente->docente->usuario->nombre_completo, 2, '') : '—' }}
-                                                </span>
+                                    @if ($bloque->es_recreo)
+                                        <td colspan="{{ count($dias) }}" class="border border-stone-200 dark:border-neutral-800 px-4 py-2 text-center text-xs font-semibold text-neutral-400 uppercase tracking-widest">{{ $bloque->nombre }}</td>
+                                    @else
+                                        @foreach ($dias as $dia)
+                                            @php $horario = $fila['dias'][$dia] ?? null; @endphp
+                                            <td class="border border-stone-200 dark:border-neutral-800 px-2.5 py-2.5 text-center">
+                                                @if ($horario)
+                                                    <span class="block font-semibold text-xs text-neutral-900 dark:text-white">{{ $horario->aulaAsignaturaDocente?->asignatura?->nombre ?? '—' }}</span>
+                                                    <span class="block text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">Prof. {{ $horario->aulaAsignaturaDocente?->docente?->usuario ? \Illuminate\Support\Str::words($horario->aulaAsignaturaDocente->docente->usuario->nombre_completo, 2, '') : '—' }}</span>
+                                                @else
+                                                    <span class="text-neutral-400">—</span>
+                                                @endif
                                             </td>
-                                        @else
-                                            <td class="border border-slate-200 px-2 py-2.5 print:py-2 text-center text-slate-300 font-bold text-xs">—</td>
-                                        @endif
-                                    @endforeach
-                                @endif
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="border border-slate-200 px-4 py-12 text-center text-stone-500 font-bold">
-                                    No hay bloques de horario definidos para este aula.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+                                        @endforeach
+                                    @endif
+                                </tr>
+                            @empty
+                                <tr><td colspan="6" class="border border-stone-200 dark:border-neutral-800 px-4 py-10 text-center text-neutral-500">No hay bloques de horario definidos.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

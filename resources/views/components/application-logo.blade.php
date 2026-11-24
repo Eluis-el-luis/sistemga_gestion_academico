@@ -1,1 +1,1 @@
-<img src="{{ asset('img/Logo.png') }}" {{ $attributes->merge(['class' => 'h-10 w-10 rounded-full object-cover shrink-0 shadow-sm border border-amber-200']) }} alt="Logo Colegio Cristiano">
+<img src="{{ asset('img/Logo.png') }}" {{ $attributes->merge(['class' => 'h-10 w-10 rounded-full object-cover shrink-0 shadow-xs border border-[#e6ac27]/40 dark:border-neutral-700']) }} alt="Logo Colegio Cristiano">

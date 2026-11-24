@@ -61,6 +61,7 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'role'])->prefix('academico')->name('academico.')->group(function () {
     Route::get('asistencia/personal', [AsistenciaPersonalController::class, 'index'])->name('asistencia.personal.index');
 
+    // Usuarios y personal
     Route::middleware('rol.acceso:directora,subdirectora,gestor_it,secretaria')->group(function () {
         Route::put('usuarios/{usuario}/reset-password', [UsuarioController::class, 'resetPassword'])
             ->middleware('anio.modificable')
@@ -75,11 +76,13 @@ Route::middleware(['auth', 'role'])->prefix('academico')->name('academico.')->gr
         });
     });
 
+    // Alumnos y matrículas (lectura)
     Route::middleware('rol.acceso:directora,subdirectora,secretaria,coordinador,docente_guia,docente_asignatura,docente_auxiliar,docente_suplente,psicologa')->group(function () {
         Route::resource('alumnos', AlumnoController::class)->only(['index', 'show']);
         Route::resource('matriculas', MatriculaController::class)->only(['index', 'show']);
     });
 
+    // Alumnos, matrículas y prematrícula (escritura)
     Route::middleware(['rol.acceso:directora,subdirectora,secretaria,coordinador,docente_guia', 'anio.modificable'])->group(function () {
         Route::resource('alumnos', AlumnoController::class)->only(['create', 'store', 'edit', 'update', 'destroy']);
         Route::resource('matriculas', MatriculaController::class)->only(['create', 'store', 'edit', 'update', 'destroy']);
@@ -90,6 +93,7 @@ Route::middleware(['auth', 'role'])->prefix('academico')->name('academico.')->gr
         Route::post('prematricula/{matricula}/remitir', [PrematriculaController::class, 'remitir'])->name('prematricula.remitir');
     });
 
+    // Estructura académica, aulas, asignaciones, horarios y grupos de materia
     Route::middleware('rol.acceso:directora,subdirectora,coordinador,gestor_it')->group(function () {
         Route::get('anios-escolares/activo', [AnioEscolarController::class, 'activo'])->name('anios-escolares.activo');
         Route::get('anios-escolares/{anioEscolar}/validaciones-cierre', [AnioEscolarController::class, 'validacionesCierre'])->name('anios-escolares.validaciones-cierre');
@@ -104,7 +108,6 @@ Route::middleware(['auth', 'role'])->prefix('academico')->name('academico.')->gr
         Route::get('asignaciones', [AulaController::class, 'indexAsignaciones'])->name('asignaciones.index');
         Route::get('asignaciones/{aula}', [AulaController::class, 'showAsignaciones'])->name('asignaciones.show');
         Route::get('gestor-horarios', [AulaController::class, 'indexHorarios'])->name('gestor-horarios.index');
-
         Route::get('grupo-materia', [GrupoMateriaController::class, 'index'])->name('grupo-materia.index');
     });
 
@@ -129,11 +132,11 @@ Route::middleware(['auth', 'role'])->prefix('academico')->name('academico.')->gr
         Route::post('asignaciones/masivo', [AulaAsignaturaController::class, 'asignarMasivo'])->name('asignaciones.masivo');
         Route::post('aulas/{aula}/asignaturas', [AulaAsignaturaController::class, 'store'])->name('aulas.asignaturas.store');
         Route::put('aulas/{aula}/asignaturas/{asignatura}', [AulaAsignaturaController::class, 'update'])->name('aulas.asignaturas.update');
-        Route::delete('aulas/{aula}/asignaturas/{asignacion}', [AulaController::class, 'destroyAsignatura'])->name('aulas.asignaturas.destroy');
+        Route::delete('aulas/{aula}/asignaturas/{asignacion}', [AulaAsignaturaController::class, 'destroyAsignatura'])->name('aulas.asignaturas.destroy');
 
         Route::get('aulas/{aula}/horarios', [HorarioController::class, 'index'])->name('aulas.horarios.index');
-        Route::post('aulas/{aula}/horarios', [HorarioController::class, 'store'])->middleware('anio.modificable')->name('aulas.horarios.store');
-        Route::delete('aulas/{aula}/horarios/{horario}', [HorarioController::class, 'destroy'])->middleware('anio.modificable')->name('aulas.horarios.destroy');
+        Route::post('aulas/{aula}/horarios', [HorarioController::class, 'store'])->name('aulas.horarios.store');
+        Route::delete('aulas/{aula}/horarios/{horario}', [HorarioController::class, 'destroy'])->name('aulas.horarios.destroy');
 
         Route::post('grupo-materia', [GrupoMateriaController::class, 'store'])->name('grupo-materia.store');
         Route::put('grupo-materia/{grupo}', [GrupoMateriaController::class, 'update'])->name('grupo-materia.update');
@@ -141,6 +144,7 @@ Route::middleware(['auth', 'role'])->prefix('academico')->name('academico.')->gr
         Route::post('grupo-materia/asignar', [GrupoMateriaController::class, 'asignarMaterias'])->name('grupo-materia.asignar');
     });
 
+    // Visor de horarios
     Route::prefix('visor-horarios')->name('visor.')->group(function () {
         Route::get('/', [VisorHorarioController::class, 'index'])->name('index');
         Route::get('/docentes', [VisorHorarioController::class, 'docentes'])->name('docentes');
@@ -149,6 +153,7 @@ Route::middleware(['auth', 'role'])->prefix('academico')->name('academico.')->gr
         Route::get('/aulas/{aula}', [VisorHorarioController::class, 'horarioAula'])->name('aula.show');
     });
 
+    // Docente guía
     Route::prefix('tutor')->name('tutor.')->middleware('rol.acceso:docente_guia,coordinador,subdirectora,directora')->group(function () {
         Route::get('mis-alumnos', [DocenteGuiaController::class, 'misAlumnos'])->name('mis-alumnos');
         Route::get('rendimiento', [DocenteGuiaController::class, 'rendimiento'])->name('rendimiento');
@@ -156,6 +161,7 @@ Route::middleware(['auth', 'role'])->prefix('academico')->name('academico.')->gr
         Route::get('detalles-mi-aula', [DocenteGuiaController::class, 'detallesMiAula'])->name('detalles-mi-aula');
     });
 
+    // Calificaciones, actividades y cortes
     Route::get('notas', [NotaController::class, 'index'])->name('notas.index');
     Route::get('notas/planilla/{asignacion}', [NotaController::class, 'create'])->name('notas.create');
     Route::get('notas/evaluar/{asignacion}', [NotaController::class, 'evaluar'])->name('notas.evaluar');
@@ -175,6 +181,7 @@ Route::middleware(['auth', 'role'])->prefix('academico')->name('academico.')->gr
         Route::delete('notas/actividades/{asignacion}/{actividad}', [ActividadEvaluativaController::class, 'destroy'])->name('notas.actividades.destroy');
     });
 
+    // Asistencia de aula y asignatura
     Route::get('asistencia/aula', [AsistenciaAulaController::class, 'create'])->name('asistencia.aula.create');
     Route::get('asistencia/asignatura/{asignacion}', [AsistenciaAsignaturaController::class, 'create'])->name('asistencia.asignatura.create');
 
@@ -184,6 +191,7 @@ Route::middleware(['auth', 'role'])->prefix('academico')->name('academico.')->gr
         Route::delete('asistencia/asignatura/{asignacion}/incidencia/{incidencia}', [AsistenciaAsignaturaController::class, 'destroy'])->name('asistencia.asignatura.destroy');
     });
 
+    // Boletines y PDFs
     Route::get('boletines/bandeja', [GestorBoletinController::class, 'bandeja'])->name('boletin.bandeja');
     Route::get('boletines', [BoletinController::class, 'index'])->name('boletines.index');
     Route::get('boletines/constancia/{matricula}', [BoletinController::class, 'constancia'])->name('boletines.constancia');
@@ -195,8 +203,9 @@ Route::middleware(['auth', 'role'])->prefix('academico')->name('academico.')->gr
     Route::get('boletines/pdf/boletin/{matricula}', [BoletinPdfController::class, 'boletin'])->name('boletines.pdf.boletin');
     Route::get('boletines/pdf/constancia/{matricula}', [BoletinPdfController::class, 'constancia'])->name('boletines.pdf.constancia');
     Route::get('boletines/pdf/certificado/{matricula}', [BoletinPdfController::class, 'certificado'])->name('boletines.pdf.certificado');
-    Route::post('boletines/pdf/masivo', [BoletinPdfController::class, 'masivo'])->name('boletines.pdf.masivo');
+    Route::match(['get', 'post'], 'boletines/pdf/masivo', [BoletinPdfController::class, 'masivo'])->name('boletines.pdf.masivo');
 
+    // Seguimiento académico y disciplina
     Route::get('reparacion', [ExamenReparacionController::class, 'index'])->name('reparacion.index');
     Route::get('avance-contenido', [AvanceContenidoController::class, 'index'])->name('avance.index');
     Route::get('apoyo-padres', [ApoyoPadresController::class, 'index'])->name('apoyo-padres.index');
@@ -218,6 +227,7 @@ Route::middleware(['auth', 'role'])->prefix('academico')->name('academico.')->gr
         Route::put('disciplina/{incidencia}', [IncidenciaDisciplinariaController::class, 'update'])->name('disciplina.update');
     });
 
+    // Reportes
     Route::prefix('reportes')->name('reportes.')->group(function () {
         Route::get('/', [ReporteController::class, 'index'])->name('index');
         Route::get('/control-notas', [ReporteController::class, 'controlNotas'])->name('control-notas');
@@ -242,6 +252,7 @@ Route::middleware(['auth', 'role'])->prefix('academico')->name('academico.')->gr
         Route::get('/escalas', [ReporteController::class, 'escalas'])->name('escalas');
     });
 
+    // Respaldos
     Route::prefix('respaldos')->name('respaldos.')->middleware('rol.acceso:directora,subdirectora')->group(function () {
         Route::get('/', [RespaldoController::class, 'index'])->name('index');
         Route::post('/', [RespaldoController::class, 'store'])->middleware('anio.modificable')->name('store');

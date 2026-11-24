@@ -1,136 +1,71 @@
+{{-- resources/views/academico/boletin/index.blade.php --}}
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between gap-4">
-            <div class="flex items-center gap-4">
-                <a href="{{ route('dashboard') }}" class="text-slate-400 hover:text-[#e6ac27] transition-colors mr-2" title="Volver al Panel">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                </a>
-                <div>
-                    <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">
-                        Validación de Boletines Oficiales
-                    </h2>
-                    <p class="text-sm font-medium text-slate-500 mt-1">Verifique las notas de sus alumnos y envíe el paquete aprobado al Gestor de Impresión.</p>
-                </div>
+        <div class="flex items-center gap-3 bg-white dark:bg-neutral-900 border border-stone-200/80 dark:border-neutral-800 rounded-2xl px-5 py-3.5 shadow-xs">
+            <a href="{{ route('dashboard') }}" class="text-neutral-400 hover:text-[#d49b1a] transition-colors cursor-pointer">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            </a>
+            <div>
+                <h2 class="font-bold text-xl text-neutral-900 dark:text-white">Validación de Boletines Oficiales</h2>
+                <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Revisa y aprueba boletines por sección.</p>
             </div>
         </div>
     </x-slot>
 
-    <div class="py-10 bg-[#FFFDF5] min-h-screen">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-            
-            @if(session('success'))
-                <div class="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl shadow-sm flex items-center gap-3 font-medium">
-                    <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
-                    {{ session('success') }}
-                </div>
-            @endif
-
-            @if(session('error'))
-                <div class="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl shadow-sm flex items-center gap-3 font-medium">
-                    <svg class="w-5 h-5 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    {{ session('error') }}
-                </div>
-            @endif
-
-            @if($aulas->count() > 0)
-                <!-- Selector de aula/sección (Director/Subdirector ven todas) -->
-                <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
-                    <form method="GET" action="{{ route('academico.boletines.index') }}" class="flex flex-wrap items-end gap-4">
-                        <div class="flex-1 min-w-[260px]">
-                            <label class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Aula / Sección</label>
-                            <select name="aula_id" onchange="this.form.submit()" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium">
-                                @foreach($aulas as $aula)
-                                    <option value="{{ $aula->id }}" @selected($aula->id == $aulaSeleccionada)>
-                                        {{ $aula->grado->nombre ?? '' }} - Sección "{{ $aula->nombre }}" · {{ $aula->modalidad->nombre ?? '' }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
+    <div class="py-8 bg-stone-50 dark:bg-neutral-950 min-h-screen transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            @if ($aulas->isNotEmpty())
+                <div class="bg-white dark:bg-neutral-900 p-6 rounded-3xl border border-stone-200 dark:border-neutral-800 shadow-xs">
+                    <form method="GET" action="{{ route('academico.boletines.index') }}" class="max-w-md">
+                        <label class="block text-xs font-semibold text-neutral-500 uppercase mb-1.5">Aula / Sección</label>
+                        <select name="aula_id" onchange="this.form.submit()" class="w-full border-stone-300 dark:border-neutral-700 bg-stone-50 dark:bg-neutral-800 rounded-xl text-sm font-medium cursor-pointer">
+                            @foreach ($aulas as $aula)
+                                <option value="{{ $aula->id }}" @selected((int) $aula->id === (int) $aulaSeleccionada)>{{ $aula->grado?->nombre ?? '' }} - Sección "{{ $aula->nombre }}"</option>
+                            @endforeach
+                        </select>
                     </form>
                 </div>
-
-                <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6 border-l-4 border-l-[#e6ac27] flex justify-between items-center flex-wrap gap-4">
-                    <div>
-                        <h3 class="font-black text-lg text-[#3d2c1d]">
-                            Tutoría Activa: <span class="text-[#e6ac27]">{{ $aulaActual->grado->nombre ?? '' }} - Sección "{{ $aulaActual->nombre ?? '' }}"</span>
-                        </h3>
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">Estado del paquete: {{ $todosAprobados ? 'Completo y listo para enviar' : 'Revisión en curso (Faltan alumnos)' }}</p>
-                    </div>
-
-                    <!-- Botón condicionado: Solo se puede enviar si todos están en la caja -->
-                    @if($todosAprobados)
-                        <button type="button" onclick="Swal.fire('¡Paquete enviado!', 'Los boletines han sido entregados exitosamente al Gestor de Usuarios para su impresión oficial.', 'success')" class="px-5 py-3 bg-[#3d2c1d] text-white rounded-xl hover:bg-slate-800 text-xs font-black uppercase tracking-widest shadow-md transition-all">
-                            Enviar Paquete al Gestor de Usuarios
-                        </button>
-                    @else
-                        <button type="button" onclick="Swal.fire('Paquete incompleto', 'No puedes enviar el paquete hasta que todos los estudiantes tengan su Visto Bueno en la caja.', 'warning')" class="px-5 py-3 bg-slate-300 text-slate-600 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm cursor-not-allowed">
-                            Enviar Paquete al Gestor de Usuarios
-                        </button>
-                    @endif
-                </div>
             @endif
 
-            <!-- Tabla de Alumnos y Validación -->
-            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="bg-white dark:bg-neutral-900 rounded-3xl shadow-xs border border-stone-200 dark:border-neutral-800 overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full text-left border-collapse">
-                        <thead class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-widest font-black text-slate-400">
+                    <table class="min-w-full text-left border-collapse text-sm">
+                        <thead class="bg-[#FFFDF8] dark:bg-neutral-800/70 text-neutral-500 uppercase text-xs font-semibold">
                             <tr>
-                                <th class="p-5 w-16 text-center">#</th>
-                                <th class="p-5">Estudiante</th>
-                                <th class="p-5 text-center">Código MINED</th>
-                                <th class="p-5 text-center">Estado de Revisión</th>
-                                <th class="p-5 text-right">Acciones de Auditoría</th>
+                                <th class="p-4 w-14 text-center">#</th>
+                                <th class="p-4">Estudiante</th>
+                                <th class="p-4 text-center">CUP</th>
+                                <th class="p-4 text-center">Estado</th>
+                                <th class="p-4 text-right">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            @forelse($matriculas as $index => $matricula)
-                                @php
-                                    $tieneBoletinAprobado = $matricula->boletines->isNotEmpty();
-                                @endphp
-                                <tr class="hover:bg-slate-50 transition-colors">
-                                    <td class="p-5 text-center font-black text-slate-300">{{ $index + 1 }}</td>
-                                    <td class="p-5 font-black text-[#3d2c1d]">
-                                        {{ $matricula->alumno->nombre_completo }}
+                        <tbody class="divide-y divide-stone-100 dark:divide-neutral-800 text-neutral-800 dark:text-neutral-200">
+                            @forelse ($matriculas as $index => $matricula)
+                                @php $aprobado = $matricula->boletines->isNotEmpty(); @endphp
+                                <tr>
+                                    <td class="p-4 text-center text-neutral-400 font-semibold">{{ $index + 1 }}</td>
+                                    <td class="p-4 font-semibold">{{ $matricula->alumno?->nombre_completo }}</td>
+                                    <td class="p-4 text-center text-neutral-500 font-mono text-xs">{{ $matricula->alumno?->codigo_unico_persona }}</td>
+                                    <td class="p-4 text-center">
+                                        <span class="px-3 py-1 rounded-lg text-xs font-semibold {{ $aprobado ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800' }}">
+                                            {{ $aprobado ? 'Aprobado' : 'Pendiente' }}
+                                        </span>
                                     </td>
-                                    <td class="p-5 text-center font-bold text-slate-500">
-                                        {{ $matricula->alumno->codigo_unico_persona }}
-                                    </td>
-                                    <td class="p-5 text-center">
-                                        @if($tieneBoletinAprobado)
-                                            <span class="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                                                ✔ En Caja (Aprobado)
-                                            </span>
-                                        @else
-                                            <span class="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                                                Pendiente de Revisión
-                                            </span>
-                                        @endif
-                                    </td>
-                                    <td class="p-5 text-right flex justify-end gap-2">
-                                        <a href="{{ route('academico.boletines.show', $matricula->id) }}" class="inline-flex items-center gap-1 px-3 py-2 bg-slate-50 border border-slate-200 hover:border-[#e6ac27] text-slate-600 rounded-xl text-xs font-black transition-all shadow-sm">
-                                            Revisar Notas
-                                        </a>
-
+                                    <td class="p-4 text-right space-x-2">
+                                        <a href="{{ route('academico.boletines.show', $matricula->id) }}" class="inline-flex px-3 py-1.5 bg-stone-100 dark:bg-neutral-800 rounded-xl text-xs font-semibold cursor-pointer">Revisar</a>
                                         <form action="{{ route('academico.boletines.aprobar', $matricula->id) }}" method="POST" class="inline">
                                             @csrf
-                                            <button type="submit" class="inline-flex items-center gap-1 px-3 py-2 bg-[#e6ac27] hover:bg-[#c48e1b] text-white rounded-xl text-xs font-black transition-all shadow-sm">
-                                                Dar Visto Bueno
-                                            </button>
+                                            <button type="submit" class="inline-flex px-3 py-1.5 bg-[#e6ac27] hover:bg-[#cf9719] text-neutral-950 rounded-xl text-xs font-bold cursor-pointer">Visto Bueno</button>
                                         </form>
                                     </td>
                                 </tr>
                             @empty
-                                <tr>
-                                    <td colspan="5" class="p-12 text-center text-slate-400 font-bold">No hay matrículas activas en esta sección.</td>
-                                </tr>
+                                <tr><td colspan="5" class="p-10 text-center text-neutral-500">No hay matrículas activas en esta sección.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
             </div>
-
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </x-app-layout>

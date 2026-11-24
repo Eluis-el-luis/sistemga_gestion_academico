@@ -1,182 +1,89 @@
+{{-- resources/views/academico/reportes/mined-detallado.blade.php --}}
 <x-app-layout>
-    <style>
-        @media print {
-            body * { visibility: hidden; }
-            #zona-impresion, #zona-impresion * { visibility: visible; }
-            #zona-impresion { position: absolute; left: 0; top: 0; width: 100%; border: none !important; }
-            @page { size: landscape; margin: 10mm; }
-            .no-print { display: none !important; }
-        }
-    </style>
-
     <x-slot name="header">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print">
-            <div>
-                <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">Formatos Oficiales MINED</h2>
-                <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Reportes de Rendimiento y Aplazados</p>
-            </div>
-            <div class="flex items-center gap-3 self-end sm:self-auto">
-                @php
-                    // Docente Guía puro (sin roles de dirección/coordinación) -> su módulo mi-aula
-                    // Si tiene roles de dirección/coordinación -> centro de reportes general
-                    $esDocenteGuiaPuro = auth()->user()->hasRole('Docente Guia') 
-                        && !auth()->user()->hasAnyRole(['Director', 'Subdirector', 'Gestor de Usuarios', 'Coordinador']);
-                    $rutaVolver = $esDocenteGuiaPuro ? route('academico.reportes.mi-aula') : url('/academico/reportes');
-                @endphp
-                <a href="{{ $rutaVolver }}" class="inline-flex items-center gap-1.5 text-stone-500 hover:text-[#3d2c1d] font-bold text-sm px-3 py-2 rounded-xl hover:bg-stone-100 transition-colors cursor-pointer">
-                    Volver
-                </a>
-                <button type="button" onclick="window.print()" class="inline-flex items-center gap-2 bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black px-5 py-2.5 rounded-xl shadow-sm text-xs uppercase tracking-widest transition-all cursor-pointer">
-                    Imprimir Formato Oficial
-                </button>
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-neutral-900 border border-stone-200/80 dark:border-neutral-800 rounded-2xl px-5 py-3.5 shadow-xs print:hidden">
+            <h2 class="font-bold text-xl text-neutral-900 dark:text-white">Formatos Oficiales MINED</h2>
+            <div class="flex items-center gap-3">
+                <a href="{{ route('academico.reportes.index') }}" class="text-xs font-semibold text-neutral-500 cursor-pointer">Volver</a>
+                <button type="button" onclick="window.print()" class="bg-[#e6ac27] hover:bg-[#cf9719] text-neutral-950 font-bold px-5 py-2 rounded-xl text-xs uppercase cursor-pointer">Imprimir</button>
             </div>
         </div>
     </x-slot>
 
-    <div class="pb-12 pt-6 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-        
-        <!-- PANEL DE FILTROS -->
-        <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 no-print relative overflow-hidden">
-            <form method="GET" action="{{ request()->url() }}" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <div>
-                    <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Tipo de Listado</label>
-                    <select name="tipo" class="w-full border-slate-200 rounded-xl text-sm font-medium">
-                        <option value="aprobados" @selected(request('tipo') == 'aprobados')>Estudiantes Aprobados</option>
-                        <option value="1_2" @selected(request('tipo') == '1_2')>Aplazados de 1 a 2 Asignaturas</option>
-                        <option value="3_mas" @selected(request('tipo') == '3_mas')>Aplazados de 3 a más Asignaturas</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Corte Evaluativo</label>
-                    <select name="corte_evaluativo_id" class="w-full border-slate-200 rounded-xl text-sm font-medium">
-                        @foreach(\App\Models\CorteEvaluativo::orderBy('numero')->get() as $corte)
-                            <option value="{{ $corte->id }}" @selected($corte->id == request('corte_evaluativo_id'))>{{ $corte->nombre ?? 'Corte '.$corte->numero }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Grado / Sección @if(!isset($esDocenteGuia) || !$esDocenteGuia) (Opcional) @endif</label>
-                    
-                    @if(isset($esDocenteGuia) && $esDocenteGuia && isset($aulaGuia))
-                        <!-- BLOQUEO VISUAL: Solo texto estático para el Docente Guía -->
-                        <div class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 flex items-center cursor-not-allowed">
-                            Mi Aula: {{ $aulaGuia->grado->nombre ?? '' }} "{{ $aulaGuia->nombre ?? '' }}"
-                        </div>
-                        <input type="hidden" name="grado_id" value="{{ $aulaGuia->grado_id }}">
-                    @else
-                        <!-- DESPLEGABLE ORIGINAL: Para Director / Subdirector -->
-                        <select name="grado_id" class="w-full border-slate-200 rounded-xl text-sm font-medium">
-                            <option value="">Todo el Colegio (General)</option>
-                            @foreach(\App\Models\Grado::all() as $grado)
-                                <option value="{{ $grado->id }}" @selected($grado->id == request('grado_id'))>{{ $grado->nombre }}</option>
+    <div class="py-8 bg-stone-50 dark:bg-neutral-950 min-h-screen transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            <div class="bg-white dark:bg-neutral-900 rounded-3xl shadow-xs border border-stone-200 dark:border-neutral-800 p-6 print:hidden">
+                <form method="GET" action="{{ request()->url() }}" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end text-sm">
+                    <div>
+                        <label class="block text-xs font-semibold text-neutral-500 uppercase mb-1.5">Tipo</label>
+                        <select name="tipo" class="w-full border-stone-300 dark:border-neutral-700 bg-stone-50 dark:bg-neutral-800 rounded-xl text-sm cursor-pointer">
+                            <option value="aprobados" @selected(request('tipo') == 'aprobados')>Aprobados</option>
+                            <option value="1_2" @selected(request('tipo') == '1_2')>Aplazados 1 a 2</option>
+                            <option value="3_mas" @selected(request('tipo') == '3_mas')>Aplazados 3 o más</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-neutral-500 uppercase mb-1.5">Corte Evaluativo</label>
+                        <select name="corte_evaluativo_id" class="w-full border-stone-300 dark:border-neutral-700 bg-stone-50 dark:bg-neutral-800 rounded-xl text-sm cursor-pointer">
+                            @foreach ($cortes ?? [] as $corte)
+                                <option value="{{ $corte->id }}" @selected($corte->id == request('corte_evaluativo_id'))>{{ $corte->nombre ?? ('Corte ' . $corte->numero) }}</option>
                             @endforeach
                         </select>
-                    @endif
-                </div>
-                <div>
-                    <button type="submit" class="bg-[#3d2c1d] text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-black w-full shadow-sm">Generar Reporte</button>
-                </div>
-            </form>
-        </div>
-
-        <!-- ZONA DE IMPRESIÓN MINED -->
-        <div id="zona-impresion" class="bg-white p-8 rounded-3xl print:rounded-none shadow-sm print:shadow-none space-y-6">
-            
-            <!-- ENCABEZADO OFICIAL MINED -->
-            <div class="border-b-2 border-black pb-4 mb-4">
-                <div class="grid grid-cols-12 items-center gap-2">
-                    <!-- Logo Izquierdo (MINED / Gobierno) -->
-                    <div class="col-span-2 flex justify-start items-center pl-2">
-                        <img src="{{ asset('img/logos/mined_izq.png') }}" alt="Gobierno de Reconciliación y Unidad Nacional" class="h-14 w-auto object-contain">
                     </div>
-                    
-                    <!-- Títulos Centrales Oficiales -->
-                    <div class="col-span-8 text-center space-y-0.5">
-                        <h3 class="text-[10px] font-black uppercase text-black tracking-widest">Gobierno de Reconciliación y Unidad Nacional</h3>
-                        <h4 class="text-[10px] font-bold uppercase text-black tracking-wide">Ministerio de Educación</h4>
-                        <h2 class="text-[10px] font-bold uppercase text-black">Delegación Departamental de Educación - León</h2>
-                        <h1 class="text-xs font-black uppercase text-black pt-1">
-                            @if($tipo === 'aprobados')
-                                LISTADO DE ESTUDIANTES APROBADOS
-                            @elseif($tipo === '1_2')
-                                LISTADO DE ESTUDIANTES APLAZADOS DE 1 A 2 ASIGNATURAS
-                            @else
-                                LISTADO DE ESTUDIANTES APLAZADOS DE 3 A MÁS ASIGNATURAS
-                            @endif
-                        </h1>
+                    <div>
+                        <label class="block text-xs font-semibold text-neutral-500 uppercase mb-1.5">Grado</label>
+                        @if (!empty($esDocenteGuia) && !empty($aulaGuia))
+                            <div class="w-full bg-stone-100 dark:bg-neutral-800 border border-stone-200 dark:border-neutral-700 rounded-xl px-4 py-2.5 text-xs font-semibold">{{ $aulaGuia->grado?->nombre ?? '' }} "{{ $aulaGuia->nombre ?? '' }}"</div>
+                            <input type="hidden" name="grado_id" value="{{ $aulaGuia->grado_id }}">
+                        @else
+                            <select name="grado_id" class="w-full border-stone-300 dark:border-neutral-700 bg-stone-50 dark:bg-neutral-800 rounded-xl text-sm cursor-pointer">
+                                <option value="">Todo el Colegio</option>
+                                @foreach ($grados ?? [] as $grado)
+                                    <option value="{{ $grado->id }}" @selected($grado->id == request('grado_id'))>{{ $grado->nombre }}</option>
+                                @endforeach
+                            </select>
+                        @endif
                     </div>
-
-                    <!-- Logo Derecho Ministerial -->
-                    <div class="col-span-2 flex justify-end items-center pr-2">
-                        <img src="{{ asset('img/logos/mined_der.png') }}" alt="Ministerio de Educación" class="h-14 w-auto object-contain">
-                    </div>
-                </div>
-
-                <!-- DATOS DEL CENTRO Y ESCUDO INSTITUCIONAL -->
-                <div class="grid grid-cols-12 items-center pt-4 px-2 text-xs font-bold text-black">
-                    <div class="col-span-5 space-y-0.5">
-                        <p>CENTRO: COLEGIO CRISTIANO EN NICARAGUA</p>
-                        <p>CODIGO UNICO: 27974</p>
-                    </div>
-                    <div class="col-span-2 flex justify-center items-center">
-                        <img src="{{ asset('img/Logo.png') }}" alt="Logo Colegio" class="h-12 w-auto object-contain">
-                    </div>
-                    <div class="col-span-5 space-y-0.5 text-right">
-                        <p>FECHA: {{ date('d/m/y') }}</p>
-                        <p>CODIGO CENTRO: 27760</p>
-                    </div>
-                </div>
+                    <button type="submit" class="bg-neutral-900 dark:bg-[#e6ac27] text-white dark:text-neutral-950 px-5 py-2.5 rounded-xl font-bold text-xs uppercase w-full cursor-pointer">Generar Reporte</button>
+                </form>
             </div>
 
-            <!-- TABLA MINED -->
-            <div class="overflow-x-auto">
-                <table class="min-w-full border-collapse border border-black text-xs">
+            <div class="bg-white p-6 rounded-3xl border border-stone-300 text-neutral-900 overflow-x-auto">
+                <table class="min-w-full border-collapse border border-neutral-800 text-xs">
                     <thead>
-                        <tr class="bg-slate-200 text-black font-black uppercase text-center">
-                            <th class="border border-black p-2 w-12">N°</th>
-                            <th class="border border-black p-2">MODALIDAD</th>
-                            <th class="border border-black p-2">NIVEL</th>
-                            <th class="border border-black p-2">TURNO</th>
-                            <th class="border border-black p-2">CODIGO</th>
-                            <th class="border border-black p-2 text-left">NOMBRE COMPLETO</th>
-                            <th class="border border-black p-2 w-16">SEXO</th>
-                            @if($tipo !== 'aprobados')
-                                <th class="border border-black p-2">ASIGNATURAS</th>
+                        <tr class="bg-stone-100 font-bold uppercase text-center">
+                            <th class="border border-neutral-800 p-2 w-10">#</th>
+                            <th class="border border-neutral-800 p-2">Modalidad</th>
+                            <th class="border border-neutral-800 p-2">Nivel</th>
+                            <th class="border border-neutral-800 p-2">Turno</th>
+                            <th class="border border-neutral-800 p-2">Código</th>
+                            <th class="border border-neutral-800 p-2 text-left">Nombre Completo</th>
+                            <th class="border border-neutral-800 p-2">Sexo</th>
+                            @if (($tipo ?? 'aprobados') !== 'aprobados')
+                                <th class="border border-neutral-800 p-2">Asignaturas</th>
                             @endif
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($filas as $fila)
-                            <tr class="text-black font-medium">
-                                <td class="border border-black p-1.5 text-center">{{ $fila['n'] }}</td>
-                                <td class="border border-black p-1.5 text-center">{{ $fila['modalidad'] }}</td>
-                                <td class="border border-black p-1.5 text-center">{{ $fila['nivel'] }}</td>
-                                <td class="border border-black p-1.5 text-center">{{ $fila['turno'] }}</td>
-                                <td class="border border-black p-1.5 text-center font-mono">{{ $fila['codigo'] }}</td>
-                                <td class="border border-black p-1.5 font-bold uppercase">{{ $fila['nombre_completo'] }}</td>
-                                <td class="border border-black p-1.5 text-center font-bold">{{ $fila['sexo'] }}</td>
-                                @if($tipo !== 'aprobados')
-                                    <td class="border border-black p-1.5 text-center font-bold text-rose-700">{{ $fila['asignaturas'] }}</td>
+                        @forelse ($filas ?? [] as $fila)
+                            <tr>
+                                <td class="border border-neutral-800 p-1.5 text-center">{{ $fila['n'] }}</td>
+                                <td class="border border-neutral-800 p-1.5 text-center">{{ $fila['modalidad'] }}</td>
+                                <td class="border border-neutral-800 p-1.5 text-center">{{ $fila['nivel'] }}</td>
+                                <td class="border border-neutral-800 p-1.5 text-center">{{ $fila['turno'] }}</td>
+                                <td class="border border-neutral-800 p-1.5 text-center font-mono">{{ $fila['codigo'] }}</td>
+                                <td class="border border-neutral-800 p-1.5 font-semibold uppercase">{{ $fila['nombre_completo'] }}</td>
+                                <td class="border border-neutral-800 p-1.5 text-center font-bold">{{ $fila['sexo'] }}</td>
+                                @if (($tipo ?? 'aprobados') !== 'aprobados')
+                                    <td class="border border-neutral-800 p-1.5 text-center font-semibold text-rose-700">{{ $fila['asignaturas'] }}</td>
                                 @endif
                             </tr>
                         @empty
-                            <tr>
-                                <td colspan="{{ $tipo !== 'aprobados' ? 8 : 7 }}" class="border border-black p-6 text-center font-bold text-slate-500">
-                                    No se encontraron registros bajo los criterios seleccionados.
-                                </td>
-                            </tr>
+                            <tr><td colspan="{{ ($tipo ?? 'aprobados') !== 'aprobados' ? 8 : 7 }}" class="border border-neutral-800 p-6 text-center text-neutral-500">No hay registros para los criterios seleccionados.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
-
-            <!-- FIRMA Y SELLO -->
-            <div class="pt-16 text-center page-break-inside-avoid">
-                <div class="w-72 mx-auto border-t-2 border-black pt-2">
-                    <p class="text-xs font-black uppercase text-black">FIRMA Y SELLO DEL DIRECTOR</p>
-                </div>
-            </div>
-
         </div>
     </div>
 </x-app-layout>

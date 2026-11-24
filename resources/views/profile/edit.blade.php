@@ -1,202 +1,184 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-neutral-900 border border-stone-200/80 dark:border-neutral-800 rounded-2xl px-5 py-3.5 shadow-xs">
             <div>
-                <h2 class="font-black text-2xl text-[#3d2c1d] leading-tight">
+                <h2 class="font-bold text-xl text-neutral-900 dark:text-white leading-tight">
                     Mi Perfil Institucional
                 </h2>
-                <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">
-                    Gestión de credenciales y seguridad de cuenta
+                <p class="text-xs font-medium text-neutral-500 dark:text-neutral-400 mt-0.5">
+                    Gestión de datos personales y seguridad de cuenta
                 </p>
             </div>
-            
-            <!-- Botón para regresar al Dashboard -->
-            <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-1.5 text-stone-500 hover:text-[#3d2c1d] font-bold text-sm px-3 py-2 rounded-xl hover:bg-stone-100 transition-colors cursor-pointer">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+
+            <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-1.5 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white font-semibold text-xs uppercase tracking-wider px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-neutral-800 hover:bg-stone-200 dark:hover:bg-neutral-700 transition-colors cursor-pointer">
                 Volver al Panel
             </a>
         </div>
     </x-slot>
 
-    <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <div class="flex flex-col lg:flex-row gap-8">
-            
-            <!-- COLUMNA IZQUIERDA: TARJETA DE IDENTIFICACIÓN -->
-            <div class="w-full lg:w-1/3 space-y-6">
-                <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden relative">
-                    <!-- Banner superior -->
-                    <div class="h-24 bg-[#3d2c1d]"></div>
-                    
-                    <div class="px-6 pb-6 relative">
-                        <!-- Avatar con botón de subida integrado en el formulario principal -->
-                        <div class="flex justify-center -mt-12 mb-4 relative group w-24 h-24 mx-auto">
-                            @php
-                                $avatarUrl = Auth::user()->avatar ? asset('storage/' . Auth::user()->avatar) : null;
-                                $iniciales = substr(Auth::user()->nombre_completo ?? Auth::user()->name ?? 'U', 0, 1);
-                            @endphp
-                            
-                            @if($avatarUrl)
-                                <img id="avatar-preview" src="{{ $avatarUrl }}" class="w-24 h-24 rounded-full border-4 border-white object-cover bg-white shadow-sm">
-                            @else
-                                <div id="avatar-preview-fallback" class="w-24 h-24 rounded-full border-4 border-white bg-slate-100 text-slate-400 flex items-center justify-center text-3xl font-black shadow-sm">
-                                    {{ $iniciales }}
-                                </div>
-                                <img id="avatar-preview" class="w-24 h-24 rounded-full border-4 border-white object-cover bg-white shadow-sm hidden">
-                            @endif
+    @php
+        $perfilUser = Auth::user();
+        $avatarUrl = ($perfilUser && !empty($perfilUser->avatar)) ? asset('storage/' . $perfilUser->avatar) : null;
+        $iniciales = mb_strtoupper(mb_substr(trim((string) ($perfilUser?->nombre_completo ?? $perfilUser?->name ?? 'U')), 0, 1, 'UTF-8'), 'UTF-8');
+        $docentePerfil = $perfilUser?->loadMissing('docente')->docente;
+    @endphp
 
-                            <!-- Botón overlay para cambiar foto -->
-                            <label for="avatar_upload" class="absolute inset-0 bg-black/50 rounded-full flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border-4 border-transparent">
-                                <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                <span class="text-[9px] font-bold uppercase tracking-wider">Cambiar</span>
-                            </label>
-                        </div>
+    <div class="py-8 bg-stone-50 dark:bg-neutral-950 min-h-screen transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col lg:flex-row gap-8">
+                <div class="w-full lg:w-1/3 space-y-6">
+                    <div class="bg-white dark:bg-neutral-900 rounded-3xl shadow-xs border border-stone-200 dark:border-neutral-800 overflow-hidden">
+                        <div class="h-24 bg-[#3d2c1d] dark:bg-neutral-800"></div>
 
-                        <!-- Info del Usuario -->
-                        <div class="text-center mb-6">
-                            <h3 class="text-lg font-black text-[#3d2c1d]">{{ Auth::user()->nombre_completo ?? Auth::user()->name }}</h3>
-                            <p class="text-xs font-medium text-slate-500 mt-0.5">{{ Auth::user()->email }}</p>
-                        </div>
+                        <div class="px-6 pb-6">
+                            <div class="flex justify-center -mt-12 mb-4 relative group w-24 h-24 mx-auto">
+                                @if ($avatarUrl)
+                                    <img id="avatar-preview" src="{{ $avatarUrl }}" class="w-24 h-24 rounded-full border-4 border-white dark:border-neutral-900 object-cover bg-white shadow-xs" alt="Avatar">
+                                @else
+                                    <div id="avatar-preview-fallback" class="w-24 h-24 rounded-full border-4 border-white dark:border-neutral-900 bg-stone-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-200 flex items-center justify-center text-2xl font-bold shadow-xs">
+                                        {{ $iniciales }}
+                                    </div>
+                                    <img id="avatar-preview" class="w-24 h-24 rounded-full border-4 border-white dark:border-neutral-900 object-cover bg-white shadow-xs hidden" alt="Avatar">
+                                @endif
 
-                        <!-- Roles (Etiquetas) -->
-                        <div class="flex flex-wrap justify-center gap-2 mb-6">
-                            @foreach(Auth::user()->roles as $rol)
-                                <span class="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200/60">
-                                    {{ $rol->name }}
-                                </span>
-                            @endforeach
-                        </div>
-
-                        <hr class="border-slate-100 mb-4">
-
-                        <!-- Datos Intocables (Solo Lectura) -->
-                        <div class="space-y-4 text-left">
-                            <div>
-                                <span class="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Código Único (CUP)</span>
-                                @php
-                                    $docente = Auth::user()->load('docente')->docente;
-                                @endphp
-                                <span class="block text-sm font-bold text-[#3d2c1d] mt-1">{{ $docente->codigo ?? 'No asignado' }}</span>
+                                <label for="avatar_upload" class="absolute inset-0 bg-black/55 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[10px] font-bold uppercase tracking-wider">
+                                    Cambiar
+                                </label>
                             </div>
-                            <div>
-                                <span class="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Miembro Desde</span>
-                                <span class="block text-sm font-bold text-[#3d2c1d] mt-1">{{ Auth::user()->created_at->translatedFormat('F Y') }}</span>
+
+                            <div class="text-center mb-5">
+                                <h3 class="text-base font-bold text-neutral-900 dark:text-white">{{ $perfilUser?->nombre_completo ?? $perfilUser?->name }}</h3>
+                                <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{{ $perfilUser?->email }}</p>
+                            </div>
+
+                            <div class="flex flex-wrap justify-center gap-1.5 mb-5">
+                                @foreach ($perfilUser?->roles ?? collect() as $rol)
+                                    <span class="px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider bg-amber-50 dark:bg-neutral-800 text-[#b88212] dark:text-[#e6ac27] border border-[#e6ac27]/30">
+                                        {{ $rol->name }}
+                                    </span>
+                                @endforeach
+                            </div>
+
+                            <hr class="border-stone-100 dark:border-neutral-800 mb-4">
+
+                            <div class="space-y-3 text-left text-xs">
+                                <div>
+                                    <span class="block font-semibold text-neutral-400 uppercase tracking-wider">Código Único (CUP)</span>
+                                    <span class="block font-bold text-neutral-800 dark:text-neutral-200 mt-0.5">{{ $docentePerfil?->codigo_unico_persona ?? $docentePerfil?->codigo ?? 'No asignado' }}</span>
+                                </div>
+                                <div>
+                                    <span class="block font-semibold text-neutral-400 uppercase tracking-wider">Miembro Desde</span>
+                                    <span class="block font-bold text-neutral-800 dark:text-neutral-200 mt-0.5">{{ $perfilUser?->created_at?->translatedFormat('F Y') ?? '-' }}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- COLUMNA DERECHA: FORMULARIOS INDEPENDIENTES -->
-            <div class="w-full lg:w-2/3 space-y-6">
-                
-                <!-- FORMULARIO 1: INFORMACIÓN GENERAL Y AVATAR -->
-                <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-8">
-                    <header class="mb-6">
-                        <h2 class="text-lg font-black text-[#3d2c1d]">Información del Perfil</h2>
-                        <p class="mt-1 text-xs font-medium text-slate-500">
-                            Actualiza tu nombre y foto de perfil. El correo institucional está bloqueado por seguridad.
-                        </p>
-                    </header>
+                <div class="w-full lg:w-2/3 space-y-6">
+                    <div class="bg-white dark:bg-neutral-900 rounded-3xl shadow-xs border border-stone-200 dark:border-neutral-800 p-6 sm:p-8">
+                        <header class="mb-5">
+                            <h2 class="text-base font-bold text-neutral-900 dark:text-white">Información del Perfil</h2>
+                            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                Actualiza tu nombre y foto de perfil. El correo institucional permanece protegido.
+                            </p>
+                        </header>
 
-                    <form method="post" action="{{ route('profile.update') }}" enctype="multipart/form-data" class="space-y-6">
-                        @csrf
-                        @method('patch')
+                        <form method="post" action="{{ route('profile.update') }}" enctype="multipart/form-data" class="space-y-5 text-sm">
+                            @csrf
+                            @method('patch')
 
-                        <input type="file" id="avatar_upload" name="avatar" class="hidden" accept="image/*" onchange="previewImage(event)">
+                            <input type="file" id="avatar_upload" name="avatar" class="hidden" accept="image/*" onchange="previewImage(event)">
 
-                        <div>
-                            <label for="nombre_completo" class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Nombre Completo</label>
-                            <input id="nombre_completo" name="nombre_completo" type="text" value="{{ old('nombre_completo', Auth::user()->nombre_completo ?? Auth::user()->name) }}" required class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium text-[#3d2c1d] focus:ring-[#e6ac27] focus:border-[#e6ac27] transition-colors" />
-                            <x-input-error class="mt-2" :messages="$errors->get('nombre_completo')" />
-                        </div>
+                            <div>
+                                <label for="nombre_completo" class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">Nombre Completo</label>
+                                <input id="nombre_completo" name="nombre_completo" type="text" value="{{ old('nombre_completo', $perfilUser?->nombre_completo ?? $perfilUser?->name) }}" required class="w-full border-stone-300 dark:border-neutral-700 bg-stone-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-xl text-sm font-medium focus:ring-[#e6ac27] focus:border-[#e6ac27]">
+                                <x-input-error class="mt-1.5" :messages="$errors->get('nombre_completo')" />
+                            </div>
 
-                        <div>
-                            <label for="email" class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                Correo Institucional
-                                <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                            </label>
-                            <!-- Campo bloqueado -->
-                            <input id="email" type="email" value="{{ Auth::user()->email }}" disabled class="w-full border-slate-200 bg-slate-100 text-slate-500 rounded-xl shadow-sm text-sm font-medium cursor-not-allowed opacity-80" />
-                            <!-- Si necesitas enviarlo oculto para que no dé error de validación, usa esto, pero Laravel lo ignora al usar ignore($this->user()->id) en el Request -->
-                            <input type="hidden" name="email" value="{{ Auth::user()->email }}">
-                            <p class="mt-2 text-[10px] font-bold text-slate-400">Este correo es asignado por administración y no puede modificarse.</p>
-                        </div>
+                            <div>
+                                <label for="email" class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">Correo Institucional</label>
+                                <input id="email" type="email" value="{{ $perfilUser?->email }}" disabled class="w-full border-stone-200 dark:border-neutral-800 bg-stone-100 dark:bg-neutral-800/60 text-neutral-500 dark:text-neutral-400 rounded-xl text-sm cursor-not-allowed" />
+                                <input type="hidden" name="email" value="{{ $perfilUser?->email }}">
+                            </div>
 
-                        <div class="flex items-center gap-4 pt-2">
-                            <button type="submit" class="inline-flex items-center gap-2 bg-[#3d2c1d] hover:bg-[#2b1f14] text-white font-black px-6 py-2.5 rounded-xl shadow-sm text-xs uppercase tracking-widest transition-all cursor-pointer">
-                                Guardar Datos
-                            </button>
+                            <div class="flex items-center gap-4 pt-1">
+                                <button type="submit" class="inline-flex items-center gap-2 bg-neutral-900 dark:bg-[#e6ac27] hover:bg-neutral-800 dark:hover:bg-[#cf9719] text-white dark:text-neutral-950 font-bold px-6 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer">
+                                    Guardar Datos
+                                </button>
 
-                            @if (session('status') === 'profile-updated')
-                                <p x-data="{ show: true }" x-show="show" x-transition x-init="setTimeout(() => show = false, 3000)" class="text-sm font-bold text-emerald-600">
-                                    ✓ Actualizado correctamente.
-                                </p>
-                            @endif
-                        </div>
-                    </form>
+                                @if (session('status') === 'profile-updated')
+                                    <p x-data="{ show: true }" x-show="show" x-transition x-init="setTimeout(() => show = false, 3000)" class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                        Actualizado correctamente.
+                                    </p>
+                                @endif
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="bg-white dark:bg-neutral-900 rounded-3xl shadow-xs border border-stone-200 dark:border-neutral-800 p-6 sm:p-8">
+                        <header class="mb-5">
+                            <h2 class="text-base font-bold text-neutral-900 dark:text-white">Seguridad y Contraseña</h2>
+                            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                Usa una contraseña segura para proteger tu cuenta.
+                            </p>
+                        </header>
+
+                        <form method="post" action="{{ route('password.update') }}" class="space-y-5 text-sm">
+                            @csrf
+                            @method('put')
+
+                            <div>
+                                <label for="current_password" class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">Contraseña Actual</label>
+                                <input id="current_password" name="current_password" type="password" class="w-full border-stone-300 dark:border-neutral-700 bg-stone-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-xl text-sm focus:ring-[#e6ac27] focus:border-[#e6ac27]" autocomplete="current-password" />
+                                <x-input-error :messages="$errors->updatePassword->get('current_password')" class="mt-1.5" />
+                            </div>
+
+                            <div>
+                                <label for="password" class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">Nueva Contraseña</label>
+                                <input id="password" name="password" type="password" class="w-full border-stone-300 dark:border-neutral-700 bg-stone-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-xl text-sm focus:ring-[#e6ac27] focus:border-[#e6ac27]" autocomplete="new-password" />
+                                <x-input-error :messages="$errors->updatePassword->get('password')" class="mt-1.5" />
+                            </div>
+
+                            <div>
+                                <label for="password_confirmation" class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">Confirmar Nueva Contraseña</label>
+                                <input id="password_confirmation" name="password_confirmation" type="password" class="w-full border-stone-300 dark:border-neutral-700 bg-stone-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-xl text-sm focus:ring-[#e6ac27] focus:border-[#e6ac27]" autocomplete="new-password" />
+                                <x-input-error :messages="$errors->updatePassword->get('password_confirmation')" class="mt-1.5" />
+                            </div>
+
+                            <div class="flex items-center gap-4 pt-1">
+                                <button type="submit" class="inline-flex items-center gap-2 bg-[#e6ac27] hover:bg-[#cf9719] text-neutral-950 font-bold px-6 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer">
+                                    Actualizar Contraseña
+                                </button>
+
+                                @if (session('status') === 'password-updated')
+                                    <p x-data="{ show: true }" x-show="show" x-transition x-init="setTimeout(() => show = false, 3000)" class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                        Contraseña actualizada.
+                                    </p>
+                                @endif
+                            </div>
+                        </form>
+                    </div>
                 </div>
-
-                <!-- FORMULARIO 2: CAMBIO DE CONTRASEÑA -->
-                <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-8">
-                    <header class="mb-6">
-                        <h2 class="text-lg font-black text-[#3d2c1d]">Seguridad y Contraseña</h2>
-                        <p class="mt-1 text-xs font-medium text-slate-500">
-                            Asegúrate de usar una contraseña larga y aleatoria para mantener tu cuenta institucional segura.
-                        </p>
-                    </header>
-
-                    <form method="post" action="{{ route('password.update') }}" class="space-y-6">
-                        @csrf
-                        @method('put')
-
-                        <div>
-                            <label for="current_password" class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Contraseña Actual</label>
-                            <input id="current_password" name="current_password" type="password" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium text-[#3d2c1d] focus:ring-[#e6ac27] focus:border-[#e6ac27] transition-colors" autocomplete="current-password" />
-                            <x-input-error :messages="$errors->updatePassword->get('current_password')" class="mt-2" />
-                        </div>
-
-                        <div>
-                            <label for="password" class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Nueva Contraseña</label>
-                            <input id="password" name="password" type="password" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium text-[#3d2c1d] focus:ring-[#e6ac27] focus:border-[#e6ac27] transition-colors" autocomplete="new-password" />
-                            <x-input-error :messages="$errors->updatePassword->get('password')" class="mt-2" />
-                        </div>
-
-                        <div>
-                            <label for="password_confirmation" class="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Confirmar Nueva Contraseña</label>
-                            <input id="password_confirmation" name="password_confirmation" type="password" class="w-full border-slate-200 bg-slate-50/50 rounded-xl shadow-sm text-sm font-medium text-[#3d2c1d] focus:ring-[#e6ac27] focus:border-[#e6ac27] transition-colors" autocomplete="new-password" />
-                            <x-input-error :messages="$errors->updatePassword->get('password_confirmation')" class="mt-2" />
-                        </div>
-
-                        <div class="flex items-center gap-4 pt-2">
-                            <button type="submit" class="inline-flex items-center gap-2 bg-[#e6ac27] hover:bg-[#c48e1b] text-white font-black px-6 py-2.5 rounded-xl shadow-sm text-xs uppercase tracking-widest transition-all cursor-pointer">
-                                Actualizar Contraseña
-                            </button>
-
-                            @if (session('status') === 'password-updated')
-                                <p x-data="{ show: true }" x-show="show" x-transition x-init="setTimeout(() => show = false, 3000)" class="text-sm font-bold text-emerald-600">
-                                    ✓ Contraseña protegida.
-                                </p>
-                            @endif
-                        </div>
-                    </form>
-                </div>
-                
             </div>
         </div>
     </div>
 
-    <!-- Script para previsualizar la foto de perfil antes de guardar -->
     <script>
         function previewImage(event) {
             const reader = new FileReader();
-            reader.onload = function(){
+            reader.onload = function () {
                 const output = document.getElementById('avatar-preview');
                 const fallback = document.getElementById('avatar-preview-fallback');
-                output.src = reader.result;
-                output.classList.remove('hidden');
-                if(fallback) fallback.classList.add('hidden');
+                if (output) {
+                    output.src = reader.result;
+                    output.classList.remove('hidden');
+                }
+                if (fallback) {
+                    fallback.classList.add('hidden');
+                }
             };
-            if(event.target.files[0]) {
+            if (event.target.files && event.target.files[0]) {
                 reader.readAsDataURL(event.target.files[0]);
             }
         }
