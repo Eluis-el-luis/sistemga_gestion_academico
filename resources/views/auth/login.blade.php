@@ -15,7 +15,29 @@
         </div>
 
         <div class="w-full lg:w-1/2 flex flex-col justify-center items-center bg-white dark:bg-neutral-950 p-6 sm:p-12 lg:p-20">
-            <div class="w-full max-w-md">
+            <div class="w-full max-w-md" x-data="{
+                recordar: {{ old('remember') ? 'true' : 'false' }},
+                correoGuardado: '',
+                init() {
+                    const guardado = localStorage.getItem('login_recordar_email');
+                    if (guardado) {
+                        this.recordar = true;
+                        this.correoGuardado = guardado;
+                        const inputEmail = document.getElementById('email');
+                        if (inputEmail && !inputEmail.value) {
+                            inputEmail.value = guardado;
+                        }
+                    }
+                },
+                alEnviar() {
+                    const inputEmail = document.getElementById('email');
+                    if (this.recordar && inputEmail && inputEmail.value.trim()) {
+                        localStorage.setItem('login_recordar_email', inputEmail.value.trim());
+                    } else {
+                        localStorage.removeItem('login_recordar_email');
+                    }
+                }
+            }">
                 <div class="flex justify-end mb-6">
                     <x-ui.theme-toggle />
                 </div>
@@ -34,7 +56,7 @@
 
                 <x-auth-session-status class="mb-4" :status="session('status')" />
 
-                <form method="POST" action="{{ route('login') }}" class="space-y-5">
+                <form method="POST" action="{{ route('login') }}" @submit="alEnviar()" class="space-y-5">
                     @csrf
 
                     <div class="space-y-1.5">
@@ -50,7 +72,7 @@
                                 class="block w-full pl-11 pr-4 py-3 bg-stone-50 dark:bg-neutral-900 border border-stone-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-2xl focus:ring-2 focus:ring-[#e6ac27] focus:border-[#e6ac27] transition-colors text-sm"
                                 type="email"
                                 name="email"
-                                :value="old('email')"
+                                value="{{ old('email') }}"
                                 required
                                 autofocus
                                 autocomplete="username"
@@ -102,6 +124,7 @@
                             <input
                                 id="remember_me"
                                 type="checkbox"
+                                x-model="recordar"
                                 class="w-4 h-4 border-stone-300 dark:border-neutral-700 rounded text-[#e6ac27] focus:ring-[#e6ac27] cursor-pointer"
                                 name="remember"
                             >
