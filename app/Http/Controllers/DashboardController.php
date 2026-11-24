@@ -58,26 +58,39 @@ class DashboardController extends Controller
             $esquemaActivo = 'Regular';
 
             $anioActivo = AnioEscolar::where('estado', 'activo')->first();
-            $rolesDocentes = ['docente_guia', 'docente_asignatura', 'docente_auxiliar', 'docente_suplente', 'Docente Guia', 'Docente por Asignatura'];
+            $rolesDocentes = [
+                'docente_guia',
+                'docente_asignatura',
+                'docente_auxiliar',
+                'docente_suplente',
+                'Docente Guia',
+                'Docente por Asignatura',
+                'Docente Auxiliar',
+                'Docente Suplente',
+            ];
+
+            $queryDocentes = Usuario::whereHas('roles', function ($q) use ($rolesDocentes) {
+                $q->whereIn('name', $rolesDocentes);
+            });
 
             if ($user->hasAnyRole(['directora', 'subdirectora', 'Director', 'Subdirector'])) {
                 $totalMatriculados = Matricula::where('estado', 'activo')
                     ->when($anioActivo, fn ($q) => $q->where('anio_escolar_id', $anioActivo->id))
                     ->count();
-                $totalPersonal = Usuario::role($rolesDocentes)->count();
+                $totalPersonal = (clone $queryDocentes)->count();
                 $dbMetricas = $this->calcularMetricas();
                 $muralData = $this->generarMuralDigital($anioActivo, $request->query('modalidad_mural') ? (int) $request->query('modalidad_mural') : null);
-            } elseif ($user->hasAnyRole(['gestor_it', 'secretaria', 'psicologa', 'Gestor de Usuarios', 'Secretaria'])) {
+            } elseif ($user->hasAnyRole(['gestor_it', 'secretaria', 'psicologa', 'Gestor de Usuarios', 'Secretaria', 'Psicóloga'])) {
                 $totalMatriculados = Matricula::where('estado', 'activo')
                     ->when($anioActivo, fn ($q) => $q->where('anio_escolar_id', $anioActivo->id))
                     ->count();
-                $totalPersonal = Usuario::role($rolesDocentes)->count();
+                $totalPersonal = (clone $queryDocentes)->count();
             } elseif ($user->hasAnyRole(['coordinador', 'Coordinador']) && $docente && $docente->modalidad_coordina_id && $anioActivo) {
                 $totalMatriculados = Matricula::where('estado', 'activo')
                     ->whereHas('aula', fn ($q) => $q->where('modalidad_id', $docente->modalidad_coordina_id))
                     ->where('anio_escolar_id', $anioActivo->id)
                     ->count();
-                $totalPersonal = Usuario::role($rolesDocentes)
+                $totalPersonal = (clone $queryDocentes)
                     ->whereHas('docente', fn ($q) => $q->where('modalidad_id', $docente->modalidad_coordina_id))
                     ->count();
                 $dbMetricas = $this->calcularMetricasPorModalidad((int) $docente->modalidad_coordina_id, $anioActivo);
@@ -140,12 +153,12 @@ class DashboardController extends Controller
 
             if ($user->hasAnyRole(['coordinador', 'Coordinador'])) {
                 $hoy = now()->timezone('America/Managua')->toDateString();
-                $docentesIds = Usuario::role($rolesDocentes)
+                $docentesIds = (clone $queryDocentes)
                     ->whereHas('docente', fn ($q) => $q->where('modalidad_id', $docente?->modalidad_coordina_id))
                     ->pluck('id');
                 $docentesQueMarcaron = AsistenciaPersonal::where('fecha', $hoy)->whereIn('usuario_id', $docentesIds)->pluck('usuario_id');
 
-                $docentesSinMarcar = Usuario::role($rolesDocentes)
+                $docentesSinMarcar = (clone $queryDocentes)
                     ->whereNotIn('id', $docentesQueMarcaron)
                     ->whereHas('docente', fn ($q) => $q->where('modalidad_id', $docente?->modalidad_coordina_id))
                     ->get();
@@ -157,10 +170,10 @@ class DashboardController extends Controller
                     ->get();
             } elseif ($user->hasAnyRole(['directora', 'subdirectora', 'Director', 'Subdirector'])) {
                 $hoy = now()->timezone('America/Managua')->toDateString();
-                $docentesIds = Usuario::role($rolesDocentes)->pluck('id');
+                $docentesIds = (clone $queryDocentes)->pluck('id');
                 $docentesQueMarcaron = AsistenciaPersonal::where('fecha', $hoy)->whereIn('usuario_id', $docentesIds)->pluck('usuario_id');
 
-                $docentesSinMarcar = Usuario::role($rolesDocentes)
+                $docentesSinMarcar = (clone $queryDocentes)
                     ->whereNotIn('id', $docentesQueMarcaron)
                     ->whereHas('docente')
                     ->get();

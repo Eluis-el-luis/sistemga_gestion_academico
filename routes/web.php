@@ -63,34 +63,48 @@ Route::middleware(['auth', 'role'])->prefix('academico')->name('academico.')->gr
 
     // Usuarios y personal
     Route::middleware('rol.acceso:directora,subdirectora,gestor_it,secretaria')->group(function () {
-        Route::put('usuarios/{usuario}/reset-password', [UsuarioController::class, 'resetPassword'])
-            ->middleware('anio.modificable')
-            ->name('usuarios.reset-password');
-
-        Route::resource('usuarios', UsuarioController::class)
-            ->except(['create', 'store', 'update', 'destroy']);
+        Route::get('usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
 
         Route::middleware('anio.modificable')->group(function () {
-            Route::resource('usuarios', UsuarioController::class)
-                ->only(['create', 'store', 'update', 'destroy']);
+            Route::get('usuarios/create', [UsuarioController::class, 'create'])->name('usuarios.create');
+            Route::post('usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
+            Route::get('usuarios/{usuario}/edit', [UsuarioController::class, 'edit'])->name('usuarios.edit');
+            Route::put('usuarios/{usuario}', [UsuarioController::class, 'update'])->name('usuarios.update');
+            Route::delete('usuarios/{usuario}', [UsuarioController::class, 'destroy'])->name('usuarios.destroy');
+            Route::put('usuarios/{usuario}/reset-password', [UsuarioController::class, 'resetPassword'])->name('usuarios.reset-password');
         });
     });
 
     // Alumnos y matrículas (lectura)
     Route::middleware('rol.acceso:directora,subdirectora,secretaria,coordinador,docente_guia,docente_asignatura,docente_auxiliar,docente_suplente,psicologa')->group(function () {
-        Route::resource('alumnos', AlumnoController::class)->only(['index', 'show']);
-        Route::resource('matriculas', MatriculaController::class)->only(['index', 'show']);
+        Route::get('alumnos', [AlumnoController::class, 'index'])->name('alumnos.index');
+        Route::get('matriculas', [MatriculaController::class, 'index'])->name('matriculas.index');
     });
 
     // Alumnos, matrículas y prematrícula (escritura)
     Route::middleware(['rol.acceso:directora,subdirectora,secretaria,coordinador,docente_guia', 'anio.modificable'])->group(function () {
-        Route::resource('alumnos', AlumnoController::class)->only(['create', 'store', 'edit', 'update', 'destroy']);
-        Route::resource('matriculas', MatriculaController::class)->only(['create', 'store', 'edit', 'update', 'destroy']);
+        Route::get('alumnos/create', [AlumnoController::class, 'create'])->name('alumnos.create');
+        Route::post('alumnos', [AlumnoController::class, 'store'])->name('alumnos.store');
+        Route::get('alumnos/{alumno}/edit', [AlumnoController::class, 'edit'])->name('alumnos.edit');
+        Route::put('alumnos/{alumno}', [AlumnoController::class, 'update'])->name('alumnos.update');
+        Route::delete('alumnos/{alumno}', [AlumnoController::class, 'destroy'])->name('alumnos.destroy');
+
+        Route::get('matriculas/create', [MatriculaController::class, 'create'])->name('matriculas.create');
+        Route::post('matriculas', [MatriculaController::class, 'store'])->name('matriculas.store');
+        Route::get('matriculas/{matricula}/edit', [MatriculaController::class, 'edit'])->name('matriculas.edit');
+        Route::put('matriculas/{matricula}', [MatriculaController::class, 'update'])->name('matriculas.update');
+        Route::delete('matriculas/{matricula}', [MatriculaController::class, 'destroy'])->name('matriculas.destroy');
+
         Route::patch('matriculas/{matricula}/retirar', [MatriculaController::class, 'retirar'])->name('matriculas.retirar');
         Route::patch('matriculas/{matricula}/reactivar', [MatriculaController::class, 'reactivar'])->name('matriculas.reactivar');
         Route::get('prematricula', [PrematriculaController::class, 'index'])->name('prematricula.index');
         Route::post('prematricula/{matricula}/promover', [PrematriculaController::class, 'promover'])->name('prematricula.promover');
         Route::post('prematricula/{matricula}/remitir', [PrematriculaController::class, 'remitir'])->name('prematricula.remitir');
+    });
+
+    // Detalle de alumno (después de alumnos/create para evitar colisiones)
+    Route::middleware('rol.acceso:directora,subdirectora,secretaria,coordinador,docente_guia,docente_asignatura,docente_auxiliar,docente_suplente,psicologa')->group(function () {
+        Route::get('alumnos/{alumno}', [AlumnoController::class, 'show'])->name('alumnos.show');
     });
 
     // Estructura académica, aulas, asignaciones, horarios y grupos de materia

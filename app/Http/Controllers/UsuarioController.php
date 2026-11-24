@@ -240,21 +240,35 @@ class UsuarioController extends Controller
 
                 $usuario->syncRoles($validated['roles']);
 
-                $esDocente = collect($validated['roles'])->contains(function ($rol) {
+                $tienePerfilPersona = collect($validated['roles'])->contains(function ($rol) {
                     $lower = mb_strtolower((string) $rol, 'UTF-8');
 
-                    return str_contains($lower, 'docente') || str_contains($lower, 'coordinador');
-                });
+                    return str_contains($lower, 'docente')
+                        || str_contains($lower, 'coordinador')
+                        || str_contains($lower, 'director')
+                        || str_contains($lower, 'subdirector')
+                        || str_contains($lower, 'gestor')
+                        || str_contains($lower, 'psicolog');
+                }) || $usuario->docente !== null;
 
-                if ($esDocente) {
+                if ($tienePerfilPersona) {
                     $esCoordinador = count(array_intersect($validated['roles'], ['coordinador', 'Coordinador'])) > 0;
+                    $esDocente = collect($validated['roles'])->contains(function ($rol) {
+                        return str_contains(mb_strtolower((string) $rol, 'UTF-8'), 'docente');
+                    });
+
+                    $codigoLimpio = isset($validated['codigo_unico_persona']) && trim((string) $validated['codigo_unico_persona']) !== ''
+                        ? trim((string) $validated['codigo_unico_persona'])
+                        : ($usuario->docente?->codigo_unico_persona ?? ('PER-' . str_pad((string) $usuario->id, 4, '0', STR_PAD_LEFT)));
+
+                    $sexoLimpio = $validated['sexo'] ?? $usuario->docente?->sexo ?? 'M';
 
                     Docente::updateOrCreate(
                         ['usuario_id' => $usuario->id],
                         [
-                            'codigo_unico_persona' => $validated['codigo_unico_persona'] ?? $usuario->docente?->codigo_unico_persona ?? ('DOC-' . str_pad((string) $usuario->id, 4, '0', STR_PAD_LEFT)),
-                            'sexo' => $validated['sexo'] ?? $usuario->docente?->sexo ?? 'M',
-                            'modalidad_id' => $validated['modalidad_id'] ?? null,
+                            'codigo_unico_persona' => $codigoLimpio,
+                            'sexo' => $sexoLimpio,
+                            'modalidad_id' => $esDocente ? ($validated['modalidad_id'] ?? null) : ($usuario->docente?->modalidad_id ?? null),
                             'es_coordinador' => $esCoordinador,
                             'modalidad_coordina_id' => $esCoordinador ? ($validated['modalidad_coordina_id'] ?? null) : null,
                         ]
